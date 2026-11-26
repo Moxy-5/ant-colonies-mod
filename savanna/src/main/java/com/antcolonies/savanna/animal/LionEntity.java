@@ -67,7 +67,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * ({@link #mood}, synced). Its day and its temper are the goals' ({@link LionGoals}).</li>
  * </ul>
  */
-public class LionEntity extends PathfinderMob implements GeoEntity, HasLife {
+public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com.antcolonies.debug.FilmFacts {
     /** The male, the lioness and the cub: one class, three entity types. */
     public enum Form {
         MALE, LIONESS, CUB
@@ -864,6 +864,30 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife {
                 + ", mood " + MOODS[Mth.clamp(mood(), 0, MOODS.length - 1)] + ", route " + (p == null ? "none" : p.getNextNodeIndex() + "/"
                 + p.getNodeCount() + " to " + p.getTarget() + (p.canReach() ? "" : " (can't reach)")) + ", on ground " + onGround()
                 + ", hunt " + hunt.stage + (hunt.holding ? " holding" : "") + ", since meal " + hunt.sinceMeal + (hunt.full ? " full" : "");
+    }
+
+    /**
+     * What its mind is doing, for the in-game camera's recordings (development only; the Motion Studio, phase 0): its
+     * doing and how far into its clip, its part of the day and its temper, and its hunt (stage, its prey, whether and
+     * where it holds on, its hunger).
+     */
+    @Override
+    public void filmFacts(java.util.Map<String, Object> out) {
+        out.put("doing", DOING_CLIPS[Mth.clamp(doing(), 0, DOING_CLIPS.length - 1)]);
+        out.put("clip_tick", clipTick());
+        out.put("act", act.name());
+        out.put("temper", temper.name());
+        out.put("stage", hunt.stage.name());
+        out.put("holding", hunt.holding());
+        if (hunt.holding()) {
+            out.put("hold_angle", hunt.holdAngle);
+        }
+        if (hunt.prey != null) {
+            out.put("prey", hunt.prey.getId());
+        }
+        out.put("since_meal", hunt.sinceMeal);
+        out.put("full", hunt.full);
+        out.put("age", tickCount);
     }
 
     // --- sounds (vanilla ones, re-pitched) ----------------------------------------------------------------------------------

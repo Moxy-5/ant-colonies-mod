@@ -1,6 +1,6 @@
 # Motion Studio: seeing the game's real motion, and animals that touch (ideas, 2026-11-25)
 
-**Ideas only, nothing built or decided.** The user's ask (2026-11-25): now that the land animals are coming, the
+**Ideas, then phase 0 built 2026-11-25 (below).** The user's ask (2026-11-25): now that the land animals are coming, the
 animation lab should show a motion the way it really looks in the game, not a clip playing in place on a stand-in, and
 should handle animations where two models touch, like a lion biting an African buffalo. The user has plenty of time for
 it; land animals are getting harder to make look right. Two read-only agents went through the code (one the offline
@@ -156,6 +156,44 @@ missing the carcass, the head snap. The first job is to film them (see "The orde
 - **Phase 3, partner moves (the lion and buffalo first):** 31, 32, then 36 and 37 offline, then 33 with 34 or 35 in
   the game (pick after seeing the phase 0 films), then 38, 40, 41. The hunt's oval and fixed ticks go.
 - **Phase 4, the replay key (9)** and the tests (43 to 46).
+
+## Phase 0, built (2026-11-25, branch `claude/motion-studio`, the user's go-ahead)
+**What was built (ideas 1, 2, 11, 12, 14, 16, 30; 29 looked at):**
+- **Every animal recorded** (`client/BodyRecorder`): `record on 1 all` writes each animal drawn into its own file
+  (`body_<its name>.jsonl.gz`, streamed, the walker's `body.jsonl.gz` unchanged for the course), each moment with its
+  clips' play speed and how far into each clip, every bone's pivot, and its mind's facts.
+- **The mind's facts** (`debug/FilmFacts`, `client/FilmFactsBoard`): an animal says what its mind is doing on the
+  game's side (the lion: doing, clip tick, part of the day, temper, hunt stage, prey, holding and where, hunger; the
+  buffalo: doing, temper, health, how many hold it, grown or not), read once a game tick while filming.
+- **Scenes with their minds on** (`debug/FilmStages`, film step `stage`): a species signs up a scene; the lions' dusk
+  hunt is `savanna/.../gametest/LionScenes.duskHunt`, the same code the game test `atDuskAHungryPrideTakesACalfAndFeeds`
+  now builds its scene with. Film steps `seed` (the dice set, so takes repeat: three takes started the stalk and rush
+  within a tick of each other once the scene is built in the frozen game), `until <fact>=<value> <ticks>` (the game runs
+  until a mind reaches that point), `aim` and `cam` (cameras round a named animal; every picture of a burst taken from
+  each camera before the game is stepped: one take, three sides).
+- **The camera's picture checks for every animal** (`client/FilmChecks`, until now ants only): parts inside blocks (a
+  model pixel allowed, as offline), and jumps no longer measured across two takes.
+- **The hunt film** `tools/film/lion_hunt.film` (about 3 minutes) and **the report** `tools/pair_report.py` (jaws
+  against the prey's body, planted feet sliding, the strike's travel, clip changes, empty clip players).
+- **The lion plans** got the clip changes the hunt and feast really make, checked offline: 0 flagged.
+
+**What the films showed (BUGS 372 to 377; numbers from three takes):**
+- **372, the worst:** after her first freeze a stalking lioness has no clip at all, so she stands up to full height
+  (1.02 blocks over her feet against 0.74 crouched) and glides forward with still legs for 9 to 18 seconds, every
+  freeze. A plain bug, not a design question.
+- **373:** a holding lioness's jaws are 0.4 to 1.0 blocks off the calf (they touch for 2 to 4 moments in about 22).
+- **374:** her planted feet slide 0.10 to 0.26 blocks a tick while she holds a calf that lies still.
+- **375:** the strike carries her box 4.1 to 4.8 blocks while the leap clip stays in place (a crouched slide).
+- **376:** a one-tick `idle` or `trot` between one-shots (each feeding turn, the grip): a twitch.
+- **377:** three lionesses stand through each other round one small calf.
+- **The buffalo film (idea 29):** walking up a step with no step moves, its hind feet go up to 0.18 blocks into the
+  step: its step moves (buffalo step 2) are needed. The lion was not filmed on a step yet.
+- **The checks on big animals:** quiet on gaits (the buffalo's walk 11 flags in three bursts, trot 3); loud on films
+  that loop a one-shot clip (the loop's snap back to its start is a real jump in that film, not a game fault) and on
+  bursts stepped 4 ticks a picture. Read the hunt's jump flags with the report beside them, not alone.
+
+**What phase 0 did not do:** the replay page (phase 1, Neon's viewer); no fix to the hunt itself (373 to 377 are the
+evidence for phase 3's partner moves; 372 is a plain bug for its own session).
 
 ## Watch out for
 - **Never copy the game's rules into Python.** A lab that re-imagines the game drifts from it; the recording is the

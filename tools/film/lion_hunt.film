@@ -1,0 +1,44 @@
+# The dusk hunt with every mind on (the Motion Studio, phase 0, 2026-11-25; docs/plans/motion-studio.md): the pride and
+# the herd of LionHuntTests.atDuskAHungryPrideTakesACalfAndFeeds (built by the same code, LionScenes.duskHunt) at 20:00.
+# The game runs until each part of the hunt, then is frozen and stepped a tick a picture, each tick taken from three
+# cameras round the calf (one take). Every animal drawn from the stalk on is recorded (body_film-*.jsonl.gz beside the
+# pictures) for tools/pair_report.py: where each lioness's jaws are against the calf, its feet, its clips.
+#   ./gradlew runFilm -PfilmScene=tools/film/lion_hunt.film     pictures in run-film/screenshots/lion_hunt/
+# The scene is built and its dice set in the frozen game, so every take starts from the same tick.
+# The field's corner is at -46 -62 -32: the cow stands at 0.5 -60 0.5, the calf 2 blocks south of her, the den 40 west.
+cmd time set 14000
+cmd weather clear
+cmd effect give @s minecraft:night_vision infinite 0 true
+lens 50
+cmd tick freeze
+stage lion_hunt -46 -62 -32
+seed 7
+aim film-calf
+cam wide -19 14 -34
+cmd tick rate 40
+cmd tick unfreeze
+until stage=STALK 2400
+cmd tick rate 20
+record on 1 all
+until stage=FIGHT 3000
+cmd tick freeze
+cam off
+cam south 0 2.5 -10
+cam east 10 2.5 0
+cam above 5 8 -5
+burst rush 60 1
+cmd tick unfreeze
+until holding=true 200
+cmd tick freeze
+burst hold 80 1
+cam off
+aim fact stage=FEAST
+cam wide -10 8 -14
+cmd tick unfreeze
+until stage=FEAST 1500
+cmd tick freeze
+cam off
+cam south 0 3 -9
+cam east 9 3 0
+burst feast 30 4
+record off

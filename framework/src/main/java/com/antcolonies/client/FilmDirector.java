@@ -25,6 +25,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.DataPackConfig;
@@ -37,6 +38,7 @@ import net.minecraft.world.level.levelgen.presets.WorldPresets;
 import net.minecraft.world.flag.FeatureFlags;
 import net.neoforged.api.distmarker.Dist;
 import software.bernie.geckolib.animation.AnimationController;
+import software.bernie.geckolib.event.GeoRenderEvent;
 import software.bernie.geckolib.model.GeoModel;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -92,6 +94,22 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  *                                 any animal (an animal's "forget" takes all its goals away, "go" uses its own legs)
  * repeat 100 ... end              the lines between written out 100 times, {i} in them 000, 001, ... (shot side_{i})
  * quit
+ * </pre>
+ * The Motion Studio's steps (phase 0, 2026-11-25, {@code docs/plans/motion-studio.md}): animals with their minds on, filmed
+ * as the game really plays them.
+ * <pre>
+ * stage lion_hunt -46 -62 -32      a scene a species mod signed up ({@link com.antcolonies.debug.FilmStages}), built on the
+ *                                 game's side at that spot (its animals with their own minds; its job, if any, run each tick)
+ * seed 7                          the game's and every animal's dice set, so the scene plays the same way each run
+ * until stage=FIGHT 3000          the game runs (unfrozen) until some animal's fact reads so
+ *                                 ({@link com.antcolonies.debug.FilmFacts}), at most 3000 client ticks
+ * aim film-calf                   the cameras below follow the animal of that name ("aim fact holding=true": the first
+ *                                 animal with that fact; "aim off")
+ * cam south 0 2 -9                a camera this far off the aimed animal's middle, looking at it; every "shot" and
+ *                                 every burst picture is taken from each camera in turn, one take (named
+ *                                 &lt;burst&gt;_south_00, ...); "cam off" drops them all. While the game runs the first
+ *                                 camera keeps it in view
+ * record on 1 all                 every animal drawn recorded, each into its own file ({@link BodyRecorder})
  * </pre>
  * An insect named {@code film:<clip>} plays that clip and nothing else ({@code AbstractAntEntity.filmClip}); name tags
  * are hidden while filming. The walker is named {@code film-walker}, so it plays its usual clips. Never active in a real game (only with the {@code antcolonies.film} system property, and
@@ -243,6 +261,11 @@ public final class FilmDirector {
         lens = sceneFov = 30;
         follow = null;
         lookAt = null;
+        cams.clear();
+        aimName = null;
+        aimFact = null;
+        untilLeft = 0;
+        FilmFactsBoard.setStageJob(null);
         framesPerTick = 1;
         drawPartial = 0.0F;
         clipTimes.clear();
@@ -318,6 +341,20 @@ public final class FilmDirector {
         if (pendingShot != null) {
             return;                            // waiting for the frame to be drawn
         }
+        if (untilLeft > 0) {
+            if (!cams.isEmpty()) {
+                aimCamera(mc, cams.get(0));    // the game runs: the first camera keeps the scene in view (so it is drawn)
+            }
+            java.util.UUID met = FilmFactsBoard.find(untilKey, untilValue);
+            if (met != null) {
+                LOG.info("Film: until {}={} met after {} ticks (game tick {})", untilKey, untilValue, untilAsked - untilLeft, FilmFactsBoard.tick());
+                untilLeft = 0;
+            } else if (--untilLeft == 0) {
+                LOG.warn("Film: until {}={} NOT met in {} ticks; the scene goes on", untilKey, untilValue, untilAsked);
+            } else {
+                return;
+            }
+        }
         if (waitTicks > 0) {
             if (!FilmStep.arrived()) {         // a burst's step seen arriving ends its wait at once
                 if (--waitTicks == 0) {
@@ -330,7 +367,20 @@ public final class FilmDirector {
         if (burstLeft > 0) {
             drawPartial = (float) burstSub / framesPerTick;
             followWalker(mc);
-            pendingShot = String.format(framesPerTick > 1 ? "%s_%03d" : "%s_%02d", burstName, burstIndex++);
+            String number = String.format(framesPerTick > 1 ? "%03d" : "%02d", burstIndex);
+            if (!cams.isEmpty()) {
+                // one take from every camera: the frozen game is not stepped until each has its picture
+                Cam cam = cams.get(burstCam);
+                aimCamera(mc, cam);
+                pendingShot = burstName + "_" + cam.name() + "_" + number;
+                if (++burstCam < cams.size()) {
+                    return;
+                }
+                burstCam = 0;
+            } else {
+                pendingShot = burstName + "_" + number;
+            }
+            burstIndex++;
             if (++burstSub < framesPerTick) {
                 return;                        // the same tick again, a little further on
             }
@@ -347,10 +397,10 @@ public final class FilmDirector {
             return;
         }
         drawPartial = 0.0F;
-        while (!steps.isEmpty() && waitTicks == 0 && pendingShot == null && burstLeft == 0) {
+        while (!steps.isEmpty() && waitTicks == 0 && pendingShot == null && burstLeft == 0 && untilLeft == 0) {
             run(mc, steps.poll());
         }
-        boolean done = steps.isEmpty() && waitTicks == 0 && pendingShot == null && burstLeft == 0;
+        boolean done = steps.isEmpty() && waitTicks == 0 && pendingShot == null && burstLeft == 0 && untilLeft == 0;
         if (done && !filmed) {
             filmed = true;
             endScene();
@@ -409,6 +459,8 @@ public final class FilmDirector {
         logName = null;
         logLines.setLength(0);
         BodyRecorder.stop();
+        untilLeft = 0;
+        FilmFactsBoard.setStageJob(null);
         checks = new FilmChecks();
         filmed = true;
     }
@@ -439,8 +491,17 @@ public final class FilmDirector {
             case "hitboxes" -> mc.getEntityRenderDispatcher().setRenderHitBoxes(w[1].equals("on"));   // F3+B, e.g. for body hit boxes
             case "lens" -> lens = sceneFov = Integer.parseInt(w[1]);
             case "shot" -> {
-                followWalker(mc);
-                pendingShot = w[1];
+                if (cams.isEmpty()) {
+                    followWalker(mc);
+                    pendingShot = w[1];
+                } else {
+                    burstName = w[1];          // a one-picture burst: one take from every camera
+                    burstLeft = 1;
+                    burstGap = 0;
+                    burstIndex = 0;
+                    burstSub = 0;
+                    burstCam = 0;
+                }
             }
             case "burst" -> {
                 burstName = w[1];
@@ -448,6 +509,7 @@ public final class FilmDirector {
                 burstGap = w.length > 3 ? Integer.parseInt(w[3]) : 1;
                 burstIndex = 0;
                 burstSub = 0;
+                burstCam = 0;
             }
             case "step" -> {
                 int ticks = Integer.parseInt(w[1]);
@@ -492,7 +554,31 @@ public final class FilmDirector {
                 if (w[1].equals("off")) {
                     BodyRecorder.stop();
                 } else {
-                    BodyRecorder.start(folder(mc).resolve("body.jsonl.gz"), w.length > 2 ? Integer.parseInt(w[2]) : 3);
+                    BodyRecorder.start(folder(mc), w.length > 2 ? Integer.parseInt(w[2]) : 3, w.length > 3 && w[3].equals("all"));
+                }
+            }
+            case "stage" -> stage(mc, w[1], Integer.parseInt(w[2]), Integer.parseInt(w[3]), Integer.parseInt(w[4]));
+            case "seed" -> seed(mc, Long.parseLong(w[1]));
+            case "until" -> {
+                String[] kv = w[1].split("=", 2);
+                untilKey = kv[0];
+                untilValue = kv.length > 1 ? kv[1] : "true";
+                untilAsked = untilLeft = Math.max(1, Integer.parseInt(w[2]));
+            }
+            case "aim" -> {
+                aimName = null;
+                aimFact = null;
+                if (w[1].equals("fact")) {
+                    aimFact = w[2].split("=", 2);
+                } else if (!w[1].equals("off")) {
+                    aimName = step.substring(4).trim();
+                }
+            }
+            case "cam" -> {
+                if (w[1].equals("off")) {
+                    cams.clear();
+                } else {
+                    cams.add(new Cam(w[1], Double.parseDouble(w[2]), Double.parseDouble(w[3]), Double.parseDouble(w[4])));
                 }
             }
             case "quit" -> {
@@ -502,6 +588,112 @@ public final class FilmDirector {
                 }
             }
             default -> LOG.warn("Film: unknown step '{}'", step);
+        }
+    }
+
+    // --- the Motion Studio's steps (phase 0, 2026-11-25) ------------------------------------------------------------------
+
+    /** A camera of the "cam" step: its name and where it is from the aimed animal's middle (blocks). */
+    private record Cam(String name, double dx, double dy, double dz) {
+    }
+
+    private static final java.util.List<Cam> cams = new java.util.ArrayList<>();
+    /** The camera taking the burst's picture now. */
+    private static int burstCam;
+    /** The aimed animal: by name, or by a fact (key, value); both null when none. */
+    private static String aimName;
+    private static String[] aimFact;
+    /** The "until" step: the fact waited for, the client ticks left and asked. */
+    private static String untilKey, untilValue;
+    private static int untilLeft, untilAsked;
+
+    /** The animal the cameras follow, as this side draws it, or null. */
+    @Nullable
+    private static Entity aimed(Minecraft mc) {
+        java.util.UUID byFact = aimFact == null ? null : FilmFactsBoard.find(aimFact[0], aimFact.length > 1 ? aimFact[1] : "true");
+        for (Entity entity : mc.level.entitiesForRendering()) {
+            if (aimName != null && entity.getCustomName() != null && aimName.equals(entity.getCustomName().getString())
+                    || byFact != null && byFact.equals(entity.getUUID())) {
+                return entity;
+            }
+        }
+        return null;
+    }
+
+    /** Puts the camera (the player, on this side, so at once) at this camera's place, looking at the aimed animal's middle. */
+    private static void aimCamera(Minecraft mc, Cam cam) {
+        Entity target = aimed(mc);
+        if (target == null) {
+            return;                             // nothing to aim at (not come yet, or gone): the camera stays
+        }
+        Vec3 middle = target.position().add(0.0, target.getBbHeight() * 0.5, 0.0);
+        Vec3 eye = middle.add(cam.dx(), cam.dy(), cam.dz());
+        Vec3 to = middle.subtract(eye);
+        float yaw = (float) (Mth.atan2(to.z, to.x) * Mth.RAD_TO_DEG) - 90.0F;
+        float pitch = (float) (-Mth.atan2(to.y, Math.sqrt(to.x * to.x + to.z * to.z)) * Mth.RAD_TO_DEG);
+        mc.player.moveTo(eye.x, eye.y - EYE, eye.z, yaw, pitch);
+        mc.player.setOldPosAndRot();
+    }
+
+    /** The "stage" step: the species' scene built on the game's side at x y z; its job (if any) run each game tick. */
+    private static void stage(Minecraft mc, String name, int x, int y, int z) {
+        com.antcolonies.debug.FilmStages.Stage stage = com.antcolonies.debug.FilmStages.get(name);
+        if (stage == null) {
+            LOG.warn("Film: no scene '{}' (signed up: {})", name, com.antcolonies.debug.FilmStages.names());
+            return;
+        }
+        MinecraftServer server = mc.getSingleplayerServer();
+        if (server == null) {
+            LOG.warn("Film: no game server for the scene {}", name);
+            return;
+        }
+        FilmStep.serve(mc, () -> {
+            FilmFactsBoard.setStageJob(stage.build(server.overworld(), new BlockPos(x, y, z)));
+            LOG.info("Film: scene {} built at {} {} {}", name, x, y, z);
+        });
+        waitTicks = 3;
+    }
+
+    /**
+     * The "seed" step: the game's dice and every animal's set from this number (each animal by the order it came in),
+     * so a scene with its minds on plays the same way each run (as far as the game's own timing allows).
+     */
+    private static void seed(Minecraft mc, long seed) {
+        MinecraftServer server = mc.getSingleplayerServer();
+        if (server == null) {
+            return;
+        }
+        FilmStep.serve(mc, () -> {
+            var level = server.overworld();
+            level.getRandom().setSeed(seed);
+            java.util.List<Entity> all = new java.util.ArrayList<>();
+            level.getAllEntities().forEach(all::add);
+            all.sort(java.util.Comparator.comparingInt(Entity::getId));   // the order they came in: the same each run
+            for (int i = 0; i < all.size(); i++) {
+                if (all.get(i) instanceof Mob mob) {
+                    mob.getRandom().setSeed(seed * 31 + i);
+                }
+            }
+            LOG.info("Film: dice set from {} ({} animals)", seed, all.size());
+        });
+    }
+
+    /**
+     * Every animal drawn with GeckoLib but not an insect (the insects come through {@link #noteRendered}): its model's
+     * clock kept for "freshclocks", and its parts checked for each picture (the Motion Studio, phase 0).
+     */
+    @SubscribeEvent
+    public static void onAnimalDrawn(GeoRenderEvent.Entity.Post event) {
+        if (!active() || event.getEntity() instanceof AbstractAntEntity) {
+            return;
+        }
+        models.add(event.getRenderer().getGeoModel());
+        if (pendingShot != null) {
+            try {
+                checks.record(event.getEntity(), event.getModel(), event.getPartialTick(), pendingShot);
+            } catch (RuntimeException e) {
+                LOG.warn("Film: cannot check {}", event.getEntity(), e);
+            }
         }
     }
 

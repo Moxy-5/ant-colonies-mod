@@ -498,7 +498,72 @@
    [
     "idle",
     "death"
+   ],
+   [
+    "gallop",
+    "jump_smack"
+   ],
+   [
+    "jump_smack",
+    "takedown_pin"
+   ],
+   [
+    "jump_smack",
+    "bite"
+   ],
+   [
+    "stalk_leap_bite",
+    "takedown_pin"
+   ],
+   [
+    "stalk_leap_bite",
+    "bite"
+   ],
+   [
+    "takedown_pin",
+    "takedown_pin"
+   ],
+   [
+    "bite",
+    "bite"
+   ],
+   [
+    "drink",
+    "takedown_pin"
+   ],
+   [
+    "takedown_pin",
+    "drink"
+   ],
+   [
+    "drink",
+    "drink"
+   ],
+   [
+    "walk",
+    "takedown_pin"
+   ],
+   [
+    "takedown_pin",
+    "walk"
+   ],
+   [
+    "walk",
+    "bite"
+   ],
+   [
+    "bite",
+    "walk"
+   ],
+   [
+    "walk",
+    "drink"
+   ],
+   [
+    "drink",
+    "walk"
    ]
-  ]
+  ],
+  "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/LionEntity.java"
  }
 }

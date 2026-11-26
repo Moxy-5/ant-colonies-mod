@@ -19,10 +19,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -37,43 +34,17 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 public class LionHuntTests {
     static final int GROUND = 1, FEET = 2;
 
+    // the scene kit is shared with the in-game camera (LionScenes, the Motion Studio, 2026-11-25)
     private static void field(GameTestHelper helper, int x0, int z0, int x1, int z1) {
-        ServerLevel level = helper.getLevel();
-        for (int x = x0; x <= x1; x++) {
-            for (int z = z0; z <= z1; z++) {
-                level.setBlock(helper.absolutePos(new BlockPos(x, 0, z)), Blocks.STONE.defaultBlockState(), 2);
-                level.setBlock(helper.absolutePos(new BlockPos(x, GROUND, z)), Blocks.GRASS_BLOCK.defaultBlockState(), 2);
-            }
-        }
+        LionScenes.field(helper.getLevel(), helper.absolutePos(BlockPos.ZERO), x0, z0, x1, z1);
     }
 
     private static BuffaloEntity buffalo(GameTestHelper helper, double x, double z, float yaw, Sex sex, boolean young, BlockPos home) {
-        BuffaloEntity b = helper.spawn(SavannaEntities.BUFFALO.get(), new Vec3(x, FEET, z));
-        b.life().setUp(young, sex, RandomSource.create((long) (x * 31 + z)));
-        if (young) {
-            b.life().setAge(0);
-        }
-        b.life().apply();
-        b.fitHealth();
-        b.setHealth(b.getMaxHealth());
-        b.setHome(home, 0);
-        b.setYRot(yaw);
-        b.yBodyRot = yaw;
-        b.yHeadRot = yaw;
-        return b;
+        return LionScenes.buffalo(helper.getLevel(), helper.absolutePos(BlockPos.ZERO), x, z, yaw, sex, young, home);
     }
 
     private static LionEntity lion(GameTestHelper helper, EntityType<LionEntity> type, double x, double z, BlockPos den, int sinceMeal) {
-        LionEntity l = helper.spawn(type, new Vec3(x, FEET, z));
-        Sex sex = type == SavannaEntities.LION.get() ? Sex.MALE : type == SavannaEntities.LIONESS.get() ? Sex.FEMALE : null;
-        l.life().setUp(false, sex, RandomSource.create((long) (x * 31 + z)));
-        l.life().apply();
-        l.setDen(den, -90.0F, null, 0);
-        l.setSinceMeal(sinceMeal);
-        l.setYRot(-90.0F);
-        l.yBodyRot = -90.0F;
-        l.yHeadRot = -90.0F;
-        return l;
+        return LionScenes.lion(helper.getLevel(), helper.absolutePos(BlockPos.ZERO), type, x, z, den, sinceMeal);
     }
 
     private static Vec3 rel(GameTestHelper helper, Vec3 abs) {
@@ -304,26 +275,15 @@ public class LionHuntTests {
     @GameTest(template = "arena", timeoutTicks = 7000, skyAccess = true, batch = "lion_hunt_dusk")
     public static void atDuskAHungryPrideTakesACalfAndFeeds(GameTestHelper helper) {
         TestClock.still(helper, 20.0);
-        field(helper, 0, 0, 64, 64);
-        BlockPos den = helper.absolutePos(new BlockPos(6, GROUND, 32));
-        BlockPos home = helper.absolutePos(new BlockPos(50, GROUND, 32));
-        BuffaloEntity cow = buffalo(helper, 46.5, 32.5, 90, Sex.FEMALE, false, home);
-        BuffaloEntity calf = buffalo(helper, 46.5, 34.5, 90, Sex.FEMALE, true, home);
-        cow.adopt(calf);
-        cow.led = true;                                     // she grazes where she stands (her day would take her off the field)
-        List<LionEntity> pride = new ArrayList<>();
-        pride.add(lion(helper, SavannaEntities.LIONESS.get(), 8.5, 28.5, den, LionHunt.HUNGRY));
-        pride.get(0).setElder(true);
-        pride.add(lion(helper, SavannaEntities.LIONESS.get(), 8.5, 31.5, den, LionHunt.HUNGRY));
-        pride.add(lion(helper, SavannaEntities.LIONESS.get(), 8.5, 34.5, den, LionHunt.HUNGRY));
-        pride.add(lion(helper, SavannaEntities.LION.get(), 5.5, 38.5, den, LionHunt.HUNGRY));
-        pride.add(lion(helper, SavannaEntities.LION_CUB.get(), 4.5, 26.5, den, LionHunt.HUNGRY));
+        // the scene is LionScenes.duskHunt, which the in-game camera films too (tools/film/lion_hunt.film)
+        LionScenes.DuskHunt scene = LionScenes.duskHunt(helper.getLevel(), helper.absolutePos(BlockPos.ZERO));
+        BuffaloEntity cow = scene.cow();
+        BuffaloEntity calf = scene.calf();
+        List<LionEntity> pride = scene.pride();
         boolean[] stalked = {false};
         long[] killedAt = {-1};
         helper.onEachTick(() -> {
-            if (cow.isAlive() && cow.doing() == BuffaloEntity.CALM && cow.temper() == BuffaloGoals.Temper.NONE) {
-                cow.setDoing(BuffaloEntity.GRAZE);
-            }
+            scene.tick();                                   // the cow grazes whenever calm
             for (LionEntity l : pride) {
                 stalked[0] |= l.doing() == LionEntity.STALK || l.doing() == LionEntity.FREEZE;
             }

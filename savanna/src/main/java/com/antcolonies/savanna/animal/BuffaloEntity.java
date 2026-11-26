@@ -74,7 +74,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * </ul>
  * Not yet: wallowing, calves, block moves.
  */
-public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
+public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, com.antcolonies.debug.FilmFacts {
     /** What it is doing, for the clips (synced). One-shot clips end by themselves once played ({@link #tick}); the loops (rest, the moods) last until a goal ends them. */
     public static final byte CALM = 0, GRAZE = 1, DRINK = 2, REST_DOWN = 3, REST = 4, REST_UP = 5, EAR_FLUTTER = 6, SHAKE_OFF = 7,
             SNORT = 8, BELLOW = 9, PAW_GROUND = 10, MOOD_ALERT = 11, MOOD_ANGRY = 12, HEADBUTT = 13, GORE = 14, CHARGE_HEADBUTT = 15;
@@ -889,6 +889,21 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
     }
 
     /** What it is about, for tests' messages. */
+    /**
+     * What its mind is doing, for the in-game camera's recordings (development only; the Motion Studio, phase 0): its
+     * doing, its temper, its health, how many lions hold it, grown or young.
+     */
+    @Override
+    public void filmFacts(java.util.Map<String, Object> out) {
+        out.put("doing", DOING_CLIPS[Mth.clamp(doing(), 0, DOING_CLIPS.length - 1)]);
+        out.put("doing_for", doingFor());
+        out.put("temper", temper.name());
+        out.put("health", getHealth());
+        out.put("held_by", holders());
+        out.put("grown", grownUp());
+        out.put("age", tickCount);
+    }
+
     public String about() {
         Path p = getNavigation().getPath();
         return "home " + home + " (across " + homeAcross + "), doing " + DOING_CLIPS[Mth.clamp(doing(), 0, DOING_CLIPS.length - 1)]

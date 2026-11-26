@@ -59,6 +59,7 @@ public class SavannaMod {
         com.antcolonies.savanna.entity.MatabeleLoads.signUp(); // its own loads, before any save is read
         SavannaEvents.signUpCreativeTab();
         SavannaTests.signUp();
+        com.antcolonies.savanna.gametest.LionScenes.signUpFilms(); // the in-game camera's lion scenes (the Motion Studio, phase 0)
         // How the giant savanna trees' blocks burn (Minecraft's fire table is filled once, at start).
         modEventBus.addListener((FMLCommonSetupEvent event) -> event.enqueueWork(TreeBlocks::setFlammable));
         // Camel thorn and baobab signs use Minecraft's own sign block entities (and so its sign drawing and editing).

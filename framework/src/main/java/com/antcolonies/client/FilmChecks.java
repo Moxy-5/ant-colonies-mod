@@ -17,6 +17,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -28,7 +29,7 @@ import software.bernie.geckolib.util.RenderUtil;
 
 /**
  * The in-game camera's automatic checks (development only, 2026-10-16): for every picture it takes, where each body part
- * of each filmed insect was really drawn (the corners of every box of the model, in the world), so that Claude only has
+ * of each filmed insect (and, since 2026-11-25, any animal drawn with GeckoLib) was really drawn (the corners of every box of the model, in the world), so that Claude only has
  * to look at the pictures where something went wrong:
  * <ul>
  * <li><b>inside</b>: a body part drawn inside a solid block (deeper than {@link #INSIDE} blocks), with the block;</li>
@@ -41,7 +42,11 @@ import software.bernie.geckolib.util.RenderUtil;
  * scene, which writes {@code checks.txt} beside the scene's pictures.
  */
 final class FilmChecks {
-    /** How deep in a block a part may be drawn before it counts (blocks; a foot pressed onto the floor is fine). */
+    /**
+     * How deep in a block a part may be drawn before it counts (blocks; a foot pressed onto the floor is fine), or one
+     * pixel of the animal's model as drawn, if more (2026-11-25: a lion's paw a pixel into the grass, as the offline
+     * checker allows a foot, is not a fault; an insect's pixel is far under this).
+     */
     static final double INSIDE = 0.01;
     /** A jump must be at least this many blocks a tick (the worker is about 0.3 long) ... */
     static final double JUMP_MIN = 0.03;
@@ -52,6 +57,11 @@ final class FilmChecks {
      * its quick swing moves far more than in the picture before, but no more than in its other swings.
      */
     static final double ABOVE_BIG = 1.5;
+    /**
+     * Two pictures more than this many game ticks apart are not one take (2026-11-25: a scene's bursts with the game
+     * running between them read as jumps of whole blocks): no move is measured between them.
+     */
+    static final int TAKE_GAP = 8;
     /** How many points along each side of a box are tested for being inside a block (3: corners, edge middles, ...). */
     private static final int GRID = 3;
 
@@ -63,7 +73,9 @@ final class FilmChecks {
     private final Map<Integer, Map<String, List<Sample>>> tracks = new LinkedHashMap<>();
     private final Map<Integer, String> lastMoment = new HashMap<>();
     private final Map<Integer, String> names = new HashMap<>();
-    private static final Set<GeoModel<?>> tracked = new HashSet<>();
+    /** Each animal's inside limit (blocks): {@link #INSIDE} or a pixel of its model as drawn. */
+    private final Map<Integer, Double> limits = new HashMap<>();
+    private static final Set<BakedGeoModel> tracked = new HashSet<>();
     private int pictures;
 
     /**
@@ -72,21 +84,35 @@ final class FilmChecks {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     void record(AbstractAntEntity ant, GeoModel model, float partial, String picture) {
-        BakedGeoModel baked = model.getBakedModel(model.getModelResource(ant));
-        if (tracked.add(model)) {
+        record(ant, model.getBakedModel(model.getModelResource(ant)), partial, picture);
+    }
+
+    /**
+     * The same for any animal drawn with GeckoLib (the Motion Studio, phase 0, 2026-11-25: until then only the insects
+     * were checked, the land and river animals filmed unchecked): called right after it is drawn, at the in-between
+     * time it was drawn at.
+     */
+    void record(Entity animal, BakedGeoModel baked, float partial, String picture) {
+        if (tracked.add(baked)) {
             baked.topLevelBones().forEach(FilmChecks::trackMatrices);
             return;                             // the matrices are filled from the next frame on
         }
-        String moment = ant.tickCount + "/" + partial;
-        if (moment.equals(lastMoment.put(ant.getId(), moment))) {
+        String moment = animal.tickCount + "/" + partial;
+        if (moment.equals(lastMoment.put(animal.getId(), moment))) {
             return;                             // the same moment seen from another camera
         }
         pictures++;
-        names.put(ant.getId(), ant.getType().toShortString() + (ant.getCustomName() == null ? "" : " " + ant.getCustomName().getString()));
-        Vec3 origin = ant.getPosition(partial);
-        Map<String, List<Sample>> parts = tracks.computeIfAbsent(ant.getId(), id -> new LinkedHashMap<>());
+        names.put(animal.getId(), animal.getType().toShortString() + (animal.getCustomName() == null ? "" : " " + animal.getCustomName().getString()));
+        Vec3 origin = animal.getPosition(partial);
+        Map<String, List<Sample>> parts = tracks.computeIfAbsent(animal.getId(), id -> new LinkedHashMap<>());
+        if (!baked.topLevelBones().isEmpty()) {
+            // a model pixel as drawn: the root bone's scale (its matrix's first column) over 16
+            Matrix4f root = new Matrix4f(baked.topLevelBones().get(0).getLocalSpaceMatrix()).sub(new Matrix4f());   // (GeckoLib adds the do-nothing matrix)
+            double px = Math.sqrt(root.m00() * root.m00() + root.m01() * root.m01() + root.m02() * root.m02()) / 16.0;
+            limits.put(animal.getId(), Math.max(INSIDE, Double.isFinite(px) ? px : 0.0));
+        }
         for (GeoBone bone : baked.topLevelBones()) {
-            sample(bone, origin, picture, ant.tickCount, parts);
+            sample(bone, origin, picture, animal.tickCount, parts);
         }
     }
 
@@ -194,10 +220,11 @@ final class FilmChecks {
         double worstDepth = 0.0, worstMove = 0.0;
         for (var insect : tracks.entrySet()) {
             String who = names.getOrDefault(insect.getKey(), "?") + " #" + insect.getKey();
+            double limit = limits.getOrDefault(insect.getKey(), INSIDE);
             for (var part : insect.getValue().entrySet()) {
                 List<Sample> samples = part.getValue();
                 for (Sample s : samples) {
-                    if (s.depth() > INSIDE) {
+                    if (s.depth() > limit) {
                         inside++;
                         lines.add(String.format(Locale.ROOT, "inside %s tick %d %s: %s %.3f deep in %s (%.2f %.2f %.2f)",
                                 s.picture(), s.tick(), who, part.getKey(), s.depth(), s.block(), s.at().x, s.at().y, s.at().z));
@@ -209,12 +236,13 @@ final class FilmChecks {
                 }
                 double[] moves = new double[samples.size()];
                 for (int i = 1; i < samples.size(); i++) {
-                    moves[i] = moved(samples.get(i - 1), samples.get(i)) * framesPerTick;
+                    int gap = samples.get(i).tick() - samples.get(i - 1).tick();
+                    moves[i] = gap < 0 || gap > TAKE_GAP ? Double.NaN : moved(samples.get(i - 1), samples.get(i)) * framesPerTick;
                 }
                 double big = bigMoves(moves);
                 for (int i = 1; i < samples.size(); i++) {
                     double usual = usual(moves, i);
-                    if (moves[i] > JUMP_MIN && moves[i] > JUMP_TIMES * usual && moves[i] > ABOVE_BIG * big) {
+                    if (!Double.isNaN(moves[i]) && moves[i] > JUMP_MIN && moves[i] > JUMP_TIMES * usual && moves[i] > ABOVE_BIG * big) {
                         jumps++;
                         lines.add(String.format(Locale.ROOT, "jump %s tick %d %s: %s moved %.3f a tick (usually %.3f), from %s",
                                 samples.get(i).picture(), samples.get(i).tick(), who, part.getKey(), moves[i], usual,
@@ -246,8 +274,10 @@ final class FilmChecks {
         if (moves.length < 3) {
             return 0.0;
         }
-        double[] sorted = java.util.Arrays.copyOfRange(moves, 1, moves.length);
-        java.util.Arrays.sort(sorted);
+        double[] sorted = java.util.Arrays.stream(moves, 1, moves.length).filter(m -> !Double.isNaN(m)).sorted().toArray();
+        if (sorted.length < 2) {
+            return 0.0;
+        }
         return sorted[Math.min(sorted.length - 2, (int) (sorted.length * 0.9))];
     }
 
@@ -255,7 +285,7 @@ final class FilmChecks {
     private static double usual(double[] moves, int i) {
         List<Double> round = new ArrayList<>();
         for (int j = i - 2; j <= i + 2; j++) {
-            if (j != i && j >= 1 && j < moves.length) {
+            if (j != i && j >= 1 && j < moves.length && !Double.isNaN(moves[j])) {
                 round.add(moves[j]);
             }
         }

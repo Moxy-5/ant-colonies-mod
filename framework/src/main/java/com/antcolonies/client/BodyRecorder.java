@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.zip.GZIPOutputStream;
 
 import com.antcolonies.ColonyFrameworkMod;
+import com.antcolonies.entity.body.SteadyController;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.logging.LogUtils;
 
@@ -46,10 +47,16 @@ import software.bernie.geckolib.util.RenderUtil;
  * The measuring course's recorder (the Animal Maker Engine, phase 1 step 1, 2026-11-19; {@code docs/ANIMAL-MAKER-ENGINE.md}):
  * while the camera's {@code record on} step is in force, every frame the walker is drawn (any GeckoLib animal or insect,
  * up to {@code n} moments a game tick) goes into {@code screenshots/<scene>/body.jsonl.gz}, one line a moment: where it
- * was drawn and how it was moving, its clips, and every bone's place as the game drew it. The first line holds what
- * stays the same (each bone's parent and boxes, the blocks round it). It judges nothing: {@code tools/body_course.py}
- * reads the file and does the checks (the game is the one truth; Java records, Python judges). Development only, like
- * the rest of the camera.
+ * was drawn and how it was moving, its clips (with each clip's play speed and how far into it), what its mind was doing
+ * on the game's side ({@link com.antcolonies.debug.FilmFacts}), and every bone's place as the game drew it. The first
+ * line holds what stays the same (each bone's parent, pivot and boxes, the blocks round it). It judges nothing:
+ * {@code tools/body_course.py} and {@code tools/pair_report.py} read the files and do the checks (the game is the one
+ * truth; Java records, Python judges). Development only, like the rest of the camera.
+ * <p>
+ * {@code record on n all} (the Motion Studio, phase 0, 2026-11-25, {@code docs/plans/motion-studio.md}): every animal
+ * drawn is recorded, each into its own file beside the walker's, {@code body_<its name or kind and number>.jsonl.gz}
+ * (a lion and the buffalo it holds, the herd round them). Lines are written as they come, so a long hunt never piles up
+ * in memory. An animal is recorded only while it is drawn (in the camera's view).
  */
 @EventBusSubscriber(modid = ColonyFrameworkMod.MODID, value = Dist.CLIENT)
 public final class BodyRecorder {
@@ -57,74 +64,127 @@ public final class BodyRecorder {
     /** How far round the walker the blocks are written down when recording starts (blocks, each way; up and down less). */
     private static final int AROUND = 16, BELOW = 5, ABOVE = 10;
 
-    private static Path file;
+    /** One animal's file: open while recording, its moments written so far. */
+    private static final class Track {
+        final Path file;
+        final Writer out;
+        final Set<String> moments = new HashSet<>();
+        int lines;
+
+        Track(Path file) throws IOException {
+            this.file = file;
+            Files.createDirectories(file.getParent());
+            out = new java.io.BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(Files.newOutputStream(file), 1 << 16),
+                    StandardCharsets.UTF_8), 1 << 16);
+        }
+    }
+
+    /** The scene's folder while recording (null when not), how many moments a tick, and whether every animal is. */
+    private static Path folder;
     private static int perTick;
-    private static final List<String> lines = new ArrayList<>();
-    private static final Set<String> moments = new HashSet<>();
+    private static boolean all;
+    private static final Map<Integer, Track> tracks = new java.util.HashMap<>();
+    private static final Set<String> fileNames = new HashSet<>();
     private static final Set<BakedGeoModel> tracked = new HashSet<>();
-    private static boolean header;
 
     private BodyRecorder() {
     }
 
-    /** The "record on n" step: from now each moment the walker is drawn (at most n a tick) goes into this file. */
-    static void start(Path into, int samplesPerTick) {
+    /**
+     * The "record on n [all]" step: from now each moment the walker is drawn (at most n a tick) goes into
+     * {@code body.jsonl.gz} in this folder; with {@code all}, every other animal drawn into a file of its own too.
+     */
+    static void start(Path into, int samplesPerTick, boolean everyAnimal) {
         stop();
-        file = into;
+        folder = into;
         perTick = Math.max(1, samplesPerTick);
-        header = false;
-        LOG.info("Film: recording the walker's body into {} ({} a tick)", into, perTick);
+        all = everyAnimal;
+        LOG.info("Film: recording {} into {} ({} a tick)", all ? "every animal drawn" : "the walker's body", into, perTick);
     }
 
     static boolean recording() {
-        return file != null;
+        return folder != null;
     }
 
-    /** The "record off" step (or the scene's end): the file written. */
+    /** The "record off" step (or the scene's end): every file closed. */
     static void stop() {
-        if (file == null) {
+        if (folder == null) {
             return;
         }
-        try {
-            Files.createDirectories(file.getParent());
-            try (Writer out = new OutputStreamWriter(new GZIPOutputStream(Files.newOutputStream(file)), StandardCharsets.UTF_8)) {
-                for (String line : lines) {
-                    out.write(line);
-                    out.write('\n');
-                }
+        for (Track t : tracks.values()) {
+            try {
+                t.out.close();
+                LOG.info("Film: {} body moments written to {}", Math.max(0, t.lines - 1), t.file);
+            } catch (IOException e) {
+                LOG.warn("Film: cannot write {}", t.file, e);
             }
-            LOG.info("Film: {} body moments written to {}", Math.max(0, lines.size() - 1), file);
-        } catch (IOException e) {
-            LOG.warn("Film: cannot write {}", file, e);
         }
-        file = null;
-        lines.clear();
-        moments.clear();
+        tracks.clear();
+        fileNames.clear();
+        folder = null;
     }
 
     @SubscribeEvent
     public static void onDrawn(GeoRenderEvent.Entity.Post event) {
-        if (file == null || !FilmDirector.isWalker(event.getEntity())) {
+        if (folder == null) {
             return;
         }
         Entity entity = event.getEntity();
+        boolean walker = FilmDirector.isWalker(entity);
+        if (!walker && !all) {
+            return;
+        }
         BakedGeoModel model = event.getModel();
         if (tracked.add(model)) {
             model.topLevelBones().forEach(BodyRecorder::track);
             return;                             // the bones' matrices are filled from the next frame on
         }
+        Track track = tracks.get(entity.getId());
+        if (track == null) {
+            try {
+                track = new Track(folder.resolve(fileName(entity, walker)));
+            } catch (IOException e) {
+                LOG.warn("Film: cannot record {}", entity, e);
+                return;
+            }
+            tracks.put(entity.getId(), track);
+        }
         float partial = event.getPartialTick();
         String moment = entity.tickCount + "/" + (int) Math.min(perTick - 1, partial * perTick);
-        if (!moments.add(moment)) {
+        if (!track.moments.add(moment)) {
             return;
         }
         List<GeoBone> bones = new ArrayList<>();
         model.topLevelBones().forEach(bone -> collect(bone, bones));
-        if (!header) {
-            header = true;
-            lines.add(header(entity, bones));
+        try {
+            if (track.lines == 0) {
+                track.out.write(header(entity, bones));
+                track.out.write('\n');
+                track.lines++;
+            }
+            track.out.write(moment(entity, partial, bones));
+            track.out.write('\n');
+            track.lines++;
+        } catch (IOException e) {
+            LOG.warn("Film: cannot write {}", track.file, e);
         }
-        lines.add(moment(entity, partial, bones));
+    }
+
+    /** The walker's file is body.jsonl.gz (the course reads it); any other animal's body_<its name, or kind and number>. */
+    private static String fileName(Entity entity, boolean walker) {
+        if (walker) {
+            fileNames.add("body");
+            return "body.jsonl.gz";
+        }
+        String label = entity.getCustomName() != null
+                ? entity.getCustomName().getString().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]+", "_")
+                : BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).getPath() + "_" + entity.getId();
+        String name = "body_" + label;
+        if (!fileNames.add(name)) {
+            name = name + "_" + entity.getId();         // two of one name
+            fileNames.add(name);
+        }
+        return name + ".jsonl.gz";
     }
 
     private static void track(GeoBone bone) {
@@ -144,6 +204,10 @@ public final class BodyRecorder {
     private static String header(Entity entity, List<GeoBone> bones) {
         StringBuilder s = new StringBuilder("{\"header\":1,\"entity\":\"")
                 .append(BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType())).append('"');
+        s.append(",\"id\":").append(entity.getId()).append(",\"uuid\":\"").append(entity.getUUID()).append('"');
+        if (entity.getCustomName() != null) {
+            s.append(",\"name\":\"").append(entity.getCustomName().getString().replace("\"", "'")).append('"');
+        }
         s.append(",\"width\":").append(num(entity.getBbWidth())).append(",\"height\":").append(num(entity.getBbHeight()));
         s.append(",\"scale\":").append(num(entity instanceof LivingEntity living ? living.getScale() : 1.0F));
         s.append(",\"bones\":[");
@@ -153,6 +217,9 @@ public final class BodyRecorder {
             if (bone.getParent() != null) {
                 s.append(",\"parent\":\"").append(bone.getParent().getName()).append('"');
             }
+            // its pivot in the bone's own frame (the frame its boxes' corners are in): an empty bone's place (a jaw's grip)
+            s.append(",\"pivot\":[").append(num(bone.getPivotX() / 16.0)).append(',').append(num(bone.getPivotY() / 16.0))
+                    .append(',').append(num(bone.getPivotZ() / 16.0)).append(']');
             s.append(",\"cubes\":[");
             boolean first = true;
             for (GeoCube cube : bone.getCubes()) {
@@ -241,6 +308,8 @@ public final class BodyRecorder {
         s.append(",\"ground\":").append(entity.onGround() ? 1 : 0).append(",\"water\":").append(entity.isInWater() ? 1 : 0);
         s.append(",\"fluid\":").append(num(entity.getFluidHeight(FluidTags.WATER)));
         s.append(",\"clips\":{");
+        // each clip player's play speed and how far into its clip it is (clip ticks; only a SteadyController knows it)
+        StringBuilder play = new StringBuilder();
         if (entity instanceof GeoAnimatable animatable) {
             boolean first = true;
             var manager = animatable.getAnimatableInstanceCache().getManagerForId(entity.getId());
@@ -249,10 +318,17 @@ public final class BodyRecorder {
                 String clip = controller.getCurrentAnimation() == null ? "-" : controller.getCurrentAnimation().animation().name();
                 s.append(first ? "" : ",").append('"').append(e.getKey()).append("\":\"").append(clip).append(' ')
                         .append(controller.getAnimationState().name().toLowerCase(Locale.ROOT)).append('"');
+                play.append(first ? "" : ",").append('"').append(e.getKey()).append("\":[").append(num(controller.getAnimationSpeed()))
+                        .append(',').append(controller instanceof SteadyController<?> steady ? num(steady.clipTicks()) : "null").append(']');
                 first = false;
             }
         }
-        s.append("},\"b\":[");
+        s.append("},\"play\":{").append(play).append('}');
+        Map<String, Object> facts = FilmFactsBoard.of(entity.getUUID());
+        if (!facts.isEmpty()) {
+            s.append(",\"facts\":").append(FilmFactsBoard.json(facts)).append(",\"ft\":").append(FilmFactsBoard.tick());
+        }
+        s.append(",\"b\":[");
         for (int i = 0; i < bones.size(); i++) {
             GeoBone bone = bones.get(i);
             s.append(i > 0 ? "," : "");

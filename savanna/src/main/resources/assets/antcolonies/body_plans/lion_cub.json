@@ -442,7 +442,20 @@
    [
     "idle",
     "death"
+   ],
+   [
+    "drink",
+    "drink"
+   ],
+   [
+    "walk",
+    "drink"
+   ],
+   [
+    "drink",
+    "walk"
    ]
-  ]
+  ],
+  "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/LionEntity.java"
  }
 }
