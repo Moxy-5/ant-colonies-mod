@@ -309,3 +309,12 @@ the clip leapt on the spot).
   film's 1.4 to 1.8 block jaw gap was found and fixed meanwhile by the film's own session: riders drawn at the
   mount's heading.)
 - **Next:** the hunt film (it now shows the feast too), then phase 1 (the replay page).
+- **The hunt film with the feast (2026-11-26, the user: "Yes, film it"; two new takes in `tools/film/lion_hunt.film`,
+  `feed` and `feed_late`):** the lions do lie down at the carcass and feed lying, and the full ones get up and lie
+  down a few blocks off. Three things spoil it, none fixed yet: the dead calf's mother stands right over the carcass
+  through the whole feast, hiding it, the lions lying round her feet (the scene keeps her grazing at her place 2 blocks
+  from the kill; what a herd does in play after a kill is not checked); round a calf's small carcass three grown
+  lions lie in a heap, their bodies well inside each other (the offline check's 2 to 3 px was for neighbours only, not
+  for everyone at once round so small a body); the cameras stand too far and the new takes come too late (the
+  lionesses were full and up again by `feed`). Lying down and the feed loop themselves could not be judged frame by
+  frame for those reasons.
