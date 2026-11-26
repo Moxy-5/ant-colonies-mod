@@ -1499,7 +1499,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     // hunter's jaws.
     @Override
     protected boolean isImmobile() {
-        return super.isImmobile() || isParalysed() || getVehicle() instanceof AbstractAntEntity
+        return super.isImmobile() || isKnockedOff() || isParalysed() || getVehicle() instanceof AbstractAntEntity
                 || !level().isClientSide && (pinnedBy != null || clampingOn != null || clamp.isHeldStill()
                 || isCallingForHelp() || isTended());
     }
@@ -1718,6 +1718,20 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             return;
         }
         super.knockback(strength, x, z);
+        if (!level().isClientSide && (wasAttached || navigator.isAttached() || navigator.isClimbing())) {
+            knockedOffAt = tickCount; // a blow that flings it tears it off its wall or ceiling: it falls (the user, 2026-11-26)
+        }
+    }
+
+    /** The tick a flinging blow knocked it off a wall or ceiling (server, not saved); far back when none did. */
+    private int knockedOffAt = Integer.MIN_VALUE / 2;
+    /** Knocked off a wall, it does not catch hold again for this long at most (a fall of about 12 blocks). */
+    private static final int KNOCKED_OFF_TICKS = 40;
+
+    /** Knocked off a wall or ceiling and still falling: its legs hold nothing until it lands (or the time is up). */
+    private boolean isKnockedOff() {
+        int since = tickCount - knockedOffAt;
+        return since >= 0 && since < KNOCKED_OFF_TICKS && !(onGround() && since > 2);
     }
 
     /** Tests only: its chance to dodge a grab and to bite back as it does (below 0: its body's). */
@@ -2417,7 +2431,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     private void tickBody() {
         if (!level().isClientSide && isImmobile() && (wasAttached || navigator.isAttached() || navigator.isClimbing())) {
-            // Frozen (paralysed, gripped, calling for help, carried, dead): its legs do not run, so they let go here.
+            // Frozen (paralysed, gripped, calling for help, carried, dead, knocked off its wall): its legs do not run, so they let go here.
             navigator.letGo();
             wasAttached = false;
             lastClimbMotion = Vec3.ZERO;

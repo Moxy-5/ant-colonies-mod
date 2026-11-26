@@ -899,6 +899,39 @@ public class LegsTests {
     }
 
     /**
+     * Review round 2 (R2-30, the user's call 2026-11-26): a blow that flings an insect (a player's, here the game's
+     * own knockback) tears it off the wall it climbs: it falls to the floor and, not hurt in its legs, sets out again.
+     * Before, the legs put their own motion back the next tick and it snapped back to its hold.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true)
+    public static void anInsectHitOnAWallFallsOffIt(GameTestHelper helper) {
+        buildNest(helper);
+        int x = MIDDLE + 6;
+        int z = MIDDLE + 6;
+        for (int dy = 0; dy < 5; dy++) {
+            helper.setBlock(new BlockPos(x, SURFACE + dy, z), Blocks.STONE);
+        }
+        AbstractAntEntity ant = TestAnts.lone(helper, SavannaEntities.MATABELE_MINOR.get(), x + 3, SURFACE, z);
+        Foothold high = new Foothold(helper.absolutePos(new BlockPos(x + 1, SURFACE + 3, z)), Direction.WEST);
+        int[] hitAt = {-1};
+        boolean[] landed = {false};
+        double floor = helper.absolutePos(new BlockPos(x, SURFACE, z)).getY();
+        helper.runAfterDelay(10, () -> helper.assertTrue(ant.getNavigator().moveTo(high, 1.0), "no way up the pillar's side"));
+        helper.onEachTick(() -> {
+            if (hitAt[0] < 0 && helper.getTick() > 10 && ant.getNavigator().isDone() && ant.getNavigator().isClimbing() && ant.getY() > floor + 2) {
+                ant.knockback(0.4, -1.0, 0.0); // pushed toward the wall, as a player facing it would
+                hitAt[0] = (int) helper.getTick();
+            }
+            landed[0] |= hitAt[0] >= 0 && ant.onGround() && ant.getY() < floor + 0.1;
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(hitAt[0] >= 0, "the ant has not climbed the pillar yet");
+            helper.assertTrue(landed[0], "hit on a wall, it has not fallen to the floor (at height " + ant.getY() + ")");
+            helper.assertTrue(helper.getTick() > hitAt[0] + 45 && ant.getNavigator().moveTo(high, 1.0), "after its fall it finds no way up again");
+        });
+    }
+
+    /**
      * Review round 2 (R2-38): an insect whose feet are in a block's own cell, on a top that is no floor to the route
      * planner (a path block, 15 pixels tall: a shovel on the grass under it, a village path), with solid ground all
      * round at its own height, still finds a start for a walk: up onto the ground beside it. Before, it never planned
