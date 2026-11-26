@@ -253,4 +253,5 @@ the clip leapt on the spot).
   side alike); `tools/spots.py` and `Spots.Strike` already were. The lion's clips proved the same keyframes after the
   move; `land` 44 of 44. A new hunter needs: its strike clips made with the kit, `strikes` in its plan, and its own code
   choosing the strike and the spot.
+- **The hunt film's causes (2026-11-26, `claude/motion-phase3-film`, BUGS 421, 422):** the jaw gap was the drawing, not the game: a rider is drawn turned to its mount's heading (GeckoLib), fixed in `LionRenderer`; the stretched leap was step 4's homing with no limit: a strike now aims at take-off and never steers in the air, gripping at its hit only within `Strikes.GRIP` (0.6 blocks at size 1) of its aim, else missing (`Strikes.Ride.target`, shared). Any future animal that holds by riding its prey needs the renderer's override too.
 - **Next:** the hunt film, then step 5 (feeding on the carcass).

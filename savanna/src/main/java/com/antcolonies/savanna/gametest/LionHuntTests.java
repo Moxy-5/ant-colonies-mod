@@ -478,6 +478,61 @@ public class LionHuntTests {
     }
 
     /**
+     * A leap never steers in the air (the hunt film, 2026-11-26: one followed a fleeing calf for 5 blocks at twice its
+     * clip's speed): the calf gone 3 blocks aside once she is off the ground, she lands where she aimed, no faster than
+     * her clip, never bites, and lets go when her leap is over.
+     */
+    @GameTest(template = "arena", timeoutTicks = 120, skyAccess = true)
+    public static void aLeapCannotSteerInTheAirAndMisses(GameTestHelper helper) {
+        TestClock.still(helper, 12.0);
+        field(helper, 0, 0, 48, 48);
+        BuffaloEntity calf = toughCalf(helper, 24.5, 24.5, 0.0F);
+        LionEntity she = lion(helper, SavannaEntities.LIONESS.get(), 24.5, 21.0, helper.absolutePos(new BlockPos(4, GROUND, 4)), 0);
+        var leap = she.spots().strike("stalk_leap_bite");
+        double reach = leap.reach() * she.getScale() / 16.0;
+        double fastest = fastestShare(leap) * reach + 0.01;
+        Vec3[] from = {null}, last = {null}, aimed = {null};
+        int[] start = {-1};
+        helper.runAtTickTime(2, () -> {
+            helper.assertTrue(LionHunt.strikeForTests(she, calf, LionEntity.LEAP_BITE), "no leap from within its reach: " + she.about());
+            from[0] = she.position();
+            last[0] = from[0];
+            start[0] = (int) helper.getTick();
+        });
+        helper.onEachTick(() -> {
+            if (from[0] == null || helper.getTick() <= 2) {
+                return;
+            }
+            int since = (int) helper.getTick() - start[0];
+            Vec3 now = she.position();
+            double step = Math.hypot(now.x - last[0].x, now.z - last[0].z);
+            last[0] = now;
+            if (since == leap.setsOff() + 2) {                  // off the ground: the calf is suddenly elsewhere
+                aimed[0] = LionHunt.placeForTests(she, calf);
+                calf.setPos(calf.getX() + 3.0, calf.getY(), calf.getZ());
+            }
+            if (since <= leap.landed()) {
+                helper.assertTrue(step <= fastest, String.format("she went %.3f in a tick, her leap's fastest %.3f (tick %d)", step, fastest, since));
+            }
+            if (since == leap.landed()) {
+                double off = Math.hypot(now.x - aimed[0].x, now.z - aimed[0].z);
+                helper.assertTrue(off < 0.05, String.format("she landed %.2f from where she aimed, steering after the calf", off));
+            }
+            if (since < LionEntity.BLEND + leap.ticks()) {
+                helper.assertTrue(calf.getHealth() >= 400.0F && she.doing() == LionEntity.LEAP_BITE,
+                        "a bite or a hold from a leap that missed: " + she.about() + "; calf " + calf.about());
+            } else {
+                // her leap over: no pin (she let go; in her own fight she may well strike again at once, the calf still near)
+                helper.assertTrue(she.doing() != LionEntity.PIN, "pinning after a miss: " + she.about());
+                if (since >= LionEntity.BLEND + leap.ticks() + 3) {
+                    helper.succeed();
+                }
+            }
+        });
+        helper.runAtTickTime(110, () -> helper.fail("the leap never played out: " + she.about() + "; calf " + calf.about()));
+    }
+
+    /**
      * The smack out of a gallop carries itself onto a cow walking away: on the move from its first tick (a running leap,
      * not a dead stop), never going back, it lands with her jaw on the cow's spot the tick its travel ends however far
      * the cow walked meanwhile, and grips from its hit.

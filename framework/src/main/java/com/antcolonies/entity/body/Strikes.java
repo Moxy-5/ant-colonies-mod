@@ -17,6 +17,12 @@ import net.minecraft.world.phys.Vec3;
  * it grips); the lioness on the buffalo first ({@code LionHunt}).
  */
 public final class Strikes {
+    /**
+     * How far (blocks at size 1) a striker's place on its prey may have gone from where it aimed and it still grips at its
+     * hit (my pick, 2026-11-26: about a jaw's reach; further, it lands on empty ground and misses).
+     */
+    public static final double GRIP = 0.6;
+
     private Strikes() {
     }
 
@@ -45,6 +51,10 @@ public final class Strikes {
         private final float yaw;
         private final double from;
         private int k;
+        @Nullable
+        private Vec3 aim;                       // where the strike lands: followed through its coil, fixed once it is off
+        private int missed = -1;                // decided at its hit: 1 its place had gone from where it aimed, 0 it grips
+        private double gapX, gapZ;              // its aim less its place at the hit (eased away as it grips)
 
         private Ride(double x, double z, float yaw, double from) {
             this.x = x;
@@ -74,6 +84,50 @@ public final class Strikes {
             }
             double f = k >= settleTicks ? 1.0 : (double) ++k / settleTicks;
             return f * f * (3.0 - 2.0 * f);
+        }
+
+        /**
+         * Where it heads now (flat). No strike: its place. On a strike it aims, never steers in the air (the hunt film,
+         * 2026-11-26: a leap that followed a fleeing calf stretched to 5 blocks at twice the clip's speed): through its
+         * coil, at where its place will be when it lands (the prey going on as it goes this tick); from the first tick
+         * off the ground that aim is fixed. At the hit it grips if its place is still within {@link #GRIP} of the aim
+         * (at its size), easing onto its place over {@code settleTicks}; otherwise it has missed and lands on the aim.
+         *
+         * @param along     its share of the way now ({@link #along})
+         * @param preyStep  how far the prey moved this tick
+         * @param size      the striker's size
+         */
+        public Vec3 target(@Nullable Spots.Strike strike, int sinceStart, double along, Vec3 place, Vec3 preyStep,
+                double size, int settleTicks) {
+            if (missed == 1) {
+                return aim;
+            }
+            if (from < 0.0 || strike == null) {
+                return place;
+            }
+            int sinceHit = sinceStart - strike.lead() - strike.hit();
+            if (aim == null || along <= 0.0 && sinceHit < 0) {
+                int left = Math.max(0, strike.landed() - sinceStart);
+                aim = new Vec3(place.x + preyStep.x * left, place.y, place.z + preyStep.z * left);
+            }
+            if (missed < 0 && sinceHit >= -1) {
+                // decided the tick before the hit: the striker's own tick (its grip, its bite) comes before its placing
+                missed = Math.hypot(place.x - aim.x, place.z - aim.z) > GRIP * size ? 1 : 0;
+                gapX = aim.x - place.x;
+                gapZ = aim.z - place.z;
+            }
+            if (sinceHit < 0 || missed == 1) {
+                return aim;
+            }
+            // gripping: on its place as the prey moves, the gap left at the hit eased away
+            double f = Math.min(1.0, (sinceHit + 1.0) / settleTicks);
+            double left = 1.0 - f * f * (3.0 - 2.0 * f);
+            return new Vec3(place.x + gapX * left, place.y, place.z + gapZ * left);
+        }
+
+        /** Whether its strike missed (decided at the strike's hit; false before it). */
+        public boolean missed() {
+            return missed == 1;
         }
 
         /** Where it is at that share of the way to its place (flat: its height is the animal's to find). */
