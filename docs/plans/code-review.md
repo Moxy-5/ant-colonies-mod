@@ -34,7 +34,7 @@ of Java.
 |---|---|---|---|
 | 1 | The colony brain: parts, food, brood, away life, neighbours, species files, the season source | `framework: colony/, species/, season/` | 17,200 |
 | 2 | Legs: the navigator, the path finder, the crowd, doorways | `framework: nav/` and the walking half of `AbstractAntEntity` | 6,000 |
-| 3 | The insect body: `AbstractAntEntity`, the shared goals, fights | `framework: entity/, entity/goal/, fight/` | 11,500 |
+| 3 | The insect body: `AbstractAntEntity`, the shared goals, fights (**read 2026-11-25**, `docs/reviews/full/round-03-insect-body.md`) | `framework: entity/, entity/goal/, fight/` | 11,500 |
 | 4 | How bodies move and are drawn in play: the game's body code and the renderers, only for what a player can meet (a wrong pose, a part in a block, lag from drawing); not the engine's design, the clips or the filming code | `framework: entity/body/, client/, coat/`; `savanna: client/` | about 11,000 |
 | 5 | Termites: mound, galleries, fungus, feeding, alarm, soldiers, new-land mounds | `savanna: colony/` (not raids), `block/`, termite entities and goals | about 24,000 |
 | 6 | Matabele, all but the raids: nests, prey pile, rescue, wound care, defence | `savanna: colony/`, `entity/`, `entity/goal/` | about 5,000 |
