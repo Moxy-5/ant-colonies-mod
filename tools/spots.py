@@ -18,6 +18,8 @@ played by the game):
 A prey's "spots" (model px, the geo file's own frame: x to its left, y up, z toward its tail; forward is -z):
   skin    the bones whose boxes make its skin for the rays (its trunk, neck and head: not its legs or tail)
   clips   the clips it can play while held; each is posed every tick (20 a second)
+  pairs   the holds the game makes on it, for clip_check.py --pair (not in the table): holder, hold clip, both sizes,
+          the prey's clips then ({clip: "once" or "loop"})
   at      {name: {"bone", "from", "out"}}: the spot moves with "bone"; it lies where a ray from "from" (a point inside
           the body) going "out" (degrees from straight ahead, + to its left, flat) last leaves the skin's boxes at rest.
           The holder faces in along "out" (it stands outside the body that way).
@@ -69,8 +71,8 @@ def fingerprint(animal, data):
     """What a table is made from: this tool's format, the plan's sections, the model and its clips."""
     a = cc.Animal(animal)
     h = hashlib.sha1()
-    h.update(json.dumps([FORMAT, data.get('spots'), data.get('holds'), data.get('legs'), data.get('bones')],
-                        sort_keys=True).encode())
+    spots = {k: v for k, v in data.get('spots', {}).items() if k not in ('about', 'pairs')}   # what the table is made from
+    h.update(json.dumps([FORMAT, spots, data.get('holds'), data.get('legs'), data.get('bones')], sort_keys=True).encode())
     for path in (cc.lab.model_file(a.model_name, 'geo', 'entity', f'{a.model_name}.geo.json'),
                  cc.lab.model_file(a.anim_stem, 'animations', 'entity', f'{a.anim_stem}.animation.json')):
         with open(path, encoding='utf-8') as f:      # the contents, not the bytes: line endings differ between checkouts
@@ -223,8 +225,8 @@ def placement(prey_table, spot, row, prey_size, hold, holder_size, draw_ahead_pr
 
 def report(holder, prey, sizes):
     ht, pt = build(holder), build(prey)
-    # where the game draws each model (model px toward its head): BuffaloEntity.DRAW_AHEAD_PX, LionEntity.Measures
-    draw = {'buffalo': 10.0, 'lioness': -2.85, 'lion': -3.2, 'lion_cub': -0.85}
+    # where the game draws each model (model px toward its head), read from the game's Java (the plans' checks.drawn_ahead)
+    draw = {holder: cc.Animal(holder).drawn_ahead(), prey: cc.Animal(prey).drawn_ahead()}
     tr = ht['trunk']
     for hs, ps in sizes:
         print(f'\n{holder} at size {hs} on {prey} at size {ps} (blocks):')

@@ -494,7 +494,10 @@
     "walk"
    ]
   ],
-  "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/LionEntity.java"
+  "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/LionEntity.java",
+  "drawn_ahead": {
+   "find": "case CUB -> new Measures\\((-?[\\d.]+)"
+  }
  },
  "holds": {
   "about": "The clips it grips prey with and the tick each bites (moved here from LionHunt's BITE_HIT and PIN_HIT, 2026-11-26: one place); its jaw is the carry bone's point. tools/spots.py writes assets/antcolonies/spots/<model>.json from this; the game places a holder so its jaw at the bite meets the prey's spot (docs/plans/motion-studio-phase3.md).",

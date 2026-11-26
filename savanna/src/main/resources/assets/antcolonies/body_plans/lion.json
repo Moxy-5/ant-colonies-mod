@@ -598,7 +598,10 @@
     "walk"
    ]
   ],
-  "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/LionEntity.java"
+  "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/LionEntity.java",
+  "drawn_ahead": {
+   "find": "case MALE -> new Measures\\((-?[\\d.]+)"
+  }
  },
  "verify": {
   "models": [

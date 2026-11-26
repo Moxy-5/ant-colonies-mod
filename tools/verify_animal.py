@@ -15,6 +15,10 @@ missing recording, a film with no pictures); findings are not hard failures, the
   1. clips      tools/clip_check.py on every clip and every clip change the plan lists (--switches), on the animal's
                 model and on each model of its young (the plan's "verify.models")
   2. boxes      the model's boxes against the box budget (tools/body_plan.py boxes; over it is a warning)
+     pairs      (2026-11-26, the Motion Studio phase 3) for an animal that holds another or is held (a prey plan's
+                "spots.pairs"): its spot tables current (tools/spots.py --check), then tools/clip_check.py <holder>
+                --pair <prey> on every pair it is in: the jaw against the hide at each bite, bodies in each other, holders
+                crowding (flags counted)
   3. course     its family's course scenes (tools/body_course.py), full or quick, for every course entry of its plan
                 (the crocodile's young included)
   4. films      its frozen three-side frame films (the plan's "verify.films", or every tools/film/<animal>_frames.film
@@ -101,6 +105,34 @@ def check_boxes(animal, plan, log):
         out.append(f'{m} {n} boxes of {budget or "?"} ({kind or "?"}) {note}')
     log.write('boxes: ' + '; '.join(out) + '\n')
     return '; '.join(out)
+
+
+def pairs_of(animal):
+    """(holder, prey) of every pair the animal is in, from the prey plans' spots.pairs."""
+    out = []
+    for model, _mod in body_plan.all_plans(drafts=False):
+        data = json.load(open(body_plan.plan_path(model), encoding='utf-8'))
+        for p in data.get('spots', {}).get('pairs', []):
+            if animal in (p['holder'], model) and (p['holder'], model) not in out:
+                out.append((p['holder'], model))
+    return out
+
+
+def check_pairs(animal, log):
+    pairs = pairs_of(animal)
+    if not pairs:
+        return 'none (in no spots.pairs of any prey plan)'
+    code, out = run([PY, 'tools/spots.py', '--check'], log)
+    if code != 0:
+        raise Hard('the spot tables are behind: ' + out.strip().splitlines()[0][:200])
+    parts = []
+    for holder, prey in pairs:
+        code, out = run([PY, 'tools/clip_check.py', holder, '--pair', prey], log)
+        if code != 0 or 'Traceback' in out:
+            raise Hard(f'clip_check.py --pair failed on {holder} and {prey} (exit {code}): ' + out.strip().splitlines()[-1][:200])
+        m = re.search(r'^\s+(\d+) flagged', out, re.M)
+        parts.append(f'{holder} holding {prey}: {m.group(1) if m else "?"} flagged')
+    return '; '.join(parts)
 
 
 # --- 3 to 5: one game launch -----------------------------------------------------------------------------------------
@@ -270,6 +302,7 @@ def main(argv):
             continue
         step(a, 'clips', check_clips, a, plans[a], logs[a])
         step(a, 'boxes', check_boxes, a, plans[a], logs[a])
+        step(a, 'pairs', check_pairs, a, logs[a])
     live = [a for a in animals if a not in stopped]
     if live and not offline:
         # one launch an animal, its course first: a single long launch of every animal's scenes (99, 80 minutes,
