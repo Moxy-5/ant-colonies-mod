@@ -7,18 +7,18 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**234 findings: 149 left (11 of them wait for your call), 85 done.**
+**234 findings: 145 left (11 of them wait for your call), 89 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
 | A: a player can meet it | 50 | 0 | 1 | 0 | 48 | 1 |
-| B: it will cost us when building on this | 107 | 72 | 2 | 4 | 28 | 1 |
-| C: a tidy-up | 77 | 68 | 0 | 2 | 6 | 1 |
+| B: it will cost us when building on this | 107 | 68 | 3 | 4 | 31 | 1 |
+| C: a tidy-up | 77 | 67 | 0 | 2 | 7 | 1 |
 
 | Round | System | Found | Left | Done |
 |---|---|---|---|---|
 | 1 | the colony brain | 50 | 30 | 20 |
-| 2 | the legs | 43 | 22 | 21 |
+| 2 | the legs | 43 | 18 | 25 |
 | 3 | the insect body | not read yet | | |
 | 4 | how bodies are drawn | not read yet | | |
 | 5 | the termites | not read yet | | |
@@ -69,7 +69,7 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R7-33** A palm's crown can blink out at the screen's edge
   - *Open:* waits to be seen (2026-11-24). Read from how Minecraft hides parts of the world, never seen in the game; the fix is large (sharing a crown's faces out over its blocks) and is built only if the user sees fronds blink out.
 
-### B: it will cost us when building on this (70 left)
+### B: it will cost us when building on this (67 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -98,11 +98,9 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R2-18** big step costs fight the fixed cap, and the mud test hides it
   - *Half fixed:* measured and the mud fixed. `SoftGroundSearchTest` (framework): a band of soft ground 8 wide that must be crossed is "no way" at 12 a step with the game's 6,000 and is crossed at 4; wet mud now costs 4 ...
 - **R2-29** the way through a chimney mouth still uses one body's lengths
+  - *Open:* left on purpose. Checked now: only the termite worker fits the tunnels (the tag `fits_termite_tunnels`), so only it takes a mouth's tube; the king, queen and nymph pass only the old chimney crown block, which no mound builds any ...
 - **R2-39** a mind pays for the same "no way" again a tick later, and a builder can ask 24 times in one tick
   - *Half fixed:* `Errand.walkOn` now treats a walk the legs gave up as "no way" (R2-2's fix): no second ask a tick later. Open: `BuildMoundGoal`'s many asks in one tick (round 5).
-- **R2-41** saving an insect that is walking a wall reads the world and loses its hold
-- **R2-42** four tests of "is this a doorway for this insect"
-- **R2-43** knocked into a cell near its route, an insect finds out only after 6 seconds
 
 **Round 7, the giant trees** (`docs/reviews/full/round-07-trees.md`)
 
@@ -164,7 +162,7 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R10-15** asking for a new path every tick to a spot that cannot be reached
 - **R10-18** small searches that run more often than they need
 
-### C: a tidy-up (67 left)
+### C: a tidy-up (66 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -190,7 +188,6 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R2-6** after a reload a held insect's heading, ceiling side and channel wall are gone
   - *Half fixed:* the heading is saved; the ceiling side and the channel wall are not.
 - **R2-10** the shuffle can move an insect 1.5 blocks, its comment says 0.7; its wall check looks at one point
-- **R2-11** the "no mouth any more" checks in the mouth moves can never fire, and would do the wrong thing
 - **R2-12** a sideways crawl ends over a tunnel opening
 - **R2-13** worked out again every tick: the doorway's point list, and up to 64 slope reads
 - **R2-15** tiny correction moves never count as blocked
@@ -291,6 +288,7 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R2-7** (C) `mayHaveGoal` asks the mind's test about twice as often as it needs
 - **R2-8** (B) the standing shuffle's search for a free spot can run every tick for good (BUGS 405)
 - **R2-9** (B) the stuck clock counts polite waiting, so a walker in a jam plans again and gives up (BUGS 404, 409)
+- **R2-11** (C) the "no mouth any more" checks in the mouth moves can never fire, and would do the wrong thing
 - **R2-14** (C) `unsqueeze` can divide by a column width of 0
 - **R2-17** (B) one search reads the same blocks 50 to 60 times per step (BUGS 399)
 - **R2-19** (B) a tunnel window sealed in front of an insect is not seen by the every-tick check (BUGS 407)
@@ -306,6 +304,9 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R2-37** (A) five goals ask the legs for a route on every tick after "no way" (BUGS 400)
 - **R2-38** (A) an insect on a path block, on farmland or in a pond with a low bank can never plan a route again (BUGS 401, 411, 412, 415)
 - **R2-40** (B) the "no foothold in reach, no search" shortcut helps one caller only
+- **R2-41** (B) saving an insect that is walking a wall reads the world and loses its hold
+- **R2-42** (B) four tests of "is this a doorway for this insect"
+- **R2-43** (B) knocked into a cell near its route, an insect finds out only after 6 seconds (BUGS 413)
 
 **Round 7, the giant trees**
 

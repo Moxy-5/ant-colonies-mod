@@ -253,6 +253,8 @@ doorways and mouths, channels, where it stands now, hugging a column). Every lin
 
 ### R2-11 (C, proven): the "no mouth any more" checks in the mouth moves can never fire, and would do the wrong thing
 
+**Status (2026-11-26, `claude/review-fix-11b`): fixed with R2-42: both checks are deleted; a mouth that is gone is seen by the tick's check, which plans again.**
+
 - **Where:** 1956 to 1958, 1984 to 1986, against `whatChanged` 663 to 668.
 - **What is wrong:** `whatChanged` runs first on the same tick with a stricter test, so these are never reached; if
   they were, `return true` would mark the step done with the body still in the tube.
@@ -520,6 +522,8 @@ surface and heading sent to the drawing, saving and restoring the hold, every `n
 
 ### R2-29 (B, likely; which castes take a mouth, unchecked): the way through a chimney mouth still uses one body's lengths
 
+**Status (2026-11-26, `claude/review-fix-11b`): open: left on purpose. Checked now: only the termite worker fits the tunnels (the tag `fits_termite_tunnels`), so only it takes a mouth's tube; the king, queen and nymph pass only the old chimney crown block, which no mound builds any more. For the worker the motion's push into the wall is about 0.01 block (a sixth of a pixel) off the renderer's, by my sum, not measured in the game (0.055 against 0.044): not to be seen. Giving the motion each body's own lengths means remaking a motion approved in the game, with films; it is done the day a second body takes a mouth.**
+
 - **Where:** `DoorwayMotion.java` 44 to 76; `AntNavigator.java` 1961, 1989, 2012, 2024 pass `ant.getScale()`.
 - **What is wrong:** BUGS 131 made every length scale with the game scale, but they are still the lengths of one
   model (one comment cites 0.17, the old harvester worker's number). The renderer's real push into a wall is worked
@@ -708,6 +712,8 @@ each pays its own search (a plugged hole is found again by every forager that wa
 
 ### R2-41 (B, the read proven; what it does at unload reasoned, not run): saving an insect that is walking a wall reads the world and loses its hold
 
+**Status (2026-11-26, `claude/review-fix-11b`): fixed: the hold of the step under way is kept as the walk goes (`AntNavigator.walkHold`, worked out each tick from the walk alone: the step's start or end the body is pressed against) and saving writes that, with no read of the world. The legs' four other direct block reads go through one guarded helper (`blockAt`), the doorway reads through the cell map. Tests `anInsectSavedWhileItClimbsAWallHoldsItAfterTheReload` and `...AsATermiteWorker` (saved in the middle of a climb with the land "not ready": it has its hold and stays up after loading). What Minecraft does at a real unload is still reasoned, not run.**
+
 - **Where:** `AbstractAntEntity.java` 2905; `AntNavigator.getHold` 520 to 523, `pos()` 2444 to 2459,
   `widestBetween` 2405 to 2416 (a plain `getBlockState`, no `LandReady` check).
 - **What is wrong:** with a route under way the hold is worked out from the world at save time. When a chunk is
@@ -722,6 +728,8 @@ each pays its own search (a plugged hole is found again by every forager that wa
 
 ### R2-42 (B, proven): four tests of "is this a doorway for this insect"
 
+**Status (2026-11-26, `claude/review-fix-11b`): fixed: one test, `Doorway.at` (a doorway with a channel is one for the insects that fit the channel, one without for those its collision shape lets through), asked through `CellMap.doorway` by the planner's `isMouth`, by the legs and by `avoidMouths`. The legs read it on a step's first tick (`stepDoor`), walk the step as it began and plan again if the answer changes under it; `doorwayAt` and the two `instanceof` checks are gone. Test `whetherABlockIsADoorwayIsJudgedInOnePlaceByTheInsect`.**
+
 - **Where:** `LevelCellMap.isMouth` 95; `AntNavigator.doorwayAt` 2084 to 2088; `outOfMouth` 1956 and `intoMouth`
   1984; `Doorway.avoidMouths`; `isDoorwayStep` 994 to 998 mixes two of them.
 - **What is wrong:** BUGS 6e was two of these disagreeing for one tick. Today they agree for the termite blocks. A
@@ -730,6 +738,8 @@ each pays its own search (a plugged hole is found again by every forager that wa
 - **Fix proposed:** one question on `CellMap`, asked by all; when its answer changes during a step, plan again.
 
 ### R2-43 (B, likely): knocked into a cell near its route, an insect finds out only after 6 seconds
+
+**Status (2026-11-26, `claude/review-fix-11b`): fixed another way: the hit itself tells the legs. Every flinging blow takes an insect off its feet until it lands (`AbstractAntEntity.knockback`, the rule BUGS 413 made for walls, now for floors too), and a walk is planned again from where it comes down (`AntNavigator.flung`, by the path a dropped walker already takes). Test `anInsectKnockedIntoADipBesideItsWayPlansAgainWhenItLands`. The fix proposed here (the body on a floor that is neither end of its step) was built first and was wrong: on ramps, and with walkers side by side, a body stands on such a floor all the time; it planned again 35 times in one run's ordinary raid marches. A blast or flowing water that only sets the motion still waits for the 3 blocks or the step's clock.**
 
 - **Where:** `AntNavigator.java` 822 (the 3-block test), 840, `walk` 1086 to 1100.
 - **What is wrong:** a hit that moves a walker less than 3 blocks (into a dip beside its way) is not noticed:

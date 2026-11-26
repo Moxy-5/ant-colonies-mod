@@ -89,6 +89,42 @@ public class TermiteTunnelTests {
     }
 
     /**
+     * Review R2-42: whether a block is a doorway for an insect is judged in one place ({@code Doorway.at}), which the
+     * route planner's "is this a mouth", the legs and the "keep away from mouths" habit all ask. A chimney mouth is
+     * one for the insect that fits its tube (the worker; not the king, who passes the block but does not fit the
+     * tube, nor a soldier); the old chimney crown, walked through whole, for the insects it lets through (the worker
+     * and the king; not a soldier).
+     */
+    @GameTest(template = "arena", timeoutTicks = 100, skyAccess = true)
+    public static void whetherABlockIsADoorwayIsJudgedInOnePlaceByTheInsect(GameTestHelper helper) {
+        lumpWithATunnel(helper);
+        ServerLevel level = helper.getLevel();
+        BlockPos crownAt = new BlockPos(3, 1, 3);
+        helper.setBlock(crownAt, SavannaBlocks.TERMITE_HOLE.get());
+        BlockPos mouth = helper.absolutePos(MOUTH);
+        BlockPos crown = helper.absolutePos(crownAt);
+        net.minecraft.world.entity.Entity worker = SavannaEntities.TERMITE_WORKER.get().create(level);
+        net.minecraft.world.entity.Entity king = SavannaEntities.TERMITE_KING.get().create(level);
+        net.minecraft.world.entity.Entity soldier = SavannaEntities.TERMITE_MINOR_SOLDIER.get().create(level);
+        String[] names = {"the worker", "the king", "a soldier"};
+        net.minecraft.world.entity.Entity[] insects = {worker, king, soldier};
+        boolean[] mouthFor = {true, false, false};
+        boolean[] crownFor = {true, true, false};
+        for (int i = 0; i < insects.length; i++) {
+            com.antcolonies.nav.LevelCellMap map = new com.antcolonies.nav.LevelCellMap(level, insects[i]);
+            helper.assertTrue((map.doorway(mouth) != null) == mouthFor[i], "the mouth is " + (mouthFor[i] ? "no" : "a") + " doorway for " + names[i]);
+            helper.assertTrue(map.isMouth(mouth) == mouthFor[i], "the planner's mouth test disagrees for " + names[i]);
+            helper.assertTrue((map.doorway(crown) != null) == crownFor[i], "the crown is " + (crownFor[i] ? "no" : "a") + " doorway for " + names[i]);
+            helper.assertTrue(!map.isMouth(crown), "the crown, which has no tube, is a mouth for " + names[i]);
+            // The habit of keeping away from mouths rules out the same steps: out over the top of a doorway it is inside.
+            double extra = com.antcolonies.nav.Doorway.avoidMouths(level, insects[i]).extra(
+                    new com.antcolonies.nav.Foothold(crown, Direction.EAST), com.antcolonies.nav.Foothold.floor(crown.east().above()), StepKind.OVER_TOP);
+            helper.assertTrue((extra > 0.0) == crownFor[i], "the habit disagrees about the crown for " + names[i]);
+        }
+        helper.succeed();
+    }
+
+    /**
      * A termite walks in at the window, along the tunnel and up inside the spire into its mouth (hidden in the channel
      * on the way); then, with the window shut behind it, the only way out is the mouth: it comes out with its look round
      * (it holds still the whole time with its head just out of the mouth, only its head moves, see DoorwayMotion, for the

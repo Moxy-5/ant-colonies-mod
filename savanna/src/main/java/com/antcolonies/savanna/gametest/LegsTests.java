@@ -774,6 +774,112 @@ public class LegsTests {
         };
     }
 
+    /**
+     * Review R2-41: an insect saved while it climbs a wall (its land going as the player walks away) is saved with the
+     * wall it holds, though the world answers "not ready" at that moment (Minecraft saves a chunk's insects after the
+     * chunk itself has gone): the hold is kept as the walk goes, never read from the world to save. Loaded again it
+     * holds the wall where it was. Before, no hold was found and the climber lay at the wall's foot afterwards.
+     */
+    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
+    public static void anInsectSavedWhileItClimbsAWallHoldsItAfterTheReload(GameTestHelper helper) {
+        anInsectSavedWhileItClimbsAWallHoldsItAfterTheReload(helper, SavannaEntities.MATABELE_MINOR.get());
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
+    public static void anInsectSavedWhileItClimbsAWallHoldsItAfterTheReloadAsATermiteWorker(GameTestHelper helper) {
+        anInsectSavedWhileItClimbsAWallHoldsItAfterTheReload(helper, SavannaEntities.TERMITE_WORKER.get());
+    }
+
+    private static void anInsectSavedWhileItClimbsAWallHoldsItAfterTheReload(GameTestHelper helper, EntityType<? extends AbstractAntEntity> body) {
+        buildNest(helper);
+        int x = MIDDLE - 6;
+        int z = MIDDLE + 8;
+        for (int y = 0; y < 6; y++) {
+            helper.setBlock(x, SURFACE + y, z, Blocks.STONE);
+        }
+        AbstractAntEntity ant = TestAnts.lone(helper, body, x - 3, SURFACE, z);
+        BlockPos top = helper.absolutePos(new BlockPos(x, SURFACE + 6, z));
+        double halfWay = helper.absolutePos(new BlockPos(x, SURFACE + 2, z)).getY() + 0.5;
+        helper.runAfterDelay(10, () -> helper.assertTrue(ant.getNavigator().moveTo(top, 1.0), "no way up the pillar"));
+        AbstractAntEntity[] copy = {null};
+        double[] savedY = {0.0};
+        long[] loadedAt = {0};
+        helper.onEachTick(() -> {
+            if (copy[0] != null || helper.getTick() <= 12 || ant.getNavigator().isDone() || !ant.getNavigator().isClimbing()
+                    || ant.getY() < halfWay) {
+                return;
+            }
+            // Saved in the middle of a climbing step, the land "not ready" as when its chunk is going.
+            net.minecraft.nbt.CompoundTag tag;
+            com.antcolonies.colony.LandReady.pretendNotReadyForTests(ant.blockPosition(), 1, true);
+            try {
+                tag = ant.saveWithoutId(new net.minecraft.nbt.CompoundTag());
+            } finally {
+                com.antcolonies.colony.LandReady.pretendNotReadyForTests(ant.blockPosition(), 1, false);
+            }
+            helper.assertTrue(tag.contains("HoldCell"), "saved in the middle of its climb with no hold, at " + ant.position());
+            tag.remove("UUID");
+            savedY[0] = ant.getY();
+            ant.discard();
+            AbstractAntEntity loaded = (AbstractAntEntity) ant.getType().create(helper.getLevel());
+            loaded.load(tag);
+            loaded.removeFreeWill();
+            loaded.keepOutOfColonies();
+            helper.getLevel().addFreshEntity(loaded);
+            copy[0] = loaded;
+            loadedAt[0] = helper.getTick();
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(copy[0] != null, "the insect has not climbed half way up yet");
+            // (Loaded between two cells of the wall, it is drawn into the nearer one: less than a block, never a drop.)
+            helper.assertTrue(copy[0].getY() > savedY[0] - 0.7, "it dropped after the reload (from " + savedY[0] + " to " + copy[0].getY() + ")");
+            helper.assertTrue(helper.getTick() < loadedAt[0] + 5 || copy[0].getNavigator().isClimbing(), "it let go of the wall after the reload");
+            helper.assertTrue(helper.getTick() >= loadedAt[0] + 60, "waiting to see whether the reloaded insect stays up");
+        });
+    }
+
+    /**
+     * Review R2-43: a walker flung by a blow into a dip beside its way (less than the 3 blocks that count as "off the
+     * route") plans again from where it comes down and climbs out. Before, nothing told the legs: it pushed at the
+     * dip's side until the step's clock ran out, 6 seconds, and only then planned.
+     */
+    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
+    public static void anInsectKnockedIntoADipBesideItsWayPlansAgainWhenItLands(GameTestHelper helper) {
+        buildNest(helper);
+        int x0 = MIDDLE - 9;
+        int z = MIDDLE + 8;
+        helper.setBlock(x0 + 3, SURFACE - 1, z + 1, Blocks.AIR); // a dip one block deep beside its way
+        BlockPos dip = helper.absolutePos(new BlockPos(x0 + 3, SURFACE - 1, z + 1));
+        BlockPos goal = helper.absolutePos(new BlockPos(x0 + 7, SURFACE, z));
+        AbstractAntEntity ant = TestAnts.lone(helper, SavannaEntities.MATABELE_MINOR.get(), x0, SURFACE, z);
+        helper.runAfterDelay(10, () -> helper.assertTrue(ant.getNavigator().moveTo(goal, 1.0), "no way along the ground"));
+        Route[] before = {null};
+        long[] knockedAt = {-1};
+        long[] plannedAt = {-1};
+        helper.onEachTick(() -> {
+            if (knockedAt[0] < 0) {
+                if (helper.getTick() > 12 && !ant.getNavigator().isDone() && ant.blockPosition().getX() == dip.getX()) {
+                    before[0] = ant.getNavigator().getPlannedRoute();
+                    // A blow as a player's or an animal's (the game's own knock), made to come down in the dip: straight
+                    // up over its middle.
+                    ant.knockback(0.4, 0.0, -1.0);
+                    ant.setPos(dip.getX() + 0.5, dip.getY(), dip.getZ() + 0.5);
+                    ant.setDeltaMovement(0.0, ant.getDeltaMovement().y, 0.0);
+                    knockedAt[0] = helper.getTick();
+                }
+            } else if (plannedAt[0] < 0 && ant.getNavigator().getPlannedRoute() != before[0]) {
+                plannedAt[0] = helper.getTick();
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(knockedAt[0] >= 0, "the walker has not come past the dip yet");
+            helper.assertTrue(plannedAt[0] >= 0, "in the dip it has not planned again yet");
+            helper.assertTrue(plannedAt[0] - knockedAt[0] <= 40, "it was " + (plannedAt[0] - knockedAt[0]) + " ticks in the dip before it planned again");
+            helper.assertTrue(ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(goal),
+                    "it has not climbed out of the dip and walked on to its goal yet");
+        });
+    }
+
     /** Fails if a climbing ant stands still for 12 ticks or more, or slides sideways away from the wall it hugs. */
     private static void trackSteadiness(GameTestHelper helper, AbstractAntEntity ant) {
         Vec3[] last = {null};
@@ -879,7 +985,7 @@ public class LegsTests {
         BlockPos inTheAir = helper.absolutePos(new BlockPos(MIDDLE + 5, SURFACE + 6, MIDDLE - 6));
         AbstractAntEntity ant = TestAnts.lone(helper, SavannaEntities.MATABELE_MINOR.get(), MIDDLE + 5, SURFACE, MIDDLE + 5);
         AbstractAntEntity withHabits = TestAnts.lone(helper, SavannaEntities.TERMITE_WORKER.get(), MIDDLE + 7, SURFACE, MIDDLE + 5);
-        withHabits.setWalkHabitsForTests(com.antcolonies.nav.Doorway.avoidMouths(helper.getLevel()));
+        withHabits.setWalkHabitsForTests(com.antcolonies.nav.Doorway.avoidMouths(helper.getLevel(), withHabits));
         helper.runAfterDelay(10, () -> {
             int before = com.antcolonies.nav.AntPathFinder.searchesRunForTests();
             helper.assertFalse(ant.getNavigator().moveTo(inBox, 1.0), "there is a way into the shut box");

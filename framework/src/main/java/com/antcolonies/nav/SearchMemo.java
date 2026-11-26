@@ -92,4 +92,9 @@ final class SearchMemo implements CellMap {
         }
         return (known & MOUTH) != 0;
     }
+
+    @Override
+    public Doorway doorway(BlockPos cell) {
+        return map.doorway(cell);
+    }
 }

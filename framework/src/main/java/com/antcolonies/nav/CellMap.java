@@ -60,4 +60,13 @@ public interface CellMap {
     default boolean isMouth(BlockPos cell) {
         return false;
     }
+
+    /**
+     * The doorway in this cell for this map's insect, or null: the one test of it ({@link Doorway#at}), which the
+     * legs ask for the step they walk and {@link #isMouth} is made from.
+     */
+    @javax.annotation.Nullable
+    default Doorway doorway(BlockPos cell) {
+        return null;
+    }
 }
