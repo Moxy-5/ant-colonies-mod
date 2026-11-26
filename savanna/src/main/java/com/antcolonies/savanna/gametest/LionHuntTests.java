@@ -670,6 +670,9 @@ public class LionHuntTests {
     /**
      * At dusk a hungry pride's lionesses spread, stalk a herd with a calf, take the calf; the pride comes to the carcass and
      * feeds; at least the male and two lionesses eat their fill (their hunger back to 0); the full lie by the kill.
+     * They feed lying at the carcass's feeding spots (the Motion Studio phase 3, step 5): one lying down onto its place is
+     * on it when it feeds (its jaw at its bite on the spot), no two feed at one spot, and feeding only ever ends in getting
+     * up (never a calm tick between its rounds, BUGS 376).
      */
     @GameTest(template = "arena", timeoutTicks = 7000, skyAccess = true, batch = "lion_hunt_dusk")
     public static void atDuskAHungryPrideTakesACalfAndFeeds(GameTestHelper helper) {
@@ -681,8 +684,28 @@ public class LionHuntTests {
         List<LionEntity> pride = scene.pride();
         boolean[] stalked = {false};
         long[] killedAt = {-1};
+        java.util.Map<LionEntity, Byte> was = new java.util.HashMap<>();
+        java.util.Set<LionEntity> fedOnPlace = new java.util.HashSet<>();
         helper.onEachTick(() -> {
             scene.tick();                                   // the cow grazes whenever calm
+            java.util.Map<String, LionEntity> spots = new java.util.HashMap<>();
+            for (LionEntity l : pride) {
+                byte d = l.doing();
+                helper.assertFalse(was.getOrDefault(l, LionEntity.CALM) == LionEntity.FEED && d != LionEntity.FEED && d != LionEntity.REST_UP,
+                        "feeding ended in something other than getting up (doing " + d + "): " + l.about());
+                was.put(l, d);
+                if (d == LionEntity.FEED) {
+                    String spot = LionHunt.feedSpotForTests(l);
+                    LionEntity other = spot == null ? null : spots.put(spot, l);
+                    helper.assertTrue(other == null, "two feed at " + spot + ": " + l.about() + " and " + (other == null ? "" : other.about()));
+                    double off = LionHunt.feedOffForTests(l);
+                    helper.assertTrue(off < 0.05, "feeding off its place by " + off + " (" + LionHunt.feedOffAbout(l) + "; the cow "
+                            + String.format("%.2f", l.distanceTo(cow)) + " away): " + l.about());
+                    if (off >= 0) {
+                        fedOnPlace.add(l);
+                    }
+                }
+            }
             for (LionEntity l : pride) {
                 stalked[0] |= l.doing() == LionEntity.STALK || l.doing() == LionEntity.FREEZE;
             }
@@ -706,6 +729,7 @@ public class LionHuntTests {
                 }
                 if (full >= 3 && maleFull && lying >= 2) {
                     helper.assertTrue(stalked[0], "a kill with no stalk");
+                    helper.assertTrue(fedOnPlace.size() >= 2, "fewer than two fed lying on a feeding place: " + fedOnPlace.size());
                     for (LionEntity l : pride) {
                         if (l.fedFull()) {
                             helper.assertTrue(l.sinceMeal() < LionHunt.HUNGRY / 10, "a full lion is still hungry: " + l.about());

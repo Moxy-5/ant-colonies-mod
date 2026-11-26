@@ -8,6 +8,7 @@ abigpanis3deeponslopinggroundandholds 0.01
 abigtermitecolonyshowsnomorethanthecap 0.85
 ablockoveragapisbuiltoutfromsetsoilbesideit 0.00
 abreakinspreadsthedrummingandsendsthesoldierstothebreach 0.32
+abuffalohelddowndieswhereitliesanditsholdersletgo 0.04
 abuffaloindeepwaterfloatsandswimsout 0.32
 abuffalosdeathclipplaysoutbeforeitsbodygoes 0.76
 abuffalostopsandfacesalionwalkingpast 0.29
@@ -106,6 +107,8 @@ ahippostepsdownintotheshallowsonitsmove 0.32
 ahippowalksoutoftheshallowsonitsmove 0.96
 ahippowearsapathwalkingthesameway 0.56
 ahippoyawnsataplayerthenchargesandbites 0.32
+aholderridesonherspotherjawonitandkeepsstill 0.05
+aholderwithnoroomatherspotletsgo 0.00
 ahungrybullfroglungesatabarb 0.28
 ahungrybullfroglungesatatadpole 0.15
 ahungrycatfishhuntsandswallowsatilapia 0.31
@@ -119,6 +122,7 @@ ahungryottergulpsdownasmallfishatonce 0.82
 ahungrysharkprowlsatnightandswallowsatilapia 0.00
 ahungryworkereatsoneseedfromthefoodstore 9.13
 alarvathatisnotfedfortwodaysstarves 0.02
+aleapcarriesitselfontoitsspotandbites 0.04
 algaegrowsbydepthspreadsandisgrazed 0.00
 alimperfollowsthetrailhomeandraiderscalledtodefendrejointheraid 0.10
 alionesshurtbyabuffalobacksoffneveratit 0.75
@@ -220,6 +224,7 @@ ascoutoutasnumbersisshownwhenawatchercomesnear 0.03
 ascoutringsalivingmounditcomesnearandfollowsatermitetunnelouttothefeeding 0.17
 ascoutstrailoveraridgeandroundapondleadstheraidthereandhome 0.26
 ascoutwithnowayonasksforarouteonlynowandthen 0.04
+asecondholdertakesafreespotclearofthefirst 0.03
 asharkbreachesatpreynearthesurface 0.00
 asharkbumpsaswimmerfirstthenwarnsandbites 0.01
 asharkhitbyaswimmerwarnsthenbites 0.00
@@ -229,6 +234,7 @@ asharkneverfollowsintoshallowwater 0.00
 asharkshakesacatfishapartandleavesremains 0.01
 asharkspyhopsataplayeronthebank 0.00
 asharkwarnsoffacrocodile 0.00
+asmackoutofagalloplandsonawalkingcow 0.03
 asmallcrocodilegiveswaytoalongershark 0.00
 asmallpanis2deepwithitstrampledring 0.01
 asnailandatadpolegrazedyinghippograss 0.33
@@ -474,6 +480,7 @@ tilapiagrazegrowupandweartheirlooks 0.33
 treeblocksplaceandbranchesjoin 0.00
 tunnelblocksjoinupontheirown 0.00
 twofedottersplayaboutahungrypairdoesnot 0.54
+twolionessesbringacowdownandgodownwithitonitsclock 0.05
 whatanantcarriesiskeptafterareload 0.32
 whatatermitecarriesiskeptafterareload 0.51
 whatthespawnercostsforourgroups 0.01

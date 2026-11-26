@@ -1515,8 +1515,21 @@ def export_game():
     print(f"Exported full African Lion Pride game assets (lion={len(clips_male)}, lioness={len(clips_lns)}, cub={len(clips_cub)} clips).")
 
 
+def export_clips():
+    """Writes only the three forms' clips. Use this when only tools/lion_anims.py changed: 'game' also writes the body
+    plans, whose holds, strikes and checks were added after by hand and by other tools and would be lost."""
+    import lion_anims
+    out = {}
+    for stem, member, kind in (("lion", "photo_king", "male"), ("lioness", "lioness", "lioness"), ("lion_cub", "cub", "cub")):
+        clips_k, _ = lion_anims.build_all_clips(build_member(member), kind=kind)
+        out[f"animations/entity/{stem}.animation.json"] = animations(clips_k)
+    write_assets(out, mod="savanna", faces=True)
+
+
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "game":
+    if len(sys.argv) > 1 and sys.argv[1] == "clips":
+        export_clips()
+    elif len(sys.argv) > 1 and sys.argv[1] == "game":
         export_game()
     else:
         print("African Lion Pride Audit (Stalker King Male x3 + Lioness + Cub):")

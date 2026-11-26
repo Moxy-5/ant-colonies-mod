@@ -91,15 +91,17 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
             // the hunt (lion step 2): creeping crouched, frozen flat, the leap from the stalk, the bounding smack, the pin
             STALK = 28, FREEZE = 29, LEAP_BITE = 30, JUMP_SMACK = 31, PIN = 32,
             // holds made against the buffalo (the Motion Studio phase 3, step 3): its throat, going down with it, holding it down
-            THROAT_HOLD = 33, HOLD_SINK = 34, HOLD_DOWN = 35;
+            THROAT_HOLD = 33, HOLD_SINK = 34, HOLD_DOWN = 35,
+            // lying at a carcass, its jaw on a feeding spot (the Motion Studio phase 3, step 5)
+            FEED = 36;
     /** Each doing's clip, by its number (a cub's roar is its {@code cub_call}). */
     private static final String[] DOING_CLIPS = {"idle", "sit_down", "sit", "sit_up", "rest_down", "rest", "rest_up", "rest_stretch_up",
             "groom", "drink", "roar", "pride_greet", "mama_nuzzle", "cub_groom", "play_pounce", "play_wrestle", "mood_alert", "mood_angry",
             "mood_flehmen", "mood_curious", "bluff_charge", "swipe", "swipe_quick", "swipe_heavy", "swipe_combo", "bite", "pounce", "gallop_swat",
-            "stalk", "ambush_freeze", "stalk_leap_bite", "jump_smack", "takedown_pin", "throat_hold", "hold_sink", "hold_down"};
+            "stalk", "ambush_freeze", "stalk_leap_bite", "jump_smack", "takedown_pin", "throat_hold", "hold_sink", "hold_down", "feed"};
     /** Each one-shot doing's clip length (ticks, from the clip files); 0 for the loops. The roar's is the male's (see {@link #oneShotTicks}). */
     private static final int[] DOING_TICKS = {0, 15, 0, 15, 19, 0, 19, 76, 88, 60, 68, 36, 37, 64, 33, 44, 0, 0, 0, 0, 27, 20, 18, 21, 29,
-            15, 25, 19, 0, 0, 29, 20, 26, 0, 41, 0};
+            15, 25, 19, 0, 0, 29, 20, 26, 0, 41, 0, 0};
     /** The lioness's roar (her sharper contact call) and the cub's call (ticks). */
     static final int LIONESS_ROAR_TICKS = 50, CUB_CALL_TICKS = 32;
     /** The moods, by number: the face clips {@code face_<mood>}. */
@@ -845,6 +847,13 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
 
     /** Lions never shove each other (a pride lies touching, in a row; a shove slid them off their beds). */
     @Override
+    public void push(Entity other) {
+        if (!hunt.lyingAt) {
+            super.push(other);                          // lying at its feeding spot nothing shoves it off (a cow brushing by)
+        }
+    }
+
+    @Override
     protected void doPush(Entity other) {
         if (!(other instanceof LionEntity) && !(other instanceof BuffaloEntity && holding())) {
             super.doPush(other);                        // nor does a lion clinging to prey shove it about
@@ -1105,8 +1114,8 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
             return state.setAndContinue(DOING_ANIMS[d]);
         }
         if (d > CALM && d < DOING_ANIMS.length) {
-            if (!oneShot(d)) {
-                player.setAnimationSpeed(loopRate());
+            if (!oneShot(d) && spots().hold(DOING_CLIPS[d]) == null) {
+                player.setAnimationSpeed(loopRate());   // (a hold's or a feed's loop at its own pace: its bite is counted in ticks)
             }
             return state.setAndContinue(d == ROAR && isCub() ? CUB_CALL : DOING_ANIMS[d]);
         }
