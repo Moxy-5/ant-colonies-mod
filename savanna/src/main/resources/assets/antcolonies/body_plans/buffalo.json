@@ -88,8 +88,8 @@
   "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/BuffaloEntity.java",
   "blend": 5,
   "feet_parts": ["foot"],
-  "feet_free": ["walk", "trot", "charge", "charge_headbutt", "paw_ground", "gore", "rest_down", "rest", "rest_up", "death", "step_up_1000", "step_down_1000"],
-  "tuck_ok": ["rest_down", "rest", "rest_up", "death", "step_up_1000", "step_down_1000"],
+  "feet_free": ["walk", "trot", "charge", "charge_headbutt", "paw_ground", "gore", "rest_down", "rest", "rest_up", "death", "step_up_1000", "step_down_1000", "held_sink", "held_down", "death_down"],
+  "tuck_ok": ["rest_down", "rest", "rest_up", "death", "step_up_1000", "step_down_1000", "held_sink", "held_down", "death_down"],
   "body_bones": ["hips", "chest"],
   "walks": {
    "walk": 9.722,
@@ -152,7 +152,15 @@
    ["headbutt", "mood_angry"],
    ["gore", "mood_angry"],
    ["mood_angry", "paw_ground"],
-   ["drink", "rest_down"]
+   ["drink", "rest_down"],
+   ["idle", "held_sink"],
+   ["walk", "held_sink"],
+   ["held_sink", "held_down"],
+   ["held_down", "rest_up"],
+   ["held_down", "death_down"],
+   ["held_sink", "death_down"],
+   ["rest", "death_down"],
+   ["rest_down", "death_down"]
   ],
   "drawn_ahead": {
    "find": "DRAW_AHEAD_PX = (-?[\\d.]+)"
@@ -171,14 +179,14 @@
   "films": ["tools/film/buffalo_frames.film"]
  },
  "spots": {
-  "about": "Where a hunter grips it (the Motion Studio, phase 3, docs/plans/motion-studio-phase3.md): each spot lies where a ray from 'from' going 'out' (degrees from straight ahead, + to its left) last leaves the skin's boxes, and moves with its bone. Lions take a buffalo by the haunch from behind, the throat from the front sides and the flanks. tools/spots.py writes assets/antcolonies/spots/buffalo.json from this (the game reads that); never edit the table by hand.",
+  "about": "Where a hunter grips it (the Motion Studio, phase 3, docs/plans/motion-studio-phase3.md): each spot lies where a ray from 'from' going 'out' (degrees from straight ahead, + to its left) last leaves the skin's boxes, and moves with its bone. Lions take a buffalo by the haunch from behind (the left haunch beside its tail's root, step 3: on the root itself its tail ran through the holder's head), the throat from the front sides and the flanks. 'pairs' say which holder clip goes with which of its clips and spots (step 3): the game picks by them (tools/spots.py writes them into the table). tools/spots.py writes assets/antcolonies/spots/buffalo.json from this (the game reads that); never edit the table by hand.",
   "skin": ["hips", "chest", "neck"],
-  "clips": ["idle", "rest_down", "rest", "rest_up", "death"],
+  "clips": ["idle", "held_sink", "held_down", "rest_down", "rest", "rest_up", "death", "death_down"],
   "at": {
    "rump": {
     "bone": "hips",
     "from": [
-     0,
+     5,
      20,
      20
     ],
@@ -223,14 +231,47 @@
   },
   "pairs": [
    {
-    "about": "a grown cow held standing, bitten (LionHunt.holdClip)",
+    "about": "a grown buffalo standing (or walking: its idle), held at the haunch or a flank: bitten again and again",
     "holder": "lioness",
     "hold": "bite",
     "holder_size": 0.97,
     "size": 0.9,
+    "spots": ["rump", "flank_left", "flank_right"],
     "clips": {
-     "idle": "loop",
-     "death": "once"
+     "idle": "loop"
+    }
+   },
+   {
+    "about": "a grown buffalo standing, held by the throat: clamped (step 3, made against these spots)",
+    "holder": "lioness",
+    "hold": "throat_hold",
+    "holder_size": 0.97,
+    "size": 0.9,
+    "spots": ["neck_left", "neck_right"],
+    "clips": {
+     "idle": "loop"
+    }
+   },
+   {
+    "about": "a grown buffalo brought down by two or more: the holders go down with it, both clips on one clock ('together': they start on the same tick) (step 3)",
+    "holder": "lioness",
+    "hold": "hold_sink",
+    "holder_size": 0.97,
+    "size": 0.9,
+    "clips": {
+     "held_sink": "once"
+    },
+    "together": true
+   },
+   {
+    "about": "a grown buffalo down (held, or caught lying): held down (step 3)",
+    "holder": "lioness",
+    "hold": "hold_down",
+    "holder_size": 0.97,
+    "size": 0.9,
+    "clips": {
+     "held_down": "loop",
+     "rest": "loop"
     }
    },
    {
@@ -241,8 +282,7 @@
     "size": 0.36,
     "clips": {
      "rest_down": "once",
-     "rest": "loop",
-     "death": "once"
+     "rest": "loop"
     }
    }
   ]

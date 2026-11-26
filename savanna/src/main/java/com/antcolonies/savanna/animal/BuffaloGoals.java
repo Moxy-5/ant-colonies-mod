@@ -1149,6 +1149,11 @@ public final class BuffaloGoals {
             if (!held) {
                 heldAway = null;
             }
+            byte now = b.doing();
+            if (held && (now == BuffaloEntity.HELD_SINK || now == BuffaloEntity.HELD_DOWN || now == BuffaloEntity.REST_UP)) {
+                b.getNavigation().stop();                   // brought down under its holders: no pulling, no turning (it
+                return;                                     // would swing them round with it); freed, it pulls once up
+            }
             if (!held && (target == null || !target.isAlive() || ticks > FLEE_TICKS)) {
                 end();
                 return;

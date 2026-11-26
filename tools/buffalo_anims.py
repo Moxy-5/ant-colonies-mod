@@ -8,11 +8,12 @@ Built directly on the exact 35-bone rig from tools/buffalo_models.py:
 - Natural blinking & classic African Buffalo rapid ear-flutter across living clips + dedicated clips.
 - 2nd-order damped spring physics (motion_kit.secondary_lag) for living 3-bone tail switch whip.
 
-Clip Suite (21 Core & Character Clips + 2 BlockMoves = 23 clips):
+Clip Suite (24 Core & Character Clips + 2 BlockMoves = 26 clips):
   Locomotion:  idle, walk, trot, charge
   Combat:      headbutt, charge_headbutt, gore, paw_ground, bellow
   Fun & Life:  ear_flutter, snort, horn_rub, shake_off, graze, drink,
                rest_down, rest, rest_up, mood_alert, mood_angry, death
+  Held:        held_sink, held_down, death_down (the Motion Studio phase 3: brought down by lionesses)
   BlockMoves:  step_up_1000, step_down_1000
 """
 import math
@@ -796,7 +797,7 @@ def build_clips(raw_bones):
     # as front knees lower onto the grass first and hindquarters slowly settle onto folded hocks!
     # ------------------------------------------------------------------------------------------------------------------
     def _grounded_rest_pose(rig_obj, k_fl, k_fr, k_hind, breath=0.0, chew_t=0.0,
-                            blink=0.0, squint=0.35, ear_l_fl=0.0, ear_r_fl=0.0):
+                            blink=0.0, squint=0.35, ear_l_fl=0.0, ear_r_fl=0.0, trunk=None):
         """Exact 2-bone IK grounded bovine rest pose:
         - k_fl, k_fr, k_hind in [0..1]: 0 = full standing, 1 = relaxed folded-leg loaf on y=0.05 px!
         - Front hooves glide smoothly back under the chest at y=3.45 (sole at y=0.05) while front knees descend onto grass!
@@ -847,6 +848,8 @@ def build_clips(raw_bones):
                 "toe": 0.0,
                 "pole": [0.22 * s * k_hind, 0.0, 1.0],
             }
+        if trunk is not None:
+            trunk(p)                    # the trunk moved before the legs are solved, so the hooves stay where they are
         rig_obj.solve_legs(p, targs, reach=0.994)
         return p
 
@@ -943,23 +946,34 @@ def build_clips(raw_bones):
     # ------------------------------------------------------------------------------------------------------------------
     # 21. DEATH (1.40s hold) — Heavy weighted collapse onto knees then right flank, 0.00 px ground clip!
     # ------------------------------------------------------------------------------------------------------------------
-    def make_death():
+    def make_death(down=False):
+        # down (death_down, the Motion Studio phase 3, step 3): dying where it lies (held down by lions, resting, a calf
+        # pinned): no buckle (it is down already), a last gasp, then the same fall onto its flank and the same last pose.
         L, N = 1.40, 28
         def frame(i, t):
-            buckle = ease(_clamp(t / 0.56, 0.0, 1.0))
-            fall   = ease(_clamp((t - 0.42) / 0.78, 0.0, 1.0))
-            bounce = 0.45 * math.sin(math.pi * _clamp((t - 1.14) / 0.22, 0.0, 1.0)) if 1.14 <= t <= 1.36 else 0.0
-            p = _grounded_rest_pose(rig, buckle, buckle, buckle, squint=0.0,
-                                    blink=ease(_clamp((t - 0.14) / 0.36, 0.0, 1.0)))
+            if down:
+                buckle = 1.0
+                fall   = ease(_clamp((t - 0.30) / 0.78, 0.0, 1.0))
+                b0     = 1.02
+                eyes   = ease(_clamp((t - 0.30) / 0.36, 0.0, 1.0))
+                gasp   = pulse(t, 0.02, 0.12, 0.08, 0.16)
+            else:
+                buckle = ease(_clamp(t / 0.56, 0.0, 1.0))
+                fall   = ease(_clamp((t - 0.42) / 0.78, 0.0, 1.0))
+                b0     = 1.14
+                eyes   = ease(_clamp((t - 0.14) / 0.36, 0.0, 1.0))
+                gasp   = 0.0
+            bounce = 0.45 * math.sin(math.pi * _clamp((t - b0) / 0.22, 0.0, 1.0)) if b0 <= t <= b0 + 0.22 else 0.0
+            p = _grounded_rest_pose(rig, buckle, buckle, buckle, squint=0.0, blink=eyes)
             base_dy = p["hips"]["position"][1]
             dy = base_dy + 0.85 * buckle + 4.2 * math.sin(math.pi * fall) + 0.4 * fall + bounce
             roll_z = -78.0 * fall
             p["hips"]  = {"position": [0.0, dy, 0.0], "rotation": [1.5 * buckle * (1.0 - 0.7 * fall), 0.0, roll_z]}
             p["chest"] = {"rotation": [0.8 * buckle, -4.0 * fall, 4.0 * fall]}
-            p["neck"]  = {"rotation": [9.0 * buckle - 4.0 * fall, -6.0 * fall, 20.0 * fall]}
-            p["head"]  = {"rotation": [5.0 * buckle - 5.0 * fall, -5.0 * fall, 18.0 * fall]}
-            rig.set_face(p, blink=ease(_clamp((t - 0.14) / 0.36, 0.0, 1.0)),
-                         jaw=12.0 * fall, tongue_rx=4.0 * fall,
+            p["neck"]  = {"rotation": [9.0 * buckle - 4.0 * fall - 10.0 * gasp, -6.0 * fall, 20.0 * fall]}
+            p["head"]  = {"rotation": [5.0 * buckle - 5.0 * fall - 14.0 * gasp, -5.0 * fall, 18.0 * fall]}
+            rig.set_face(p, blink=eyes,
+                         jaw=12.0 * fall + 16.0 * gasp, tongue_rx=4.0 * fall,
                          ear_l=(-8.0 * fall, -14.0 * fall, 16.0 * fall),
                          ear_r=(-6.0 * fall, 10.0 * fall, -12.0 * fall))
             f_rel = ease(_clamp((fall - 0.20) / 0.80, 0.0, 1.0))
@@ -977,6 +991,68 @@ def build_clips(raw_bones):
         return _bake_clip(rig, L, N, frame, loop="hold", tail_lag=0.09)
 
     clips["death"] = make_death()
+    clips["death_down"] = make_death(down=True)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # 21b & 21c. HELD BY LIONS (the Motion Studio phase 3, step 3): held by two or more lionesses it is brought down
+    # (held_sink) and struggles on the ground (held_down). All four legs buckle together, so every spot a lioness holds
+    # (the haunch, the flanks, the throat) goes down together: one holder clip fits them all (tools/lion_anims.py makes
+    # hold_sink against this clip's spots). Both end in, and stay near, the rest pose, so rest_up and death_down follow.
+    # ------------------------------------------------------------------------------------------------------------------
+    def make_held_sink():
+        # 2.0 s: a struggle on its feet (its head thrown back at the lions, horns hooking side to side, a bellow, a
+        # stagger), then its legs give way together (0.75..1.55 s) and it sinks onto its brisket with a thud.
+        L, N = 2.00, 40
+        def frame(i, t):
+            k = ease(_clamp((t - 0.75) / 0.80, 0.0, 1.0))
+            thud = math.sin(math.pi * _clamp((t - 1.50) / 0.20, 0.0, 1.0)) if 1.50 <= t <= 1.70 else 0.0
+            toss = pulse(t, 0.06, 0.16, 0.26, 0.30)
+            hook = math.sin(2.0 * math.pi * t / 0.85) * pulse(t, 0.02, 0.18, 0.95, 0.45)
+            roar = pulse(t, 0.22, 0.12, 0.42, 0.30)
+            stag = math.sin(2.0 * math.pi * t * 1.4) * (1.0 - k)
+            def trunk(q):
+                q["hips"]["position"][1] += -0.30 * thud
+                q["hips"]["rotation"][2] += 2.2 * stag
+                q["chest"]["rotation"][1] += 0.4 * hook
+            p = _grounded_rest_pose(rig, k, k, k, squint=0.0, trunk=trunk)
+            p["neck"]["rotation"][0] += -5.0 * toss
+            p["neck"]["rotation"][1] += 1.0 * hook          # the hooking is in its head: its neck (the throat holders' spots) held
+            p["head"]["rotation"][0] += -24.0 * toss + 6.0 * thud
+            p["head"]["rotation"][1] += 16.0 * hook
+            p["head"]["rotation"][2] += 8.0 * hook
+            rig.set_face(p, blink=pulse(t, 1.52, 0.05, 0.06, 0.10), squint=0.30, angry=0.9 * (1.0 - 0.5 * k),
+                         jaw=26.0 * roar + 4.0 * k, tongue_rx=-5.0 * roar,
+                         ear_l=(-14.0, -22.0 - 6.0 * toss, 8.0))
+            return p, 14.0 + 10.0 * toss, 34.0 + 10.0 * hook * (1.0 - k)   # lashing on its right, off the left haunch
+        return _bake_clip(rig, L, N, frame, loop="hold", tail_lag=0.08)
+
+    def make_held_down():
+        # 2.4 s loop: on its brisket under the lions, heaving, a bellow, a try to push up on its front knees that fails.
+        # Made against its holders (tools/clip_check.py --pair): its trunk barely moves (their spots), its head is held
+        # (a small swing, not a sweep into the lionesses at its throat), its ears flat back, its tail clamped down over
+        # its right buttock (the lioness at its haunch bites the left one, beside the tail's root). The struggle is in the head's toss, the breath and the knees.
+        L, N = 2.40, 36
+        def frame(i, t):
+            ph = 2.0 * math.pi * t / L
+            heave = math.sin(2.0 * ph)
+            swing = math.sin(ph)
+            roar = pulse(t, 0.30, 0.14, 0.40, 0.30)
+            push = pulse(t, 1.35, 0.25, 0.20, 0.35)
+            kf = 1.0 - 0.10 * push
+            p = _grounded_rest_pose(rig, kf, kf, 1.0, breath=1.6 * heave, squint=0.40)
+            p["neck"]["rotation"][1] += 1.5 * swing
+            p["neck"]["rotation"][0] += -4.0 * roar
+            p["head"]["rotation"][0] += -14.0 * roar + 5.0 * push
+            p["head"]["rotation"][1] += 4.0 * swing
+            p["head"]["rotation"][2] += 3.0 * swing
+            rig.set_face(p, blink=pulse(t, 2.05, 0.06, 0.05, 0.10), squint=0.40, angry=0.7,
+                         jaw=4.0 + 24.0 * roar, tongue_rx=-4.0 * roar,
+                         ear_l=(-30.0, -34.0, 14.0))
+            return p, 14.0 + 4.0 * abs(swing), 34.0 + 5.0 * swing   # its tail clamped down over its right buttock
+        return _bake_clip(rig, L, N, frame, loop=True, tail_lag=0.08)
+
+    clips["held_sink"] = make_held_sink()
+    clips["held_down"] = make_held_down()
 
     # ------------------------------------------------------------------------------------------------------------------
     # 22 & 23. BLOCKMOVES: step_up_1000 & step_down_1000 (1-block = 16.0 px ledge climb & descent!)

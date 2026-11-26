@@ -279,7 +279,7 @@ public class LionHuntTests {
 
     /** Where a holder's jaw is at its bite (the world), from its spot table. */
     private static Vec3 jawAtBite(LionEntity she, BuffaloEntity prey) {
-        var hold = LionHunt.holdOf(she, prey);
+        var hold = LionHunt.holdOf(she, prey, she.holdSpot());
         return com.antcolonies.entity.body.Spots.world(new Vec3(hold.x(), hold.y(), hold.z()), she.position(), she.yBodyRot,
                 she.getScale(), she.measures.drawAheadPx());
     }
@@ -386,6 +386,125 @@ public class LionHuntTests {
             helper.assertTrue(LionHunt.freeSpot(she, cow) != rump, "the rump counted free with a wall where she would stand");
             helper.succeed();
         });
+    }
+
+    // --- the cow brought down (the Motion Studio, phase 3, step 3) ------------------------------------------------------
+
+    /** A grown cow, its days off, too tough to die in the test unless killed on purpose. */
+    private static BuffaloEntity toughCow(GameTestHelper helper, double x, double z, float yaw) {
+        BuffaloEntity cow = buffalo(helper, x, z, yaw, Sex.FEMALE, false, helper.absolutePos(new BlockPos((int) x, GROUND, (int) z)));
+        cow.led = true;
+        cow.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH).setBaseValue(400.0);
+        cow.setHealth(400.0F);
+        return cow;
+    }
+
+    /**
+     * Two lionesses holding a cow bring it down: it goes down under them (held_sink, then held_down) and they go down with
+     * it on its clock (hold_sink a tick ahead of its held_sink: their blends are 4 and 5 ticks), never moving from their
+     * places (every hold keeps her jaw at the same reach), their jaws on its spots every tick; held down, their clamps
+     * bite. One let go, it gets up (rest_up).
+     */
+    @GameTest(template = "arena", timeoutTicks = 260, skyAccess = true)
+    public static void twoLionessesBringACowDownAndGoDownWithItOnItsClock(GameTestHelper helper) {
+        TestClock.still(helper, 12.0);
+        field(helper, 0, 0, 48, 48);
+        BuffaloEntity cow = toughCow(helper, 24.5, 24.5, 30.0F);
+        BlockPos den = helper.absolutePos(new BlockPos(4, GROUND, 4));
+        LionEntity[] both = {lion(helper, SavannaEntities.LIONESS.get(), 25.0, 21.0, den, 0),
+                lion(helper, SavannaEntities.LIONESS.get(), 27.5, 27.0, den, 0)};
+        helper.runAtTickTime(2, () -> {
+            LionHunt.gripForTests(both[0], cow, "rump");
+            LionHunt.gripForTests(both[1], cow, "neck_left");
+        });
+        int lead = BuffaloEntity.BLEND - LionEntity.BLEND;
+        Vec3[] placed = {null, null};
+        double[] worst = {0.0, 0.0};
+        int[] sink = {0}, down = {0}, freedAt = {-1};
+        helper.onEachTick(() -> {
+            int t = (int) helper.getTick();
+            if (t < 12) {
+                return;                                         // gripped, settled over her blend
+            }
+            byte d = cow.doing();
+            if (freedAt[0] < 0) {
+                for (int i = 0; i < 2; i++) {
+                    LionEntity she = both[i];
+                    helper.assertTrue(she.getVehicle() == cow, "not riding the cow: " + she.about());
+                    Vec3 jaw = jawAtBite(she, cow), at = cow.spotAt(she.holdSpot());
+                    worst[0] = Math.max(worst[0], Math.hypot(jaw.x - at.x, jaw.z - at.z));
+                    helper.assertTrue(worst[0] < 0.05, String.format("her jaw at her bite %.2f blocks off its spot", worst[0]));
+                    if (placed[i] == null) {
+                        placed[i] = she.position();
+                    }
+                    worst[1] = Math.max(worst[1], Math.hypot(she.getX() - placed[i].x, she.getZ() - placed[i].z));
+                    helper.assertTrue(worst[1] < 0.08, String.format("she moved %.3f blocks from her place while it went down: %s",
+                            worst[1], she.about()));
+                    if (d == BuffaloEntity.HELD_SINK) {
+                        helper.assertTrue(she.doing() == LionEntity.HOLD_SINK && she.clipTick() == cow.clipTick() + lead,
+                                "not on the cow's clock: her clip tick " + she.clipTick() + ", its " + cow.clipTick() + "; " + she.about());
+                    } else if (d == BuffaloEntity.HELD_DOWN) {
+                        helper.assertTrue(she.doing() == LionEntity.HOLD_DOWN, "not holding it down: " + she.about());
+                    }
+                }
+                sink[0] += d == BuffaloEntity.HELD_SINK ? 1 : 0;
+                down[0] += d == BuffaloEntity.HELD_DOWN ? 1 : 0;
+                if (down[0] >= 60 && sink[0] >= 30 && cow.getHealth() < 400.0F - 13.0F) {
+                    freedAt[0] = t;
+                    LionHunt.letGoForTests(both[1]);
+                }
+            } else if (t > freedAt[0] + 2) {
+                helper.assertFalse(both[1].isPassenger(), "the one let go still rides: " + both[1].about());
+                if (d == BuffaloEntity.REST_UP) {
+                    helper.succeed();
+                }
+            }
+        });
+        helper.runAtTickTime(250, () -> helper.fail("went down " + sink[0] + " ticks, held down " + down[0] + ", freed at " + freedAt[0]
+                + ", its health " + cow.getHealth() + "; cow " + cow.about() + "; " + both[0].about() + "; " + both[1].about()));
+    }
+
+    /**
+     * A cow held down that dies dies where it lies (death_down, not death: it does not stand up first) and its holders let
+     * go as it dies (they are placed on its spots only while it lives). A pinned calf that dies dies lying down too.
+     */
+    @GameTest(template = "arena", timeoutTicks = 200, skyAccess = true)
+    public static void aBuffaloHeldDownDiesWhereItLiesAndItsHoldersLetGo(GameTestHelper helper) {
+        TestClock.still(helper, 12.0);
+        field(helper, 0, 0, 48, 48);
+        BuffaloEntity cow = toughCow(helper, 16.5, 24.5, 0.0F);
+        BuffaloEntity calf = lyingCalf(helper, 34.5, 24.5, 0.0F);
+        BlockPos den = helper.absolutePos(new BlockPos(4, GROUND, 4));
+        LionEntity a = lion(helper, SavannaEntities.LIONESS.get(), 16.5, 21.0, den, 0);
+        LionEntity b = lion(helper, SavannaEntities.LIONESS.get(), 19.5, 26.0, den, 0);
+        LionEntity c = lion(helper, SavannaEntities.LIONESS.get(), 37.0, 24.5, den, 0);
+        helper.runAtTickTime(1, () -> calf.setDoing(BuffaloEntity.REST_DOWN));
+        helper.runAtTickTime(2, () -> {
+            LionHunt.gripForTests(a, cow, "rump");
+            LionHunt.gripForTests(b, cow, "flank_left");
+            LionHunt.gripForTests(c, calf, "neck_left");
+        });
+        int[] killedAt = {-1};
+        helper.onEachTick(() -> {
+            int t = (int) helper.getTick();
+            if (killedAt[0] < 0) {
+                if (cow.doing() == BuffaloEntity.HELD_DOWN && calf.doing() == BuffaloEntity.REST && c.isPassenger()) {
+                    killedAt[0] = t;
+                    cow.hurt(cow.damageSources().generic(), 1000.0F);
+                    calf.hurt(calf.damageSources().generic(), 1000.0F);
+                }
+                return;
+            }
+            helper.assertTrue(cow.isDeadOrDying() && "death_down".equals(cow.clipName()), "the cow dies standing up first: " + cow.clipName());
+            helper.assertTrue(calf.isDeadOrDying() && "death_down".equals(calf.clipName()), "the calf dies standing up first: " + calf.clipName());
+            if (t >= killedAt[0] + 2) {
+                for (LionEntity she : new LionEntity[] {a, b, c}) {
+                    helper.assertFalse(she.isPassenger(), "still riding its kill as it dies: " + she.about());
+                }
+                helper.succeed();
+            }
+        });
+        helper.runAtTickTime(190, () -> helper.fail("never held down and pinned: cow " + cow.about() + "; calf " + calf.about()));
     }
 
     // --- the hunt ------------------------------------------------------------------------------------------------------
