@@ -143,6 +143,8 @@ days where ticked (to measure in a long soak: count algae blocks in a fenced poo
 world's own algae feature uses), and only while fewer than some number of mats lie in the 5 by 5 round the new spot, so
 beds stay patchy as new land lays them.
 
+**Your call (2026-11-26):** River algae spreading. Today a thick mat seeds any shallow still water beside it, with nothing to stop it: over many hours it creeps out of the savanna's rivers along lake and sea shores and into a player's pond joined to a river, and grows back unless every bare speck is broken. Keep it to the savanna's waters, and patchy (no new mat where enough lie round it)? My pick: yes.
+
 ### R10-6 (C, proven): small things that disagree or are test-only
 
 - `TilapiaFryGoal.java:17, 23, 42`: the note says a fry whose mother is gone is on its own after 10 seconds; the count
@@ -326,6 +328,8 @@ inside that time, and with R10-13 the crab is hungry again at once. Crabs and sn
 own eggs. Not a crash of the chain (the spawner refills), but snail breeding is for show there. The user's call:
 leave it (fun first, the spawner covers it), or make eggs one food among the others (not first) and only when the
 crab stands within 2 or 3 blocks.
+
+**Your call (2026-11-26):** Crabs and snail eggs. Today a crab goes for snail eggs before any other food, anywhere in its search box, so where both live no snail clutch ever hatches (the world's spawner still refills the snails). Leave it, or make eggs one food among the others, eaten only when the crab stands within 2 or 3 blocks? My pick: the second, so the snails' own breeding counts.
 
 ### R10-17 (C/B, likely): the snail's crawl and rest clips flicker (BUGS 250's likely cause)
 

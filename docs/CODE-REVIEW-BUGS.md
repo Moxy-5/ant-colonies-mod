@@ -7,7 +7,7 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**234 findings: 150 left, 84 done.**
+**234 findings: 150 left (11 of them wait for your call), 84 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
@@ -29,10 +29,38 @@ review stay in `docs/BUGS.md`.
 | 10 | the river's small life | 19 | 13 | 6 |
 | 11 | the new raid code | 22 | 6 | 16 |
 
+## Waiting for your call (11)
+
+These change how the game looks or plays, or a balance number, so nothing is built until you say. Each has
+what happens today and my pick. Answer whenever you like: tell Claude the number and what you want.
+
+- **R7-12** (grade B, the giant trees) Lightning takes big trees faster than old age
+  - *Your call:* Lightning near big trees. Today every bolt that lands within 24 blocks of a big tree is pulled onto it, so by my sum (not measured) one thunderstorm kills about 1 big tree in 8, and a Channeling trident thrown near big trees strikes the tree, not the mob. Change it so only the weather's own bolts are pulled, and a tree is struck at most once a storm? My pick: yes.
+- **R7-13** (grade B, the giant trees) Seedlings after rain fill the savanna in
+  - *Your call:* Seedlings after rain. By my sums (not measured) about 9 new grown trees come up in each 64-block square over 100 days where new land put 1, so round a long-lived base the open savanna slowly closes into woodland with fallen logs everywhere. Cap the seedlings so each square keeps about as many trees as new land gives it, and let old logs weather away in the end? My pick: yes; it keeps the savanna open, as the design says.
+- **R7-14** (grade B, the giant trees) Termites hollow baobabs, which nobody decided
+  - *Your call:* Termites and baobabs. Today termites hollow a baobab near their mound like any tree: a cave about 7 wide in the trunk, and the tree dies at half its age. Nobody decided that. Leave baobabs out? My pick: yes, leave them out (as far as I know Macrotermes do not hollow living baobabs; not checked against a paper).
+- **R7-31** (grade B, the giant trees) A cut tree's crown hangs for good
+  - *Your call:* A cut giant tree. Today a giant tree cut through at the foot keeps its trunk and whole crown hanging in the air for good, and a burnt fig or palm leaves pieces in the air. Should a tree cut through fall, the way a dead one already does (the fall, the log and the smashing are built)? My pick: yes.
+- **R9-19** (grade C, the river hunters) several small things, listed in the review file
+  - *Your call:* Hippo paths. Today the ground a pod walks wears to path blocks and never heals, a player's lawn by a pool too (only with mobGriefing on). Let worn paths grow back to grass when no hippo has walked them for some days? My pick: yes, slowly. (The other small things in this finding need no call.)
+- **R9-24** (grade B, the river hunters) a shark hit from the bank or from a boat does nothing
+  - *Your call:* The big river hunters and arrows. Today a shark shot from the bank or a boat does nothing about it, and the crocodile afloat and the hippo past 16 blocks are the same: all three can be killed from a distance with no answer. Should one hit by something it cannot reach swim off deep and fast for a while? My pick: yes, for the shark and the crocodile; the hippo charges or goes under.
+- **R9-44** (grade C, the river hunters) small things in the monitor
+  - *Your call:* The monitor in water and on mud. Two looks: hunting in the water it leaves by Minecraft's plain hop, not its own climbing-out move, and on soft mud it steps and hops the plain way because its moves never start there. Worth the work to give both its own moves? My pick: not now (small, and only a look); say if you have seen it and it bothers you.
+- **R10-5** (grade B, the river's small life) river algae spreads into any shallow water, with nothing to stop it
+  - *Your call:* River algae spreading. Today a thick mat seeds any shallow still water beside it, with nothing to stop it: over many hours it creeps out of the savanna's rivers along lake and sea shores and into a player's pond joined to a river, and grows back unless every bare speck is broken. Keep it to the savanna's waters, and patchy (no new mat where enough lie round it)? My pick: yes.
+- **R10-16** (grade B, the river's small life) snail eggs within a crab's reach never hatch
+  - *Your call:* Crabs and snail eggs. Today a crab goes for snail eggs before any other food, anywhere in its search box, so where both live no snail clutch ever hatches (the world's spawner still refills the snails). Leave it, or make eggs one food among the others, eaten only when the crab stands within 2 or 3 blocks? My pick: the second, so the snails' own breeding counts.
+- **R11-17** (grade B, the new raid code) near and away still differ in how often a colony raids
+  - *Your call:* How late a raid may leave. Today a raid may set out until 19:00 and dusk turns every raid home at 19:30, which is 25 real seconds later, so a raid that leaves late walks out, turns round empty and the scout's find is used up. Stop raids leaving earlier (the find then waits for the morning)? My pick: yes, but first a soak measures how long a raid takes, so the hour is not a guess.
+- **R11-22** (grade C, the new raid code) numbers
+  - *Your call:* Real ants in one raid. `most_real` is 75, while the project's aim is about 50 to 60 real mobs for a whole colony. Lower it to about 50 (the rest of a big raid goes along as numbers, as now), or keep 75 for the look of a long column? My pick: keep 75 unless you see lag in a big raid; it is your eye that decides.
+
 ## Left to do
 
 Grade A first. *Open* means looked at and left for a reason (the reason is given); *half fixed* says what
-is left; no word means nobody has started it.
+is left; no word means nobody has started it. The findings that wait for your call are in the part above.
 
 ### A: a player can meet it (1 left)
 
@@ -41,7 +69,7 @@ is left; no word means nobody has started it.
 - **R7-33** A palm's crown can blink out at the screen's edge
   - *Open:* waits to be seen (2026-11-24). Read from how Minecraft hides parts of the world, never seen in the game; the fix is large (sharing a crown's faces out over its blocks) and is built only if the user sees fronds blink out.
 
-### B: it will cost us when building on this (79 left)
+### B: it will cost us when building on this (71 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -85,16 +113,12 @@ is left; no word means nobody has started it.
 - **R7-5** The fall in sight: up to 2,500 entities made in one tick
 - **R7-6** The whole tree book is written at every autosave, and it only grows
 - **R7-7** Four shape stores are never emptied
-- **R7-12** Lightning takes big trees faster than old age
-- **R7-13** Seedlings after rain fill the savanna in
-- **R7-14** Termites hollow baobabs, which nobody decided
 - **R7-18** One bad record empties the tree book
 - **R7-19** A fallen log's record never ends
 - **R7-20** Felling checks the foot's chunk only
 - **R7-24** The tree kind files are not the "numbers I can tweak" they look like
 - **R7-26** Test gaps on what the player sees
 - **R7-30** The river animals' ground finder stops on top of a crown
-- **R7-31** A cut tree's crown hangs for good
 - **R7-32** Fruit stands still when nobody is near
 
 **Round 8, the world** (`docs/reviews/full/round-08-world.md`)
@@ -123,7 +147,6 @@ is left; no word means nobody has started it.
 - **R9-21** a shark's hunt hangs still for up to 45 seconds
 - **R9-22** only the three nearest fish are tried, so a school on the shelf hides every fish behind it
 - **R9-23** a shark with nowhere to go asks for a new target every tick and lies still
-- **R9-24** a shark hit from the bank or from a boat does nothing
 - **R9-25** the catfish plans a new route every tick once its route has run out short of its prey
 - **R9-31** while an otter on screen holds a crab or a frog, the game reads and parses a file from the mod's jar twice every frame
 - **R9-32** a hunt that gives up takes the same prey again half a second later
@@ -137,19 +160,12 @@ is left; no word means nobody has started it.
 **Round 10, the river's small life** (`docs/reviews/full/round-10-river-small-life.md`)
 
 - **R10-4** catfish eggs are eaten long before they can hatch
-- **R10-5** river algae spreads into any shallow water, with nothing to stop it
 - **R10-10** the two frog steps before breeding can end with nothing, and a hungry frog searches wide 5 times a second
 - **R10-14** the crab's 20-second limit on threatening does nothing
 - **R10-15** asking for a new path every tick to a spot that cannot be reached
-- **R10-16** snail eggs within a crab's reach never hatch
 - **R10-18** small searches that run more often than they need
 
-**Round 11, the new raid code** (`docs/reviews/full/round-11-raids.md`)
-
-- **R11-17** near and away still differ in how often a colony raids
-  - *Open:* nothing changed. The late leave (a raid may set out until 19:00 and dusk turns it at 19:30, 25 seconds later) is put to the user; the near and away difference waits for a soak to measure.
-
-### C: a tidy-up (70 left)
+### C: a tidy-up (67 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -220,12 +236,10 @@ is left; no word means nobody has started it.
 - **R9-11** a crocodile hit while afloat does not react, and a nest mother shot from afar stands still
 - **R9-12** small things in the crocodile
 - **R9-14** dung on land almost never happens
-- **R9-19** several small things, listed in the review file
 - **R9-20** small things in the hippo
 - **R9-26** small things in the shark
 - **R9-36** small things in the otter
 - **R9-43** three small behaviours that do not end the way they should
-- **R9-44** small things in the monitor
 
 **Round 10, the river's small life** (`docs/reviews/full/round-10-river-small-life.md`)
 
@@ -242,7 +256,6 @@ is left; no word means nobody has started it.
 - **R11-19** work done more often than needed
 - **R11-20** small bookkeeping
 - **R11-21** comments and notes that disagree with the code
-- **R11-22** numbers
 
 ## Done
 

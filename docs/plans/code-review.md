@@ -147,6 +147,13 @@ part, with Minecraft's own tick readout and profiler and the mod's perf scenes. 
   `./gradlew build` fails when it is behind (`checkReviewBugs`). So that the list reads right, **the newest status
   line under a finding begins with one of four words: `fixed`, `half fixed` (then what is left), `open` (then why),
   `not a bug`.** Run the tool after writing findings or status lines, and commit the list with them.
+- **Findings that wait for the user (the user, 2026-11-26: "a separate part of the list of open bugs that take my
+  confirmation").** A fix that changes how the game looks or plays, or a balance or real-biology number, is never
+  built before the user says yes. Such a finding gets a line under it, `**Your call (date):** ...`: the question in
+  plain words, what happens today, and "My pick: ...". The list shows these in their own part, "Waiting for your
+  call", apart from the findings to fix. When the user answers, add `**Call made (date):** ...` under it (it goes
+  back among the findings to fix) or, once built, its status line. A fix session that meets such a finding writes
+  the line and goes on with the rest of its batch; it does not stop to ask.
 - **Review bugs and other bugs are kept apart (the user, 2026-11-26, "so things don't get mixed").** A review
   finding's fix takes no number in `docs/BUGS.md` any more: its `R` number is its number (in the commit, the test's
   comment, the change log), and what was done goes in its status line. The 67 findings fixed before this keep their

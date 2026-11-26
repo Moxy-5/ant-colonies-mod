@@ -353,6 +353,8 @@ storm by storm (and fill up again with seedlings, R7-13). A Channeling trident t
 **Proposed fix (the user's call, a balance number).** Only one strike in a few is drawn to a tree, or a tree is
 drawn to at most once a storm; bolts that did not come from the weather are left alone.
 
+**Your call (2026-11-26):** Lightning near big trees. Today every bolt that lands within 24 blocks of a big tree is pulled onto it, so by my sum (not measured) one thunderstorm kills about 1 big tree in 8, and a Channeling trident thrown near big trees strikes the tree, not the mob. Change it so only the weather's own bolts are pulled, and a tree is struck at most once a storm? My pick: yes.
+
 ### R7-13 (B, likely, to measure). Seedlings after rain fill the savanna in
 
 **What is wrong.** The rates do not balance against new land's own spacing:
@@ -381,6 +383,8 @@ balanced for.
 land takes seedlings only up to a target count of trees (new land's own density), so the rate falls to the rate at
 which trees die. And let old sound logs weather away in the end.
 
+**Your call (2026-11-26):** Seedlings after rain. By my sums (not measured) about 9 new grown trees come up in each 64-block square over 100 days where new land put 1, so round a long-lived base the open savanna slowly closes into woodland with fallen logs everywhere. Cap the seedlings so each square keeps about as many trees as new land gives it, and let old logs weather away in the end? My pick: yes; it keeps the savanna open, as the design says.
+
 ### R7-14 (B, proven). Termites hollow baobabs, which nobody decided
 
 **What is wrong.** Heart rot leaves baobabs out on purpose (`HeartRot.canRot`: "baobabs hollow on their own"). The
@@ -397,6 +401,8 @@ about 7 wide and 7 high with a door at the foot, and in an ancient baobab it mee
 
 **Proposed fix.** Ask the user; my pick is to leave baobabs out (as far as I know Macrotermes do not hollow living
 baobabs, whose wood is wet fibre; not checked against a paper), one line beside the age check.
+
+**Your call (2026-11-26):** Termites and baobabs. Today termites hollow a baobab near their mound like any tree: a cave about 7 wide in the trunk, and the tree dies at half its age. Nobody decided that. Leave baobabs out? My pick: yes, leave them out (as far as I know Macrotermes do not hollow living baobabs; not checked against a paper).
 
 ---
 
@@ -718,6 +724,8 @@ fig leaves and a palm head in mid-air.
 foot falls, the way a dead one already does (the fall, the log and the smashing are all built), instead of its record
 just ending. For the palm until its life in play: its crown, bunches and leaf bases drop when the stem behind them
 goes.
+
+**Your call (2026-11-26):** A cut giant tree. Today a giant tree cut through at the foot keeps its trunk and whole crown hanging in the air for good, and a burnt fig or palm leaves pieces in the air. Should a tree cut through fall, the way a dead one already does (the fall, the log and the smashing are built)? My pick: yes.
 
 ### R7-32 (B, proven; a balance call). Fruit stands still when nobody is near
 

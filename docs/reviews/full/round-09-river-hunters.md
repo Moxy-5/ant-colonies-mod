@@ -425,6 +425,8 @@ the same way.
   path and never heal, charges too; a player's lawn by a pool is worn as well. All behind `mobGriefing`; bounded by
   the pod's range. A looks matter.
 
+**Your call (2026-11-26):** Hippo paths. Today the ground a pod walks wears to path blocks and never heals, a player's lawn by a pool too (only with mobGriefing on). Let worn paths grow back to grass when no hippo has walked them for some days? My pick: yes, slowly. (The other small things in this finding need no call.)
+
 ### R9-20 (C): small things in the hippo
 
 - **The bed-step hop never happens:** `travel` sets an upward speed of 0.35 against a step (640) and `tick`, later in
@@ -510,6 +512,8 @@ past: no flight, no dive, no change of pace. With R9-11 (the crocodile afloat) a
 this is one pattern: **all three big hunters can be killed from a distance with no answer.** Whether that matters is
 the user's call (fun first). **Fix if wanted:** hit by something it cannot reach, it swims away deep and fast a while
 (the call its swim-off already uses).
+
+**Your call (2026-11-26):** The big river hunters and arrows. Today a shark shot from the bank or a boat does nothing about it, and the crocodile afloat and the hippo past 16 blocks are the same: all three can be killed from a distance with no answer. Should one hit by something it cannot reach swim off deep and fast for a while? My pick: yes, for the shark and the crocodile; the hippo charges or goes under.
 
 ### R9-25 (B, the call proven, the cost likely; the catfish's file, for round 10's fix session): the catfish plans a new route every tick once its route has run out short of its prey
 
@@ -997,6 +1001,8 @@ fixed there. Guard with the monitor's course and its frame films, since the move
   `getNoActionTime()` 960 answers what the stroll was already told (303); `waterTop()` is worked out up to three
   times in one `startMove`; the class comment (81-87) leaves out the bullfrog; the hiss goal keeps a logged-off
   player's object until its next hiss (1215).
+
+**Your call (2026-11-26):** The monitor in water and on mud. Two looks: hunting in the water it leaves by Minecraft's plain hop, not its own climbing-out move, and on soft mud it steps and hops the plain way because its moves never start there. Worth the work to give both its own moves? My pick: not now (small, and only a look); say if you have seen it and it bothers you.
 
 ### What is solid in the monitor
 

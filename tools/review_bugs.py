@@ -15,6 +15,15 @@ How a status line is read: the newest "**Status" line under a finding counts, an
     not a bug ...             closed, nothing to fix (also: not a fault)
 A finding with no status line is not started. "grade B now" in a status line changes the finding's grade.
 A status line the tool cannot read is listed under "check these" when the tool runs: add a clearer line under it.
+
+Findings that wait for the user (the user, 2026-11-26): a fix that changes how the game looks or plays, or a real
+number, is never built before the user says yes. Such a finding gets a line under it in its review file:
+    **Your call (date):** the question in plain words, what happens today, and "My pick: ...".
+While it is left and unanswered it is listed in its own part of the list, "Waiting for your call", and not among the
+findings to fix. Once the user has answered, write under it
+    **Call made (date):** what the user said.
+and it goes back among the findings to fix (or write its status line when the fix is in). A finding not started that
+says "the user's call" with no such line is listed under "check these".
 """
 import re
 import sys
@@ -32,6 +41,9 @@ ROUNDS = {
 GRADES = {"A": "A: a player can meet it", "B": "B: it will cost us when building on this", "C": "C: a tidy-up"}
 HEADING = re.compile(r"(?m)^### (R(\d+)-(\d+)) \(([ABC])(.*?)\)(?:[:.] *(.*))?$")
 STATUS = re.compile(r"(?ms)^\*\*Status\s*(?:\([^)]*\))?:\s*(.*?)(?:\n\s*\n|\Z)")
+CALL = re.compile(r"(?ms)^\*\*Your call\s*(?:\([^)]*\))?:\*\*\s*(.*?)(?:\n\s*\n|\Z)")
+CALL_MADE = re.compile(r"(?m)^\*\*Call made")
+SAYS_CALL = re.compile(r"(?i)\buser'?s call\b|\bask the user\b")
 
 
 def read_status(text):
@@ -69,11 +81,19 @@ def findings():
                     regrade = re.search(r"grade ([ABC]) now", line)
                     if regrade:
                         grade = regrade.group(1)
+            calls = list(CALL.finditer(body))
+            made = [m.start() for m in CALL_MADE.finditer(body)]
+            call = ""
+            if calls and state in ("not started", "open", "half") and not (made and made[-1] > calls[-1].start()):
+                call = " ".join(calls[-1].group(1).split())
+            if not calls and state == "not started" and SAYS_CALL.search(head.group(0) + body):
+                unclear.append(f"{head.group(1)}: says it is the user's call but has no '**Your call (date):**' line")
             bugs = sorted({int(n) for line in lines for part in re.findall(r"BUGS ((?:\d+(?:,? and |, | to )?)+)", line)
                            for n in re.findall(r"\d+", part)})
             found.append({
                 "id": head.group(1), "round": int(head.group(2)), "n": int(head.group(3)), "grade": grade,
                 "title": (head.group(6) or first_words(body)).strip(), "state": state, "note": note, "bugs": bugs, "file": path.name,
+                "call": call,
             })
     return found, unclear
 
@@ -94,6 +114,8 @@ def build():
     found, unclear = findings()
     left = [f for f in found if f["state"] in ("not started", "open", "half")]
     done = [f for f in found if f["state"] in ("fixed", "not a bug")]
+    waiting = [f for f in left if f["call"]]
+    to_fix = [f for f in left if not f["call"]]
     out = ["# Code review bugs", ""]
     out += [
         "Every finding of the full code review (`docs/plans/code-review.md`) and where it stands: what is left on",
@@ -102,7 +124,7 @@ def build():
         "review files under `docs/reviews/full/`; search there for a finding's number (`R2-16`). A fix session writes",
         "a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code",
         "review stay in `docs/BUGS.md`.", "",
-        f"**{len(found)} findings: {len(left)} left, {len(done)} done.**", "",
+        f"**{len(found)} findings: {len(left)} left ({len(waiting)} of them wait for your call), {len(done)} done.**", "",
         "| Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |", "|---|---|---|---|---|---|---|",
     ]
     for grade in "ABC":
@@ -118,11 +140,18 @@ def build():
                        f"{sum(1 for f in of if f in done)} |")
         else:
             out.append(f"| {number} | {name} | not read yet | | |")
+    out += ["", f"## Waiting for your call ({len(waiting)})", "",
+            "These change how the game looks or plays, or a balance number, so nothing is built until you say. Each has",
+            "what happens today and my pick. Answer whenever you like: tell Claude the number and what you want.", ""]
+    if not waiting:
+        out += ["None.", ""]
+    for f in waiting:
+        out += [f"- **{f['id']}** (grade {f['grade']}, {ROUNDS[f['round']]}) {f['title']}", f"  - *Your call:* {f['call']}"]
     out += ["", "## Left to do", "",
             "Grade A first. *Open* means looked at and left for a reason (the reason is given); *half fixed* says what",
-            "is left; no word means nobody has started it.", ""]
+            "is left; no word means nobody has started it. The findings that wait for your call are in the part above.", ""]
     for grade in "ABC":
-        of = [f for f in left if f["grade"] == grade]
+        of = [f for f in to_fix if f["grade"] == grade]
         out += [f"### {GRADES[grade]} ({len(of)} left)", ""]
         if not of:
             out += ["None.", ""]

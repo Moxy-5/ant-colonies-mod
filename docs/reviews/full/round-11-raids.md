@@ -249,6 +249,8 @@ late is turned home empty and still costs one of the day's raids. Stopping leave
 
 **Status (2026-11-26, `claude/review-fix-11b`): open:** nothing changed. The late leave (a raid may set out until 19:00 and dusk turns it at 19:30, 25 seconds later) is put to the user; the near and away difference waits for a soak to measure.
 
+**Your call (2026-11-26):** How late a raid may leave. Today a raid may set out until 19:00 and dusk turns every raid home at 19:30, which is 25 real seconds later, so a raid that leaves late walks out, turns round empty and the scout's find is used up. Stop raids leaving earlier (the find then waits for the morning)? My pick: yes, but first a soak measures how long a raid takes, so the hour is not a guess.
+
 ---
 
 ## Grade C
@@ -292,6 +294,8 @@ note still says the scout runs into the nest to call).
 - `most_real` is 75, the project's target is about 50 to 60 real mobs for a whole colony. **The user's call.**
 - The plan aimed at about 30 raid numbers; `Raid` holds about 20 more as constants in code (134-168, 1689-1692).
 - `RaidsAway`'s numbers are all still "my pick, to confirm"; the unseen pace is 1.5 blocks a second against 2.5 watched.
+
+**Your call (2026-11-26):** Real ants in one raid. `most_real` is 75, while the project's aim is about 50 to 60 real mobs for a whole colony. Lower it to about 50 (the rest of a big raid goes along as numbers, as now), or keep 75 for the look of a long column? My pick: keep 75 unless you see lag in a big raid; it is your eye that decides.
 
 ---
 
