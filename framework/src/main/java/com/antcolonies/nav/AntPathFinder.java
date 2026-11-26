@@ -194,16 +194,34 @@ public final class AntPathFinder {
     }
 
     /**
+     * BUGS 362: the cell whose floor a walk asked into {@code cell} ends on: the cell itself if it has a floor; for an
+     * open cell over a slope (a ramp, a comb, and since BUGS 412 a path, a slab, a carpet) the slope's own cell, since
+     * the body standing on that top has its feet in the block's cell; null if neither (no floor there: mid-air, or the
+     * top of something that is no floor, a thin upright plate of mud). The legs' one answer to "can a walk end standing
+     * here", which a mind's own ground checks ask too (the raids' {@code RaidGround.canStand}).
+     */
+    @Nullable
+    public static BlockPos floorCell(CellMap map, BlockPos cell) {
+        if (Foothold.isValid(map, cell, Direction.DOWN)) {
+            return cell;
+        }
+        BlockPos below = cell.below();
+        return map.isOpen(cell) && map.isSlope(below) && Foothold.isValid(map, below, Direction.DOWN) ? below : null;
+    }
+
+    /**
      * A route from any of the {@code starts} into the {@code goal} cell, with a mind's extra costs. It ends on the cell's
-     * floor if it has one (never hanging at the foot of a wall), otherwise (in a shaft) on any of its walls.
+     * floor if it has one (never hanging at the foot of a wall), or on the slope under it ({@link #floorCell}: asked to
+     * stand over a ramp or a slab, it stands on it), otherwise (in a shaft) on any of its walls.
      */
     @Nullable
     public static Route find(CellMap map, List<Foothold> starts, BlockPos goal, int maxExpansions, StepCosts costs) {
-        final BlockPos target = goal.immutable();
+        BlockPos floorAt = floorCell(map, goal);
+        final BlockPos target = floorAt != null ? floorAt.immutable() : goal.immutable();
         if (!map.isOpen(target) && !map.isSlope(target) && map.channelSides(target) == 0) {
             return null;
         }
-        boolean hasFloor = Foothold.isValid(map, target, Direction.DOWN);
+        boolean hasFloor = floorAt != null;
         if (!hasFloor && !hasHold(map, target)) {
             return null; // a cell in mid-air: nothing to end on, so no search (it could only fail, at full cost; review R2-20)
         }
