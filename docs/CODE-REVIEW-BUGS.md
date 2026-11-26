@@ -7,17 +7,17 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**234 findings: 145 left (11 of them wait for your call), 89 done.**
+**234 findings: 131 left (11 of them wait for your call), 103 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
 | A: a player can meet it | 50 | 0 | 1 | 0 | 48 | 1 |
-| B: it will cost us when building on this | 107 | 68 | 3 | 4 | 31 | 1 |
+| B: it will cost us when building on this | 107 | 53 | 5 | 3 | 45 | 1 |
 | C: a tidy-up | 77 | 67 | 0 | 2 | 7 | 1 |
 
 | Round | System | Found | Left | Done |
 |---|---|---|---|---|
-| 1 | the colony brain | 50 | 30 | 20 |
+| 1 | the colony brain | 50 | 16 | 34 |
 | 2 | the legs | 43 | 18 | 25 |
 | 3 | the insect body | not read yet | | |
 | 4 | how bodies are drawn | not read yet | | |
@@ -69,27 +69,14 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R7-33** A palm's crown can blink out at the screen's edge
   - *Open:* waits to be seen (2026-11-24). Read from how Minecraft hides parts of the world, never seen in the game; the fix is large (sharing a crown's faces out over its blocks) and is built only if the user sees fronds blink out.
 
-### B: it will cost us when building on this (67 left)
+### B: it will cost us when building on this (53 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
-- **R1-3** a young colony that once yielded to a neighbour yields again after one meeting
-- **R1-4** some numbers in the species file have no range check, and a 0 crashes
-- **R1-10** a colony with no food plants still scans about 2,400 columns every 5 seconds
-- **R1-11** once a second every outside worker is compared with every plant
-- **R1-12** each forager's plant search counts every claim for every plant
-- **R1-13** the store's room is judged in three places by three rules
-- **R1-22** the catch-up digs the founders' chamber by weaker rules than the real diggers
-- **R1-26** the far rule removes loaded insects without asking whether a player can see them
 - **R1-27** a colony that dies out while away is not ended until a player comes near
-- **R1-28** folding an insect into the numbers loses a species load it carries
-- **R1-29** an insect frozen while its colony is here waits in limbo
+  - *Open:* left on purpose. Ending a colony writes down its dead mound, combs and works by reading their blocks (`DeadMounds.addMound`, `addCombs`, `DeadWorks.record`), so it cannot be done as numbers in land that is not loaded; ending it ...
 - **R1-31** every colony ever made ticks once a second for ever and marks the file changed
-- **R1-37** all the numbers of a caste share one meal minute
-- **R1-46** a colony whose queen cannot be found is skipped for ever while near
-- **R1-47** more reads one step past the guarded cell, and on a list up to 5 seconds old
-  - *Half fixed:* mostly fixed, BUGS 390 (`FoodMap`'s 27 cells round each ant and `isEntranceCovered` left: the ant's own land is loaded).
-- **R1-48** the "no route to this food" memory is not saved
+  - *Open:* to measure, in a big explored world (not done; no such world at hand). Checked now: marking the file only on a change saves nothing, since a colony's clocks (ages, meals, the garden) change every second it lives as numbers; the ...
 
 **Round 2, the legs** (`docs/reviews/full/round-02-legs.md`)
 
@@ -261,9 +248,15 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 
 - **R1-1** (A) a Matabele queen never lays while a player is near (BUGS 392)
 - **R1-2** (A) a broken species file crashes the game while the log says "using the built-in numbers" (BUGS 387)
+- **R1-3** (B) a young colony that once yielded to a neighbour yields again after one meeting
+- **R1-4** (B) some numbers in the species file have no range check, and a 0 crashes
 - **R1-7** (A) the new-holes check reads a far food block in land that is not loaded (BUGS 390)
 - **R1-8** (A) `ForagingHoles.isOpen` reads the block before it asks whether the land is loaded (BUGS 390)
 - **R1-9** (A) "is anyone still outside" looks only 32 blocks round the nest (BUGS 393)
+- **R1-10** (B) a colony with no food plants still scans about 2,400 columns every 5 seconds
+- **R1-11** (B) once a second every outside worker is compared with every plant
+- **R1-12** (B) each forager's plant search counts every claim for every plant
+- **R1-13** (B) the store's room is judged in three places by three rules
 - **R1-14** (B) a found plant far out is read with no load check once its finder is home (BUGS 390)
 - **R1-16** (A) every builder looking for work scans the whole nest for leaks (BUGS 394)
 - **R1-17** (A) on return the nest ledger does a whole second's changes in one tick (BUGS 395)
@@ -271,14 +264,22 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R1-19** (A) a foraging tunnel not fitted to a hillside the first time is never fitted again (BUGS 391)
 - **R1-20** (A) while no nest plan fits, the room planner runs on every call and a shaft is dug anyway (BUGS 396)
 - **R1-21** (B) `nestCells` is rebuilt on every call (BUGS 394)
+- **R1-22** (B) the catch-up digs the founders' chamber by weaker rules than the real diggers
 - **R1-24** (C) `Nest.isEntranceOpen` reads the block before asking whether the land is ready (BUGS 390)
+- **R1-26** (B) the far rule removes loaded insects without asking whether a player can see them
+- **R1-28** (B) folding an insect into the numbers loses a species load it carries
+- **R1-29** (B) an insect frozen while its colony is here waits in limbo
 - **R1-30** (B) one colony that fails to load wipes every colony of the dimension (BUGS 387)
 - **R1-35** (A) sleeping in a bed takes the termites' foraging night away, while their hunger runs on (BUGS 397)
 - **R1-36** (B) builder numbers do nothing near a player and bank work without end while away (BUGS 398)
+- **R1-37** (B) all the numbers of a caste share one meal minute
 - **R1-42** (A) one typo in a species file empties every colony of the world (R1-2 and R1-30 joined) (BUGS 387)
 - **R1-43** (A) an insect already folded into the numbers is folded a second time (BUGS 388)
 - **R1-44** (A) every autosave and every pause rebuilds and copies every colony's whole record
 - **R1-45** (A) a minor that comes out when a number scout is shown goes back into the numbers, but its body stays (BUGS 389)
+- **R1-46** (B) a colony whose queen cannot be found is skipped for ever while near
+- **R1-47** (B) more reads one step past the guarded cell, and on a list up to 5 seconds old (BUGS 390)
+- **R1-48** (B) the "no route to this food" memory is not saved
 
 **Round 2, the legs**
 

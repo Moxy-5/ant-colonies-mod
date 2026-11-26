@@ -12,6 +12,8 @@ import com.antcolonies.ColonyFrameworkMod;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.AntEggEntity;
 import com.antcolonies.entity.AntLarvaEntity;
+import com.antcolonies.entity.load.CarriedLoad;
+import com.antcolonies.entity.load.LoadKind;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -116,9 +118,18 @@ public class AwayLife {
      * it had gone hungry, and the soldier it grows into. All as when it was frozen.
      */
     record Frozen(Kind kind, String caste, long grownUpAt, Load load, long left, int fed, @Nullable String growsInto,
-            long frozenAt, boolean folded, long lastMeal) {
+            long frozenAt, boolean folded, long lastMeal, String speciesLoad, int speciesCount) {
         Frozen fold() {
-            return new Frozen(kind, caste, grownUpAt, load, left, fed, growsInto, frozenAt, true, lastMeal);
+            return new Frozen(kind, caste, grownUpAt, load, left, fed, growsInto, frozenAt, true, lastMeal, speciesLoad, speciesCount);
+        }
+
+        /** An adult as it is now, with what it holds. */
+        static Frozen adult(AbstractAntEntity mob, long grownUpAt, long now) {
+            Load load = loadOf(mob);
+            CarriedLoad held = mob.getLoad();
+            boolean species = load == Load.NONE && !held.isEmpty() && held.kind().folds();
+            return new Frozen(Kind.ADULT, mob.nestCaste(), grownUpAt, load, 0, 0, null, now, false, mob.getLastMeal(),
+                    species ? held.kind().name().toString() : "", species ? Math.max(1, held.item().getCount()) : 0);
         }
     }
 
@@ -273,13 +284,13 @@ public class AwayLife {
         // (A paralysed insect is never folded in: it lies where it was stung and dies there in time, M8 step 2b.)
         if (entity instanceof AbstractAntEntity mob && mob.nestCaste() != null && mob.isAlive() && !mob.isDowned()) {
             long grownUpAt = mob.getGrownUpAt() == AbstractAntEntity.AGE_NOT_SET ? now : mob.getGrownUpAt();
-            what = new Frozen(Kind.ADULT, mob.nestCaste(), grownUpAt, loadOf(mob), 0, 0, null, now, false, mob.getLastMeal());
+            what = Frozen.adult(mob, grownUpAt, now);
         } else if (entity instanceof AntEggEntity egg && egg.isAlive()) {
             long left = egg.getHatchAt() < 0 ? -1 : Math.max(0, egg.getHatchAt() - now);
-            what = new Frozen(Kind.EGG, "", 0, Load.NONE, left, 0, null, now, false, Colony.NOT_SET);
+            what = new Frozen(Kind.EGG, "", 0, Load.NONE, left, 0, null, now, false, Colony.NOT_SET, "", 0);
         } else if (entity instanceof AntLarvaEntity larva && larva.isAlive()) {
             long hungry = larva.getLastFed() == Colony.NOT_SET ? 0 : Math.max(0, now - larva.getLastFed());
-            what = new Frozen(Kind.LARVA, "", 0, Load.NONE, hungry, larva.getFed(), larva.getGrowsInto(colony), now, false, Colony.NOT_SET);
+            what = new Frozen(Kind.LARVA, "", 0, Load.NONE, hungry, larva.getFed(), larva.getGrowsInto(colony), now, false, Colony.NOT_SET, "", 0);
         }
         return what;
     }
@@ -303,9 +314,16 @@ public class AwayLife {
             }
         }
         int folded = 0;
+        List<net.minecraft.world.phys.Vec3> eyes = colony.population().seersAnywhere(level);
         for (Entity entity : members) {
             Frozen what = frozenOf(level, entity);
             if (what == null) {
+                continue;
+            }
+            if (!Population.outOfSight(level, entity.getEyePosition(), eyes)) {
+                // A player can see it (termites at a gallery hole stand up to about 56 blocks out, so 24 from a player
+                // just past the far rule's 80): it stays real, and the next look takes it once it is out of sight.
+                // (Before, every loaded member vanished at once wherever it stood; review R1-26.)
                 continue;
             }
             Frozen was = frozen.remove(entity.getUUID());
@@ -329,7 +347,7 @@ public class AwayLife {
     public void foldInNow(ServerLevel level, AbstractAntEntity mob) {
         long now = level.getGameTime();
         long grownUpAt = mob.getGrownUpAt() == AbstractAntEntity.AGE_NOT_SET ? now : mob.getGrownUpAt();
-        foldIn(level, mob.getUUID(), new Frozen(Kind.ADULT, mob.nestCaste(), grownUpAt, loadOf(mob), 0, 0, null, now, false, mob.getLastMeal()));
+        foldIn(level, mob.getUUID(), Frozen.adult(mob, grownUpAt, now));
         if (!mob.isRemoved()) {
             mob.discard(); // a number now: its body never stays behind (review R1-45, a scout's stand-in left standing)
         }
@@ -446,6 +464,12 @@ public class AwayLife {
                     case EGG -> colony.brood().addInside(Brood.Young.egg(-1));
                     case BODY -> colony.ledger().addBodies(1);
                     case NONE -> {
+                        if (!what.speciesLoad().isEmpty()) {
+                            // A species' own load (the Matabele ants' stung termites): its row says what it becomes
+                            // as numbers. (Before, it was gone with the body; review R1-28.)
+                            LoadKind.byName(net.minecraft.resources.ResourceLocation.parse(what.speciesLoad()))
+                                    .folded(level, colony, what.speciesCount());
+                        }
                     }
                 }
             }
@@ -474,6 +498,33 @@ public class AwayLife {
         return colony != null && colony.away().cameBack(level, entity);
     }
 
+    /**
+     * While the colony is here: an insect frozen longer than the grace (left at the edge of the loaded land with the
+     * player staying by the nest) has walked home, so it becomes one of the numbers, as it would with the colony away.
+     * Its body leaves the world when its land is loaded again ({@link #cameBack}). (Before, it waited there for good,
+     * counted but neither real nor inside: not eating, not ageing, never swapped back; review R1-29.)
+     */
+    private void foldLongFrozen(ServerLevel level) {
+        if (frozen.isEmpty() || !isOn(level)) {
+            return;
+        }
+        long now = level.getGameTime();
+        boolean changed = false;
+        for (Map.Entry<UUID, Frozen> entry : frozen.entrySet()) {
+            Frozen what = entry.getValue();
+            Entity body = level.getEntity(entry.getKey()); // (one that ticks unfreezes itself, cameBack)
+            if (!what.folded() && now - what.frozenAt() >= grace()
+                    && (body == null || !level.isPositionEntityTicking(body.blockPosition()))) {
+                foldIn(level, entry.getKey(), what);
+                entry.setValue(what.fold());
+                changed = true;
+            }
+        }
+        if (changed) {
+            ColonyManager.get(level).markChanged();
+        }
+    }
+
     private boolean cameBack(ServerLevel level, Entity entity) {
         if (frozen.isEmpty()) {
             return false;
@@ -500,6 +551,7 @@ public class AwayLife {
      * the queen sits, for the next time away.
      */
     void settle(ServerLevel level) {
+        foldLongFrozen(level);
         if (awaySince != Colony.NOT_SET) {
             long away = level.getGameTime() - awaySince;
             awaySince = Colony.NOT_SET;
@@ -689,6 +741,10 @@ public class AwayLife {
             entry.putLong("frozenAt", what.frozenAt());
             entry.putBoolean("folded", what.folded());
             entry.putLong("lastMeal", what.lastMeal());
+            if (!what.speciesLoad().isEmpty()) {
+                entry.putString("speciesLoad", what.speciesLoad());
+                entry.putInt("speciesCount", what.speciesCount());
+            }
             list.add(entry);
         });
         away.put("frozen", list);
@@ -711,7 +767,8 @@ public class AwayLife {
             frozen.put(entry.getUUID("id"), new Frozen(Kind.valueOf(entry.getString("kind")), entry.getString("caste"),
                     entry.getLong("grownUpAt"), Load.valueOf(entry.getString("load")), entry.getLong("left"), entry.getInt("fed"),
                     growsInto, entry.getLong("frozenAt"), entry.getBoolean("folded"),
-                    entry.contains("lastMeal") ? entry.getLong("lastMeal") : Colony.NOT_SET));
+                    entry.contains("lastMeal") ? entry.getLong("lastMeal") : Colony.NOT_SET,
+                    entry.getString("speciesLoad"), entry.getInt("speciesCount")));
         }
     }
 }

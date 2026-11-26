@@ -672,6 +672,55 @@ public class Colony {
         return queenDiedAt != NOT_SET;
     }
 
+    /** How long a queen may be missing from loaded, ticking land before she counts as dead: 5 minutes (my pick). */
+    static final long QUEEN_LOST_TICKS = 6_000;
+    /** Game time the queen was first not found with the land round the nest loaded and ticking. Not saved: counted again after a load. */
+    private long queenMissedAt = NOT_SET;
+    /** Tests only: the wait for this colony, in ticks (the rule is off on the test server otherwise: scenes clear queens away on purpose). */
+    @Nullable
+    private Long queenLostAfterForTests;
+
+    /** Tests only: this colony's queen counts as lost after this many ticks missing from ticking land. */
+    public void setQueenLostAfterForTests(@Nullable Long ticks) {
+        queenLostAfterForTests = ticks;
+    }
+
+    /**
+     * Called once a second while the colony is here and its queen is not found: whether she is lost for good. Her land
+     * not loaded (the 3 by 3 chunks round the nest's middle must tick their animals) means only "not there yet", and
+     * the wait starts again; missing from ticking land for {@link #QUEEN_LOST_TICKS} she is gone without having died
+     * (discarded, through a portal, lost with a chunk), and the colony takes the queen-died path. (Before, such a
+     * colony was skipped for ever: a mound standing still that never died out; review R1-46.)
+     */
+    boolean queenLost(ServerLevel level) {
+        boolean on = queenLostAfterForTests != null || !(level.getServer() instanceof net.minecraft.gametest.framework.GameTestServer);
+        if (!on || !landTicksRoundTheMiddle(level)) {
+            queenMissedAt = NOT_SET;
+            return false;
+        }
+        long now = level.getGameTime();
+        if (queenMissedAt == NOT_SET) {
+            queenMissedAt = now;
+        }
+        return now - queenMissedAt >= (queenLostAfterForTests != null ? queenLostAfterForTests : QUEEN_LOST_TICKS);
+    }
+
+    /** The queen was found: no wait runs. */
+    void queenSeen() {
+        queenMissedAt = NOT_SET;
+    }
+
+    private boolean landTicksRoundTheMiddle(ServerLevel level) {
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (!level.isPositionEntityTicking(center.offset(dx * 16, 0, dz * 16))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     /** The queen has died. Returns true if the colony carries on without her, false if nobody is left (it is gone). */
     public boolean queenDied(ServerLevel level) {
         queenDiedAt = level.getGameTime();

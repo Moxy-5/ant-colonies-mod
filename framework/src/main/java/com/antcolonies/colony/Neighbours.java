@@ -168,8 +168,13 @@ public class Neighbours {
         double needed = numbers.needed(colony.ageDaysAt(now));
         if (!meeting.yielded && strength >= needed - 0.05) {
             meeting.yielded = true;
+        } else if (meeting.yielded && strength < needed * 0.5 - 1e-9) {
+            // Faded under half: forgotten, so the place must be met the full count again before the colony yields
+            // there. (The mark stayed for good: a young colony that had yielded once turned away again at the first
+            // new meeting, the opposite of the young-colony rule; review R1-3.)
+            meeting.yielded = false;
         }
-        return meeting.yielded && strength >= needed * 0.5 - 1e-9;
+        return meeting.yielded;
     }
 
     /** The places the colony yields to now. */

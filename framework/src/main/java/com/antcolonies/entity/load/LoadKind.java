@@ -48,6 +48,16 @@ public final class LoadKind {
         void drop(ServerLevel level, Colony colony, AbstractAntEntity carrier, CarriedLoad load);
     }
 
+    /**
+     * What the load becomes when its carrier is folded into the colony's numbers holding it (frozen in unloaded land, a
+     * far colony, a stray: {@code AwayLife}): it walked home with it, so the row counts it in. Numbers only: the land
+     * may not be loaded, so it must never read or change the world. {@code count}: how many items the load held.
+     */
+    @FunctionalInterface
+    public interface Fold {
+        void fold(ServerLevel level, Colony colony, int count);
+    }
+
     /** Empty jaws: holds nothing, saves nothing, draws nothing. Not in the list. */
     public static final LoadKind NONE = new LoadKind(ResourceLocation.fromNamespaceAndPath(ColonyFrameworkMod.MODID, "none"),
             (tag, load, registries) -> { }, (tag, registries) -> null, (level, colony, carrier, load) -> { });
@@ -59,6 +69,8 @@ public final class LoadKind {
     private final Write write;
     private final Read read;
     private final Drop drop;
+    @Nullable
+    private Fold fold;
 
     public LoadKind(ResourceLocation name, Write write, Read read, Drop drop) {
         this.name = name;
@@ -117,6 +129,22 @@ public final class LoadKind {
 
     public void write(CompoundTag tag, CarriedLoad load, HolderLookup.Provider registries) {
         write.write(tag, load, registries);
+    }
+
+    /** Says what this load becomes when its carrier is folded into the numbers ({@link Fold}); without it the load is lost. */
+    public LoadKind foldsAs(Fold fold) {
+        this.fold = fold;
+        return this;
+    }
+
+    public boolean folds() {
+        return fold != null;
+    }
+
+    public void folded(ServerLevel level, Colony colony, int count) {
+        if (fold != null) {
+            fold.fold(level, colony, count);
+        }
     }
 
     public void drop(ServerLevel level, Colony colony, AbstractAntEntity carrier, CarriedLoad load) {

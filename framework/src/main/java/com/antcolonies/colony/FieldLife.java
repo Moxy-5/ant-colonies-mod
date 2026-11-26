@@ -419,7 +419,7 @@ public class FieldLife {
             progress.clear();
             return false;
         }
-        roomNow = colony.food().roomKnown();
+        roomNow = colony.food().roomKnown(level.getGameTime());
         if (roomNow <= 0) {
             return false;
         }

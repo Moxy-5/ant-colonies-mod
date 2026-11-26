@@ -69,7 +69,10 @@ public class ForagingHoles {
     /** M8 step 3F: how many foods a check tries for a gallery piece, nearest first (each try plans a route). */
     private static final int FOODS_TRIED = 6;
     private long newHolesCheckedAt = Long.MIN_VALUE;
-    /** Plants the colony found no tunnel route to, and until when it leaves them. Not saved. */
+    /**
+     * Plants the colony found no tunnel route to, and until when it leaves them. Saved (review R1-48: after a load
+     * every grown colony planned each route it had given up on again, in the world's first seconds).
+     */
     private final java.util.Map<BlockPos, Long> noRouteUntil = new java.util.HashMap<>();
 
     /**
@@ -82,7 +85,7 @@ public class ForagingHoles {
     }
     /**
      * Plants the colony found no runway route to, and until when it leaves them; kept apart from {@link #noRouteUntil}
-     * so food a runway cannot reach may still get a gallery piece (the user's bug, 2026-10-17). Not saved.
+     * so food a runway cannot reach may still get a gallery piece (the user's bug, 2026-10-17). Saved.
      */
     private final java.util.Map<BlockPos, Long> noRunwayUntil = new java.util.HashMap<>();
 
@@ -103,6 +106,21 @@ public class ForagingHoles {
      * is open to the sky (a young mound has no roof over it yet; an ant nest's hole is always one).
      */
     public List<WayOut> waysOut(Level level) {
+        // (Worked out once a tick, as hasFinishedRunway: every forager looking for a plant asks, and each answer reads
+        // every cell of every tunnel; review R1-12.)
+        long now = level.getGameTime();
+        if (waysOutNow == null || waysOutTick != now) {
+            waysOutNow = List.copyOf(openWaysOut(level));
+            waysOutTick = now;
+        }
+        return waysOutNow;
+    }
+
+    private long waysOutTick = Long.MIN_VALUE;
+    @Nullable
+    private List<WayOut> waysOutNow;
+
+    private List<WayOut> openWaysOut(Level level) {
         List<WayOut> ways = new java.util.ArrayList<>();
         for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
             // A hole with a runway of sheeting over it leads into the runway, not outside; a hole closed for danger (brain
@@ -945,5 +963,40 @@ public class ForagingHoles {
 
     private static boolean touchesFluid(Level level, BlockPos pos) {
         return Nest.touchesFluid(level, pos);
+    }
+
+    /** Tests only: a sample in both saved memories ({@code ColonyPart.sample}). */
+    public void fillForTests(net.minecraft.server.level.ServerLevel level) {
+        noRouteUntil.put(new BlockPos(7, 0, 4), level.getGameTime() + 100);
+        noRunwayUntil.put(new BlockPos(7, 61, 5), level.getGameTime() + 200);
+    }
+
+    void save(net.minecraft.nbt.CompoundTag tag) {
+        tag.put("noRouteUntil", saved(noRouteUntil));
+        tag.put("noRunwayUntil", saved(noRunwayUntil));
+    }
+
+    void load(net.minecraft.nbt.CompoundTag tag) {
+        read(tag, "noRouteUntil", noRouteUntil);
+        read(tag, "noRunwayUntil", noRunwayUntil);
+    }
+
+    private static net.minecraft.nbt.ListTag saved(java.util.Map<BlockPos, Long> until) {
+        net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
+        until.forEach((food, time) -> {
+            net.minecraft.nbt.CompoundTag entry = new net.minecraft.nbt.CompoundTag();
+            entry.putLong("food", food.asLong());
+            entry.putLong("until", time);
+            list.add(entry);
+        });
+        return list;
+    }
+
+    private static void read(net.minecraft.nbt.CompoundTag tag, String name, java.util.Map<BlockPos, Long> until) {
+        until.clear();
+        for (net.minecraft.nbt.Tag t : tag.getList(name, net.minecraft.nbt.Tag.TAG_COMPOUND)) {
+            net.minecraft.nbt.CompoundTag entry = (net.minecraft.nbt.CompoundTag) t;
+            until.put(BlockPos.of(entry.getLong("food")), entry.getLong("until"));
+        }
     }
 }

@@ -23,14 +23,18 @@ import net.minecraft.world.item.ItemStack;
 public final class MatabeleLoads {
     public static final LoadKind TERMITE_REMAINS = LoadKind.signUp(LoadKind.flag(
             ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "termite_remains"), "CarryingTermiteRemains",
-            (level, colony, carrier, load) -> colony.part(SavannaParts.PREY_PILE).ifPresent(PreyPile::loadDropped)));
+            (level, colony, carrier, load) -> colony.part(SavannaParts.PREY_PILE).ifPresent(PreyPile::loadDropped))
+            .foldsAs((level, colony, count) -> colony.part(SavannaParts.PREY_PILE).ifPresent(PreyPile::loadDropped)));
 
     /** Saved as {@code CarryingTermites: n}. */
     public static final LoadKind TERMITES = LoadKind.signUp(new LoadKind(
             ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "termites"),
             (tag, load, registries) -> tag.putInt("CarryingTermites", load.item().getCount()),
             (tag, registries) -> tag.getInt("CarryingTermites") > 0 ? termites(tag.getInt("CarryingTermites")) : null,
-            MatabeleLoads::dropTermites));
+            MatabeleLoads::dropTermites)
+            // (A carrier folded into the numbers walked home with them: counted into the prey pile; review R1-28.)
+            .foldsAs((level, colony, count) -> colony.part(SavannaParts.PREY_PILE)
+                    .ifPresent(pile -> pile.bringInCounted(level.getGameTime(), count))));
 
     /**
      * The raid code review, finding 18: a carrier dying on the way home drops the stung termites it held where it died,

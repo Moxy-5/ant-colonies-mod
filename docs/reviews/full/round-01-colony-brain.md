@@ -105,6 +105,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
 
 ### R1-3 (B, proven by its reader): a young colony that once yielded to a neighbour yields again after one meeting
 
+**Status (2026-11-26, `claude/review-fix-1b`): fixed: a colony that yielded keeps yielding until its strength falls under half of what its age needs; one meeting no longer flips it back.**
+
 - **Where:** `Neighbours.java:166-173` (`yields`), 132 to 137 (`met`).
 - **What is wrong:** `meeting.yielded` is set true once the strength reaches the meetings its age needs and is never
   set back, not even when the strength has faded under half. Macrotermes: 4 meetings for a young colony, forgotten
@@ -115,6 +117,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
 - **Fix proposed:** in `yields`, clear `yielded` once the strength is under half of what is needed.
 
 ### R1-4 (B, proven by its reader for one field): some numbers in the species file have no range check, and a 0 crashes
+
+**Status (2026-11-26, `claude/review-fix-1b`): fixed: every number of the species file that is divided by or counted in steps (14 of them: the feed, egg, burst, meal and meeting intervals, the half lives, workers per piece and per room, what one stands for) must be 1 or more; a 0 is refused when the file is read, with the field's name (`PositiveNumbersTest`).**
 
 - **Where:** `QueenCare.java:224` and `371` (`now % founding.feedIntervalTicks() < 20`); `SpeciesProfile.java:902-908`.
 - **What is wrong:** `founding.feed_interval_ticks: 0` passes the reader; `now % 0` throws once a second.
@@ -199,6 +203,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
 
 ### R1-10 (B, proven by its reader; to measure): a colony with no food plants still scans about 2,400 columns every 5 seconds
 
+**Status (2026-11-26, `claude/review-fix-1b`): fixed: a species with no food plants in its file scans nothing (`FoodStore.plants` answers at once). Not measured.**
+
 - **Where:** `FieldLife.java:104-109`, `145-157`; `FoodStore.java:343-359`, `441-471`, `485-512`;
   `megaponera_analis.json:57` (`"plants": []`).
 - **What is wrong:** `FieldLife` is a shared part, so it ticks for Matabele colonies too; `look` asks
@@ -208,6 +214,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
 
 ### R1-11 (B, proven by its reader; to measure): once a second every outside worker is compared with every plant
 
+**Status (2026-11-26, `claude/review-fix-1b`): fixed: the distance is tested before the plant is looked up in the known list (the cheap test first). Not measured; the loop is still workers times plants.**
+
 - **Where:** `FoodMap.java:117`, `125-156` (the loop at 151 to 155).
 - **What is wrong:** workers times plants; dry grass is termite food, so thousands of plants in a savanna. About 50
   workers times 3,000 plants on one tick each second, for each colony.
@@ -215,12 +223,16 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
 
 ### R1-12 (B, proven by its reader; to measure): each forager's plant search counts every claim for every plant
 
+**Status (2026-11-26, `claude/review-fix-1b`): fixed: a forager's plant search counts the claims once into a table, tests the cheap things before reading the block, and works out the ways out only when a plant is found; `ForagingHoles.waysOut` is worked out once a tick. Not measured.**
+
 - **Where:** `FoodStore.java:283`, `286-300`, `536-544`; `ForagingHoles.java:105-114`, `190-197`.
 - **What is wrong:** `findGrass` (every forager, every 40 ticks) first runs `waysOut`, an `isDug` over every tunnel
   cell (galleries up to 600 long), then for nearly every plant `foragersAt`, a walk over all claims.
 - **Fix proposed:** count the claims into a map once a call; keep `waysOut` for the tick, as `hasFinishedRunway` does.
 
 ### R1-13 (B, proven paths, how often unchecked): the store's room is judged in three places by three rules
+
+**Status (2026-11-26, `claude/review-fix-1b`): fixed: one count of the free layers (`FoodStore.freeLayers`, with the floor check) behind the store's room, the watch and the foragers' room; `roomKnown` now takes off what the ledger owes and the loads bound for the store.**
 
 - **Where:** `FoodStore.java:170-173`, `194-213`, `705-725`, `736-738`; `NestLedger.java:148-163`;
   `FieldLife.java:369`, `501-511`.
@@ -356,6 +368,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
 
 ### R1-22 (B, proven by its reader): the catch-up digs the founders' chamber by weaker rules than the real diggers
 
+**Status (2026-11-26, `claude/review-fix-1b`): fixed: the catch-up leaves a founders' cell with water or lava beside it, as the real diggers do.**
+
 - **Where:** `BuildLife.java:279-301`; `Nest.java:605-639` (630 to 637); against `Nest.java:1084-1086`.
 - **What is wrong:** real diggers take a block only through `firstDiggable` (a place to stand, no fluid beside it);
   `foundersDigLeft` lists every soil cell with neither check and `settleFounders` digs them all. Two places judging
@@ -411,6 +425,8 @@ servers, not in the user's usual game. They stay A: a freeze is a freeze, and th
 
 ### R1-26 (B, proven; checked again): the far rule removes loaded insects without asking whether a player can see them
 
+**Status (2026-11-26, `claude/review-fix-1b`): fixed: the far rule's sweep leaves a member real while any player can see it (the eyes of every player in the world, not only those near the nest); the next sweep, 20 seconds on, takes it once it is out of sight.**
+
 - **Where:** `AwayLife.java:163`, `189-204`, `287-317` (the `discard` at 309), `404-406`; `SavannaParts.java:302`
   (only the raids sign up `OUT_THERE`).
 - **What is wrong:** "here" is judged from the nest's middle (and `OUT_THERE` places, which termites have none of).
@@ -424,6 +440,8 @@ servers, not in the user's usual game. They stay A: a freeze is a freeze, and th
 
 ### R1-27 (B, proven; checked again): a colony that dies out while away is not ended until a player comes near
 
+**Status (2026-11-26, `claude/review-fix-1b`): open: left on purpose. Ending a colony writes down its dead mound, combs and works by reading their blocks (`DeadMounds.addMound`, `addCombs`, `DeadWorks.record`), so it cannot be done as numbers in land that is not loaded; ending it away needs those three made to work from the brain's own lists first. What is lost today is small: an empty, queenless colony has no members to raid or count, and its mound starts to wear when a player comes, not when it died. Now grade C by my judgment.**
+
 - **Where:** `ColonyManager.java:89-98` (the away branch calls only `tickAway`); `Colony.java:675-678` (the one
   `isQueenless() && isEmpty` check, in the near tick); `QueenCare.java:401-403` (a queen starved away is only a flag).
 - **What is wrong:** the empty record ticks as numbers every second and sends no `COLONY_ENDED` news until a player is
@@ -435,6 +453,8 @@ servers, not in the user's usual game. They stay A: a freeze is a freeze, and th
 
 ### R1-28 (B, the fold proven; how often, unchecked): folding an insect into the numbers loses a species load it carries
 
+**Status (2026-11-26, `claude/review-fix-1b`): fixed: a load's row can say what it becomes when its carrier is folded into the numbers (`LoadKind.foldsAs`, numbers only); the Matabele rows do: stung termites are counted onto the prey pile, leftovers back to the pile's waiting loads. The frozen record keeps the load's name and count, saved. The framework's own four loads (egg, body, nurse food, seed) stay in `AwayLife` as they were: they reach the brain's own ledgers. Test `aMatabeleFoldedIntoTheNumbersBringsItsStungTermitesHome`.**
+
 - **Where:** `AwayLife.java:348-362` (`loadOf` knows only egg, corpse, bread and seed), `418-441`; callers
   `Strays:82`, `AwayLife:307`, `394`, `481`; `MatabeleLoads.java:24-33`; `AbstractAntEntity.java:574-580`.
 - **What is wrong:** any other load becomes `Load.NONE` and is gone with the body. A death sends the same load through
@@ -445,6 +465,8 @@ servers, not in the user's usual game. They stay A: a freeze is a freeze, and th
   in place of the framework's own list in `loadOf`. Fewer rules: one place knows what a load becomes.
 
 ### R1-29 (B, proven in `AwayLife`; the `Population` side likely): an insect frozen while its colony is here waits in limbo
+
+**Status (2026-11-26, `claude/review-fix-1b`): fixed: while the colony is here, an insect frozen longer than the grace whose body is not loaded (or loaded where nothing ticks) is folded into the numbers once a second's look (`AwayLife.foldLongFrozen`); its body leaves when its land loads again, as before.**
 
 - **Where:** `AwayLife.java:251-260`, `390-398`, `468-485`; `Population.java:179-182`, `700`.
 - **What is wrong:** a frozen insect is folded only when the colony goes away or when that same body ticks again.
@@ -465,6 +487,8 @@ servers, not in the user's usual game. They stay A: a freeze is a freeze, and th
 - **Fix proposed:** a try round each `Colony.load`: log it, keep the raw record and write it back unchanged.
 
 ### R1-31 (B, likely; checked again; to measure): every colony ever made ticks once a second for ever and marks the file changed
+
+**Status (2026-11-26, `claude/review-fix-1b`): open: to measure, in a big explored world (not done; no such world at hand). Checked now: marking the file only on a change saves nothing, since a colony's clocks (ages, meals, the garden) change every second it lives as numbers; the real saving is a slower clock for colonies far from every player, which changes every away rate and waits for the measurement.**
 
 - **Where:** `ColonyManager.java:81-98`; `AwayLife.java:407-410` (`markChanged()` every away second, changed or not).
 - **What is wrong:** no distance limit and no slower clock for far colonies. New land has a colony about every 96
@@ -578,6 +602,8 @@ readers; the line-by-line slices above cover those).
   **This changes how fast a watched mound grows: the user's call.**
 
 ### R1-37 (B, the mechanism proven; checked again): all the numbers of a caste share one meal minute
+
+**Status (2026-11-26, `claude/review-fix-1b`): fixed: numbers that join with no known meal are spread evenly over the last meal's length (one alone: now); while hunger is off the meal clocks move on with the game's time, a minute each minute, in place of all being set to now. Test `termiteNumbersPutInTogetherAreDueTheirMealsSpreadOverADay`.**
 
 - **Where:** `Meals.java:124-126`, `154-158`, `185-196`; against `Population.java:224-259` (old age is spread).
 - **What is wrong:** every number with no known meal gets the same minute (`times.merge(minute(now), want - have)`); a
@@ -733,6 +759,8 @@ whether new-land mound code reaches the brain from a world-making thread.
 
 ### R1-46 (B, proven by its reader): a colony whose queen cannot be found is skipped for ever while near
 
+**Status (2026-11-26, `claude/review-fix-1b`): fixed: a queen not found for 5 minutes (6,000 ticks, my pick) while the colony is here and the 3 by 3 chunks round its middle tick their animals counts as dead: the colony takes the queen-died path (queenless, or ended if nobody is left). Off on the test server but where a test asks (`Colony.setQueenLostAfterForTests`). Test `aTermiteColonyWhoseQueenIsGoneFromLoadedLandCarriesOnQueenless`.**
+
 - **Where:** `ColonyManager.java:100-103`; `Colony.java:661-679`; `ModEvents.java:130-137`.
 - **What is wrong:** `if (!colony.isQueenless() && colony.getQueen(level) == null) { ... continue; }`. A queen gone
   without `die()` (discarded, lost with a chunk, through a portal, R1-49) leaves a colony never ticked near and never
@@ -742,7 +770,7 @@ whether new-land mound code reaches the brain from a world-making thread.
 
 ### R1-47 (B, likely): more reads one step past the guarded cell, and on a list up to 5 seconds old
 
-**Status (2026-11-25, `claude/review-fix-1`): mostly fixed, BUGS 390 (`FoodMap`'s 27 cells round each ant and `isEntranceCovered` left: the ant's own land is loaded).**
+**Status (2026-11-26, `claude/review-fix-1b`): fixed: BUGS 390 did most (2026-11-25); now `Nest.isEntranceCovered` asks whether the land is ready before the column is read. `FoodMap`'s 27 cells round each ant are in that ant's own loaded land and stay as they are.**
 
 - **Where (beyond R1-18's places):** `FieldLife.java:158` and `FoodStore.java:287` (`plantFor(level.getBlockState(pos))`
   on `FoodStore.plants()`, rescanned every 100 ticks); `Nest.java:1130`; `FoodMap.tick` (the 27 cells round each
@@ -757,6 +785,8 @@ whether new-land mound code reaches the brain from a world-making thread.
   neighbours and remembered positions; with R1-18's shared helper this closes the whole family.
 
 ### R1-48 (B, likely; to measure): the "no route to this food" memory is not saved
+
+**Status (2026-11-26, `claude/review-fix-1b`): fixed: the two memories are saved with the colony (`ForagingHoles.save`, in the save and load check by its sample). The stutter was not measured before or after.**
 
 - **Where:** `ForagingHoles.java:73`, `87` (`noRouteUntil`, `noRunwayUntil`, 6,000 ticks); the part is signed up as
   not saved.

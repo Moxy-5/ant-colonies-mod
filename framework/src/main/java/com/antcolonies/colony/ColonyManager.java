@@ -105,8 +105,14 @@ public class ColonyManager extends SavedData {
             }
             if (!colony.isQueenless() && colony.getQueen(level) == null) {
                 com.antcolonies.debug.Perf.colony("near, queen not loaded", System.nanoTime() - started);
+                if (colony.queenLost(level)) {
+                    com.antcolonies.ColonyFrameworkMod.LOGGER.info("[colony] colony {} at {}: its queen is nowhere in loaded land for {} ticks, she counts as dead",
+                            colony.getId(), colony.getCenter().toShortString(), Colony.QUEEN_LOST_TICKS);
+                    queenDied(level, colony.getId());
+                }
                 continue; // her part of the world is not loaded yet (or a game test has cleared her away)
             }
+            colony.queenSeen();
             boolean lives;
             com.antcolonies.debug.Perf.colonyWhere("near");
             try {

@@ -109,7 +109,10 @@ class Meals {
 
     /**
      * The meal lists follow the headcount inside: numbers that joined without a known meal (hatched into the numbers,
-     * the population command) ate just now; ones that left without saying so (old age) are taken at random.
+     * the population command, a colony new land put in) ate some time in the last meal's length, spread evenly over it
+     * as {@code Population.growOld} spreads deaths (one alone: just now); ones that left without saying so (old age) are
+     * taken at random. (Before, a whole colony put in at once shared one meal minute and ate a block's worth of comb in
+     * one tick once a day, or starved to the last one in one second; review R1-37.)
      */
     void keepUp(ServerLevel level, Population population) {
         long now = level.getGameTime();
@@ -121,8 +124,10 @@ class Meals {
             TreeMap<Long, Integer> times = lastAte.computeIfAbsent(caste, c -> new TreeMap<>());
             int have = total(times);
             int want = population.inside(caste);
-            if (have < want) {
-                times.merge(minute(now), want - have, Integer::sum);
+            int joined = want - have;
+            long interval = dietOf(caste).interval();
+            for (int i = 0; i < joined; i++) {
+                times.merge(minute(now - interval * i / joined), 1, Integer::sum);
             }
             for (int extra = have - want; extra > 0 && !times.isEmpty(); extra--) {
                 remove(times, pick(times, colony.random()), 1);
@@ -138,7 +143,8 @@ class Meals {
     /**
      * Once a second, here or away: the numbers whose meal is due eat, the hungriest first, while there is food; worker
      * numbers that have gone their starve time without food die ({@link Population#starved}). With the colony's hunger
-     * off (the game tests), they are all fed.
+     * off (the game tests; termites before their first comb), the time is not counted: every meal clock moves on with
+     * the game's, so each number is as near its next meal after as it was before.
      */
     void tick(ServerLevel level, Population population) {
         keepUp(level, population);
@@ -152,9 +158,12 @@ class Meals {
                 continue;
             }
             if (!colony.isHungerOn() || diet.workers() && !colony.workerFood().hungerRuns()) {
-                int all = total(times);
-                times.clear();
-                times.put(minute(now), all);
+                if (minute(now) != minute(now - 20)) { // (a new minute of the list began this second: all one minute on)
+                    TreeMap<Long, Integer> later = new TreeMap<>();
+                    times.forEach((minute, count) -> later.merge(Math.min(minute(now), minute + Population.AGE_STEP), count, Integer::sum));
+                    times.clear();
+                    times.putAll(later);
+                }
                 continue;
             }
             int fed = 0;

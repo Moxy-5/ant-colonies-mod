@@ -95,7 +95,8 @@ public final class ColonyParts {
             .notSaved("only the workers' claims on dead ants"));
     public static final Type<ForagingHoles> FORAGING_HOLES = shared("foraging_holes", ForagingHoles::new, part -> part
             .ticks(80, ForagingHoles::tick)
-            .notSaved("claims and short memories, worked out again after a load"));
+            .saves(ForagingHoles::save, ForagingHoles::load) // (only the "no way to this food" memories; claims start again)
+            .sample(ForagingHoles::fillForTests));
     public static final Type<ForagingTrails> FORAGING_TRAILS = shared("foraging_trails", ForagingTrails::new, part -> part
             .saves(ForagingTrails::save, ForagingTrails::load)
             .sample(ForagingTrails::fillForTests));

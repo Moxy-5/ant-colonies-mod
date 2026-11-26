@@ -427,7 +427,7 @@ public class Population {
         for (Vec3 eye : Watchers.pretend()) { // (a measuring run's pretend player; none in a game)
             double dx = eye.x - (center.getX() + 0.5);
             double dz = eye.z - (center.getZ() + 0.5);
-            if (dx * dx + dz * dz <= (double) radius * radius && Math.abs(eye.y - center.getY()) <= 64) {
+            if (dx * dx + dz * dz <= (double) radius * radius && (radius == Integer.MAX_VALUE || Math.abs(eye.y - center.getY()) <= 64)) {
                 eyes.add(eye);
             }
         }
@@ -437,7 +437,7 @@ public class Population {
             }
             double dx = player.getX() - (center.getX() + 0.5);
             double dz = player.getZ() - (center.getZ() + 0.5);
-            if (dx * dx + dz * dz <= (double) radius * radius && Math.abs(player.getY() - center.getY()) <= 64) {
+            if (dx * dx + dz * dz <= (double) radius * radius && (radius == Integer.MAX_VALUE || Math.abs(player.getY() - center.getY()) <= 64)) {
                 eyes.add(player.getEyePosition());
             }
         }
@@ -447,6 +447,14 @@ public class Population {
     /** Where the eyes are of every player who could see into the nest (the watch radius and the sight together). */
     public List<Vec3> viewersInSight(ServerLevel level) {
         return viewers(level, numbers().watchRadius() + (int) SIGHT);
+    }
+
+    /**
+     * Where the eyes are of every player things must be hidden from, wherever in the world they stand: for an insect
+     * far out from the nest, which a player past the nest's own watch radius may still see.
+     */
+    List<Vec3> seersAnywhere(ServerLevel level) {
+        return viewers(level, Integer.MAX_VALUE, true);
     }
 
     /** Whether no player can see this point: too far, or a block is in the way. */
@@ -734,6 +742,12 @@ public class Population {
     /** How many numbers of all castes have gone longer than a meal without one. */
     public int hungry(ServerLevel level) {
         return meals.hungry(level.getGameTime());
+    }
+
+    /** Tests only: how many numbers will have gone longer than a meal without one at this game time, if none eats till then. */
+    public int hungryAtForTests(ServerLevel level, long time) {
+        meals.keepUp(level, this);
+        return meals.hungry(time);
     }
 
     /** Tests only: every number of this caste last ate at this game time. */

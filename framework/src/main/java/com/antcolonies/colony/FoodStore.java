@@ -190,19 +190,34 @@ public class FoodStore {
         storeBound.remove(ant);
     }
 
-    /** How many more seeds the food store takes right now: the empty layers of its heaps and its empty cells. */
+    /**
+     * How many more seeds the food store takes right now, for the real foragers: its free layers ({@link #freeLayers})
+     * less the layers the numbers have brought in and not put down yet (the ledger's; they fill it as soon as nobody
+     * looks). 0 while its land is not loaded.
+     */
     private int roomInStore(Level level) {
+        return Math.max(0, freeLayers(level)) - Math.max(0, colony.ledger().store());
+    }
+
+    /**
+     * The one count of the food store's room (review R1-13: the real foragers and the numbers each had a count, by
+     * different rules, so the numbers cut plants for room that was not there and the pieces were dropped): the empty
+     * layers of its heaps and its empty cells, not where a young one lies, and only where the floor holds a heap
+     * (docs/BUGS.md 95). -1 while a cell's land is not loaded. What is on its way in is taken off by the two askers:
+     * {@link #roomInStore} for the real foragers, {@link #roomKnown} for the numbers.
+     */
+    private int freeLayers(Level level) {
         Set<BlockPos> young = colony.brood().getBroodCells(level);
         SeedPileBlock pile = food().pileBlock();
         int room = 0;
         for (BlockPos pos : colony.nest().getFoodStoreCells(level)) {
-            if (young.contains(pos)) {
+            if (!LandReady.at(level, pos)) {
+                return -1;
+            }
+            if (young.contains(pos) || !holds(level, pos, pile)) {
                 continue;
             }
             BlockState state = level.getBlockState(pos);
-            if (!holds(level, pos, pile)) {
-                continue; // (no floor that holds a heap: no room there, docs/BUGS.md 95)
-            }
             if (state.isAir()) {
                 room += pile.maxLayers();
             } else if (state.is(pile)) {
@@ -280,16 +295,29 @@ public class FoodStore {
         long now = level.getGameTime();
         busyGrass.prune(now);
         plantClaims.values().removeIf(claim -> claim.until() <= now);
-        List<BlockPos> exits = colony.foragingHoles().waysOut(level).stream().map(ForagingHoles.WayOut::mouth).toList();
+        // (Review R1-12, the cost of one ask with thousands of plants: the claims are counted once, not walked through
+        // for every plant; the tests that read nothing from the world come first; the ways out are asked for only
+        // when a plant has passed them all.)
+        Map<BlockPos, Integer> claimed = new HashMap<>();
+        for (PlantClaim claim : plantClaims.values()) {
+            claimed.merge(claim.plant(), 1, Integer::sum);
+        }
+        List<BlockPos> exits = null;
         BlockPos best = null;
         double bestWorth = -1;
         for (BlockPos pos : plants(level)) {
+            if (avoid.contains(pos) || busyGrass.contains(pos) || !colony.foodMap().knows(pos, ant)) {
+                continue;
+            }
             SpeciesProfile.PlantFood plant = LandReady.at(level, pos) ? food().plantFor(level.getBlockState(pos)) : null;
             // (a plant the numbers have used up out of sight still stands until it is out of every player's sight: skipped)
-            if (plant == null || plant.pieces() - getPiecesCut(pos) <= 0 || busyGrass.contains(pos) || avoid.contains(pos) || foragersAt(pos) >= Math.max(1, plant.foragers())
-                    || !colony.foodMap().knows(pos, ant) || fromInside && !isFeedableFromInside(level, pos)
+            if (plant == null || plant.pieces() - getPiecesCut(pos) <= 0 || claimed.getOrDefault(pos, 0) >= Math.max(1, plant.foragers())
+                    || fromInside && !isFeedableFromInside(level, pos)
                     || (fromInside ? colony.keepsOff(level, pos) : !colony.mayForageAt(level, pos))) { // (only where the patrollers came back from, never where the colony keeps away for danger)
                 continue;
+            }
+            if (exits == null) {
+                exits = colony.foragingHoles().waysOut(level).stream().map(ForagingHoles.WayOut::mouth).toList();
             }
             double trip = tripLength(pos, exits.isEmpty() ? List.of(center) : exits);
             double worth = worth(plant.pieces() - getPiecesCut(pos), trip, pos.distSqr(near));
@@ -341,6 +369,11 @@ public class FoodStore {
      * each of its real workers out farther (where a searcher off any trail is).
      */
     public List<BlockPos> plants(Level level) {
+        if (food().plants().isEmpty()) {
+            // A species with no food plants (the Matabele ant: it hunts): nothing to scan for. (The shared parts asked
+            // all the same, about 2,400 columns every 5 seconds for each colony, all thrown away; review R1-10.)
+            return List.of();
+        }
         long now = level.getGameTime();
         if (now >= grassScanTime || now + GRASS_SCAN_TICKS < grassScanTime) {
             grassScanTime = now + GRASS_SCAN_TICKS;
@@ -703,25 +736,10 @@ public class FoodStore {
      * take (the empty floor and the heaps not full, not where a young one lies), for when it cannot look ({@link #roomKnown}).
      */
     void watchRoom(Level level) {
-        List<BlockPos> cells = colony.nest().getFoodStoreCells(level);
-        SeedPileBlock pile = food().pileBlock();
-        Set<BlockPos> young = colony.brood().getBroodCells(level);
-        int room = 0;
-        for (BlockPos pos : cells) {
-            if (!LandReady.at(level, pos)) {
-                return; // (keep what was seen last)
-            }
-            BlockState state = level.getBlockState(pos);
-            if (young.contains(pos)) {
-                continue;
-            }
-            if (state.isAir()) {
-                room += pile.maxLayers();
-            } else if (state.is(pile)) {
-                room += Math.max(0, pile.maxLayers() - state.getValue(SeedPileBlock.LAYERS));
-            }
+        int room = freeLayers(level);
+        if (room >= 0) { // (else: keep what was seen last)
+            seenRoom = room;
         }
-        seenRoom = room;
     }
 
     /**
@@ -732,9 +750,13 @@ public class FoodStore {
         seenRoom = Math.max(seenRoom, floorCells * food().pileBlock().maxLayers());
     }
 
-    /** How many more pieces the food store can take as far as the brain knows: the room it last saw, less what is owed to it. */
-    public int roomKnown() {
-        return (roomForTests != null ? roomForTests : seenRoom) - colony.ledger().store();
+    /**
+     * How many more pieces the food store can take as far as the brain knows, for the numbers: the room it last saw,
+     * less what is owed to it, less the places real foragers on their way in hold.
+     */
+    public int roomKnown(long now) {
+        storeBound.prune(now);
+        return (roomForTests != null ? roomForTests : seenRoom) - colony.ledger().store() - storeBound.size();
     }
 
     /** Tests only: pretend the store had this much room the last time the brain looked (null: as seen). */

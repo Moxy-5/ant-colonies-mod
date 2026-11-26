@@ -149,7 +149,9 @@ public class FoodMap {
                 continue;
             }
             for (BlockPos plant : plants) {
-                if (!known.contains(plant) && plant.distSqr(at) <= see * see) {
+                // (The distance first: three subtractions, against a look-up in the known plants for each of some
+                // thousands of plants for each worker outside, once a second; review R1-11.)
+                if (plant.distSqr(at) <= see * see && !known.contains(plant)) {
                     found.computeIfAbsent(id, key -> new HashSet<>()).add(plant);
                 }
             }

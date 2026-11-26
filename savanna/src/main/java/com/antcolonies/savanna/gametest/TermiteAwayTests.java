@@ -169,6 +169,64 @@ public class TermiteAwayTests {
      * brain last saw it), nothing either; with room again, 2 more tufts are eaten up.
      */
     /**
+     * Review R1-37: numbers that join without a known meal (a colony new land puts in, the population command) all got
+     * the same meal minute, so a day later all ate in one second (200 workers: a block's worth of comb in a tick) or
+     * starved together. Now they are spread over the last meal's length. 120 worker numbers put in at once: about a
+     * quarter are due after a quarter of the day, half after half.
+     */
+    @GameTest(template = "arena", timeoutTicks = 200, skyAccess = true)
+    public static void termiteNumbersPutInTogetherAreDueTheirMealsSpreadOverADay(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.onEachTick(() -> noRealWorkers(helper));
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null, "no termite colony");
+            colony.population().setOnForTests(false);
+            colony.population().addNewMembers(Caste.WORKER, level.getGameTime(), 120);
+        });
+        helper.runAfterDelay(60, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            long now = level.getGameTime();
+            long day = colony.profile().worker().mealIntervalTicks();
+            int soon = colony.population().hungryAtForTests(level, now + day / 4);
+            int half = colony.population().hungryAtForTests(level, now + day / 2);
+            int all = colony.population().hungryAtForTests(level, now + day + 2400);
+            helper.assertTrue(all >= 120, "only " + all + " of the 120 worker numbers have a meal clock");
+            helper.assertTrue(soon >= 20 && soon <= 45 && half >= 50 && half <= 75,
+                    "120 numbers put in together should be due their meals evenly over the day: " + soon + " after a quarter of it, "
+                            + half + " after half, " + all + " after it all (one meal minute for all: review R1-37)");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Review R1-46: a colony whose queen is gone without having died (discarded, lost with a chunk) while a player is
+     * by it was skipped for ever: nothing ticked, and it never died out. Now, missing from loaded, ticking land for the
+     * wait, she counts as dead and the colony carries on queenless.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true)
+    public static void aTermiteColonyWhoseQueenIsGoneFromLoadedLandCarriesOnQueenless(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        Colony[] found = new Colony[1];
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null, "no termite colony");
+            found[0] = colony;
+            colony.population().setOnForTests(false);
+            colony.population().addNewMembers(Caste.WORKER, level.getGameTime(), 30);
+            colony.setQueenLostAfterForTests(60L);
+            colony.getQueen(level).discard(); // (gone, not killed: nobody told the colony)
+        });
+        helper.runAfterDelay(50, () -> helper.assertTrue(!found[0].isQueenless(), "the queen counts as dead before the wait is over"));
+        helper.runAfterDelay(60, () -> helper.succeedWhen(() -> helper.assertTrue(found[0].isQueenless(),
+                "the colony still waits for a queen that is nowhere in its loaded land")));
+    }
+
+    /**
      * Review R1-36, the user's call (2026-11-25): the builder numbers work beside a player too, out of sight. A termite
      * colony here (never away) with its workers all in the numbers and its nest not dug. With the near work off (as
      * before the change) the numbers dig nothing and bank no time; with it on they dig the nest, which is out of
@@ -278,6 +336,9 @@ public class TermiteAwayTests {
             colony.population().setViewersForTests(List.of());
             TermiteScenes.digNestAtOnce(level, colony);
             colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - 250000, 60);
+            // (This test counts food coming in: all have just eaten, so none eats comb meanwhile. Numbers put in
+            // together are due their meals spread over the day since review R1-37.)
+            colony.population().setLastAteForTests(level, Caste.WORKER, level.getGameTime());
             // Step 2c's rule with the 2 holes of before (the galleries' night holes have their own scene, step 4 below).
             com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(false);
             int[][] spots = {{MIDDLE + 6, MIDDLE}, {MIDDLE - 6, MIDDLE}, {MIDDLE, MIDDLE + 6}, {MIDDLE, MIDDLE - 6}};

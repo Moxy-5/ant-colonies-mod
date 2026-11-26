@@ -45,6 +45,16 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         FoodNumbers food, RefuseNumbers refuse, NestNumbers nest, Optional<Founding> founding, Optional<GardenRooms> gardenRooms,
         Optional<Laying> laying, Optional<BodyLanguage> bodyLanguage, List<String> parts, Map<SpeciesSection<?>, Object> sections) {
 
+    /**
+     * A whole number of 1 or more: for the numbers that are divided by or counted in steps of (an interval in ticks, a
+     * half-life, how many workers a piece feeds). A 0 there passed the reader and crashed the game a second later
+     * ({@code now % 0}); now the file stops loading with a message that says so (review R1-4). (In a holder of its own,
+     * so the parts' readers can use it whichever of them is first asked for.)
+     */
+    interface Ints {
+        Codec<Integer> POSITIVE = Codec.intRange(1, Integer.MAX_VALUE);
+    }
+
     public SpeciesProfile {
         sections = Map.copyOf(sections);
     }
@@ -100,7 +110,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
     public record GardenRooms(int rooms, int workersPerRoom) {
         public static final Codec<GardenRooms> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("rooms").forGetter(GardenRooms::rooms),
-                Codec.INT.fieldOf("workers_per_room").forGetter(GardenRooms::workersPerRoom)
+                Ints.POSITIVE.fieldOf("workers_per_room").forGetter(GardenRooms::workersPerRoom)
         ).apply(i, GardenRooms::new));
 
         /** How many garden rooms a colony with this many workers wants (none while it has no workers). */
@@ -137,7 +147,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 // 50 to 700 counted against 1 to 2 million real). Hunters taking this colony's members take them from
                 // the many, so only one in standsFor of them costs a counted member (Population.loseToHunters,
                 // AbstractAntEntity.carriedOff). 1: each counted insect is one real one.
-                Codec.INT.optionalFieldOf("stands_for", 1).forGetter(ColonyNumbers::standsFor)
+                Ints.POSITIVE.optionalFieldOf("stands_for", 1).forGetter(ColonyNumbers::standsFor)
         ).apply(i, ColonyNumbers::new));
 
         public ColonyNumbers(int maxWorkers, List<Integer> nursesFrom, int realCap, int crew, int watchRadius, int swapsPerSecond,
@@ -212,9 +222,9 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             double youngMeetings, double oldAtDays, double turnDegrees, boolean wallGalleries) {
         public static final Codec<NeighbourNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.optionalFieldOf("within", 3.0).forGetter(NeighbourNumbers::within),
-                Codec.INT.optionalFieldOf("meet_every_ticks", 1200).forGetter(NeighbourNumbers::meetEveryTicks),
+                Ints.POSITIVE.optionalFieldOf("meet_every_ticks", 1200).forGetter(NeighbourNumbers::meetEveryTicks),
                 Codec.DOUBLE.optionalFieldOf("merge_within", 4.0).forGetter(NeighbourNumbers::mergeWithin),
-                Codec.INT.optionalFieldOf("half_life_ticks", 48000).forGetter(NeighbourNumbers::halfLifeTicks),
+                Ints.POSITIVE.optionalFieldOf("half_life_ticks", 48000).forGetter(NeighbourNumbers::halfLifeTicks),
                 Codec.DOUBLE.optionalFieldOf("forget_below", 0.5).forGetter(NeighbourNumbers::forgetBelow),
                 Codec.DOUBLE.optionalFieldOf("young_meetings", 4.0).forGetter(NeighbourNumbers::youngMeetings),
                 Codec.DOUBLE.optionalFieldOf("old_at_days", 8.0).forGetter(NeighbourNumbers::oldAtDays),
@@ -254,10 +264,10 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.DOUBLE.optionalFieldOf("killed", 4.0).forGetter(DangerNumbers::killed),
                 Codec.DOUBLE.optionalFieldOf("seen", 1.0).forGetter(DangerNumbers::seen),
                 Codec.DOUBLE.optionalFieldOf("seen_within", 4.0).forGetter(DangerNumbers::seenWithin),
-                Codec.INT.optionalFieldOf("seen_every_ticks", 1200).forGetter(DangerNumbers::seenEveryTicks),
+                Ints.POSITIVE.optionalFieldOf("seen_every_ticks", 1200).forGetter(DangerNumbers::seenEveryTicks),
                 Codec.DOUBLE.optionalFieldOf("merge_within", 4.0).forGetter(DangerNumbers::mergeWithin),
                 Codec.DOUBLE.optionalFieldOf("reach", 6.0).forGetter(DangerNumbers::reach),
-                Codec.INT.optionalFieldOf("half_life_ticks", 24000).forGetter(DangerNumbers::halfLifeTicks),
+                Ints.POSITIVE.optionalFieldOf("half_life_ticks", 24000).forGetter(DangerNumbers::halfLifeTicks),
                 Codec.DOUBLE.optionalFieldOf("forget_below", 0.5).forGetter(DangerNumbers::forgetBelow),
                 Codec.DOUBLE.optionalFieldOf("dangerous_from", 1.0).forGetter(DangerNumbers::dangerousFrom),
                 Codec.DOUBLE.optionalFieldOf("most", 12.0).forGetter(DangerNumbers::most),
@@ -281,7 +291,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
     public record WorkerNumbers(int mealIntervalTicks, int slowAfterTicks, int starveAfterTicks, int nurseUntilTicks, int builderUntilTicks,
             int lifespanTicks, boolean eats, WorkerDiet diet, int restNearEntrance, boolean restInRooms) {
         public static final Codec<WorkerNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.INT.fieldOf("meal_interval_ticks").forGetter(WorkerNumbers::mealIntervalTicks),
+                Ints.POSITIVE.fieldOf("meal_interval_ticks").forGetter(WorkerNumbers::mealIntervalTicks),
                 Codec.INT.fieldOf("slow_after_ticks").forGetter(WorkerNumbers::slowAfterTicks),
                 Codec.INT.fieldOf("starve_after_ticks").forGetter(WorkerNumbers::starveAfterTicks),
                 Codec.INT.optionalFieldOf("nurse_until_ticks", 72000).forGetter(WorkerNumbers::nurseUntilTicks),
@@ -365,7 +375,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         public static final Codec<WorkerDiet> CODEC = RecordCodecBuilder.create(i -> i.group(
                 MealFood.CODEC.optionalFieldOf("young", MealFood.STORE).forGetter(WorkerDiet::young),
                 MealFood.CODEC.optionalFieldOf("older", MealFood.STORE).forGetter(WorkerDiet::older),
-                Codec.INT.optionalFieldOf("workers_per_piece", 1).forGetter(WorkerDiet::workersPerPiece),
+                Ints.POSITIVE.optionalFieldOf("workers_per_piece", 1).forGetter(WorkerDiet::workersPerPiece),
                 Codec.BOOL.optionalFieldOf("hungry_from_first_food", false).forGetter(WorkerDiet::hungryFromFirstFood),
                 Codec.BOOL.optionalFieldOf("mouth_to_mouth", false).forGetter(WorkerDiet::mouthToMouth)
         ).apply(i, WorkerDiet::new));
@@ -386,7 +396,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.INT.fieldOf("meal").forGetter(QueenNumbers::meal),
                 Codec.INT.fieldOf("rich_meal").forGetter(QueenNumbers::richMeal),
                 Codec.INT.fieldOf("burst_eggs").forGetter(QueenNumbers::burstEggs),
-                Codec.INT.fieldOf("burst_interval_ticks").forGetter(QueenNumbers::burstIntervalTicks),
+                Ints.POSITIVE.fieldOf("burst_interval_ticks").forGetter(QueenNumbers::burstIntervalTicks),
                 Codec.INT.fieldOf("incubation_ticks").forGetter(QueenNumbers::incubationTicks),
                 Codec.LONG.fieldOf("starve_ticks").forGetter(QueenNumbers::starveTicks)
         ).apply(i, QueenNumbers::new));
@@ -523,7 +533,7 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
     public record Trails(int halfLifeTicks, double mostStrength, double fadeBelow) {
         public static final Trails DEFAULT = new Trails(24000, 64.0, 1.0);
         public static final Codec<Trails> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.INT.optionalFieldOf("half_life_ticks", 24000).forGetter(Trails::halfLifeTicks),
+                Ints.POSITIVE.optionalFieldOf("half_life_ticks", 24000).forGetter(Trails::halfLifeTicks),
                 Codec.DOUBLE.optionalFieldOf("most_strength", 64.0).forGetter(Trails::mostStrength),
                 Codec.DOUBLE.optionalFieldOf("fade_below", 1.0).forGetter(Trails::fadeBelow)
         ).apply(i, Trails::new));
@@ -902,8 +912,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
     public record Founding(int eggs, int eggIntervalTicks, int feedIntervalTicks, int secondBatchEggs) {
         public static final Codec<Founding> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("eggs").forGetter(Founding::eggs),
-                Codec.INT.fieldOf("egg_interval_ticks").forGetter(Founding::eggIntervalTicks),
-                Codec.INT.fieldOf("feed_interval_ticks").forGetter(Founding::feedIntervalTicks),
+                Ints.POSITIVE.fieldOf("egg_interval_ticks").forGetter(Founding::eggIntervalTicks),
+                Ints.POSITIVE.fieldOf("feed_interval_ticks").forGetter(Founding::feedIntervalTicks),
                 Codec.INT.optionalFieldOf("second_batch_eggs", 0).forGetter(Founding::secondBatchEggs)
         ).apply(i, Founding::new));
 
@@ -920,8 +930,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      */
     public record Laying(int eggIntervalTicks, int eggIntervalTicksFullSize, int foodPerEgg) {
         public static final Codec<Laying> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.INT.fieldOf("egg_interval_ticks").forGetter(Laying::eggIntervalTicks),
-                Codec.INT.fieldOf("egg_interval_ticks_full_size").forGetter(Laying::eggIntervalTicksFullSize),
+                Ints.POSITIVE.fieldOf("egg_interval_ticks").forGetter(Laying::eggIntervalTicks),
+                Ints.POSITIVE.fieldOf("egg_interval_ticks_full_size").forGetter(Laying::eggIntervalTicksFullSize),
                 Codec.INT.fieldOf("food_per_egg").forGetter(Laying::foodPerEgg)
         ).apply(i, Laying::new));
 

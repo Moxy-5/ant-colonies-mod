@@ -584,7 +584,8 @@ public class Nest {
      * to the sky. A plug in the entrance itself does not count.
      */
     public boolean isEntranceCovered(Level level) {
-        return GroundTop.isRoofed(level, center);
+        // (Land not ready: not known, so no; asked before the column is read, review R1-47.)
+        return LandReady.at(level, center) && GroundTop.isRoofed(level, center);
     }
 
     /**
@@ -646,7 +647,9 @@ public class Nest {
             if (!LandReady.at(level, pos)) {
                 return null;
             }
-            if (isSoil(level.getBlockState(pos))) {
+            // (Never a cell with water or lava beside it: the real diggers leave those too, see firstDiggable. The
+            // catch-up dug them, which flooded the founders' chamber as the player came back; review R1-22.)
+            if (isSoil(level.getBlockState(pos)) && !touchesFluid(level, pos)) {
                 left.add(pos);
             }
         }

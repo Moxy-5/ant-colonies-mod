@@ -571,6 +571,35 @@ public class MatabeleAwayTests {
                 .thenSucceed();
     }
 
+    /**
+     * Review R1-28: an insect folded into the numbers holding a species' own load (a stray, a far colony's sweep, one
+     * frozen in unloaded land) lost it with its body: the framework knew only its own loads. Now the load's row says
+     * what it becomes as numbers: a Matabele folded in with 3 stung termites has walked home with them, so the prey
+     * pile counts 3 brought in.
+     */
+    @GameTest(template = "arena", timeoutTicks = 200, skyAccess = true)
+    public static void aMatabeleFoldedIntoTheNumbersBringsItsStungTermitesHome(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestScenes.deepGround(helper);
+        TestClock.still(helper, 13.0); // (between the raid hours)
+        MatabeleScenes.deadMound(helper, MIDDLE, MIDDLE);
+        Colony colony = MatabeleScenes.colony(helper, MIDDLE + 9, MIDDLE, 30);
+        PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElseThrow();
+        helper.runAfterDelay(10, () -> {
+            var ant = com.antcolonies.gametest.TestIsolation.insectsOf(level, colony, com.antcolonies.savanna.entity.MatabeleEntity.class)
+                    .stream().filter(mob -> mob.nestCaste() != null && mob.isAlive()).findFirst().orElse(null);
+            helper.assertTrue(ant != null, "the colony has no real worker");
+            int before = pile.broughtIn();
+            int members = colony.getMemberCount();
+            ant.setLoad(com.antcolonies.savanna.entity.MatabeleLoads.termites(3));
+            helper.assertTrue(colony.away().foldInStray(level, ant), "the worker was not folded into the numbers");
+            helper.assertTrue(ant.isRemoved() && colony.getMemberCount() == members, "folded in, it should be gone from the world and still counted");
+            helper.assertTrue(pile.broughtIn() == before + 3, "the 3 stung termites it held are lost: " + (pile.broughtIn() - before)
+                    + " counted onto the pile" + pile.describe(level));
+            helper.succeed();
+        });
+    }
+
     /** The termite colony lives as numbers too (nobody near it either), so the raid's judge takes its own word for who feeds at the spot. */
     private static void farToo(Colony termites) {
         termites.away().setOnForTests(true);
