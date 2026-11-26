@@ -31,7 +31,7 @@ round one calf. All five come from the hold being placed by hand round the prey'
 ## The steps
 1. **The hold on the prey's body (ideas 31, 32, 34, 43; BUGS 373, 374, 377, and 376 in the hold).** Built 2026-11-26,
    below.
-2. **The pair seen offline (ideas 36, 39):** `clip_check.py --pair <holder>:<clip> <prey>:<clip>@<spot>`: both posed
+2. **The pair seen offline (ideas 36, 39). Built 2026-11-26, below.** `clip_check.py <holder> --pair <prey>`: both posed
    together from the table: parts of one inside the other, the jaw against the skin at the bite (in the air or buried),
    several holders against each other; strips from three sides. Then the hunt film again with `pair_report.py`.
 3. **Clips made against the partner (ideas 33, 37, 38):** what step 1's numbers show is missing (below): a `cling`
@@ -84,3 +84,37 @@ round one calf. All five come from the hold being placed by hand round the prey'
   bite), `aSecondHolderTakesAFreeSpotClearOfTheFirst`, `aHolderWithNoRoomAtHerSpotLetsGo` (a wall at the rump: she lets
   go at once and stands on the ground, not on the cow's back); `aHeldCowPullsAwayNeverAtHerHolderAndHerBullComes` now
   rides.
+
+## Step 2, built (2026-11-26, the user: "Go to step 2")
+- **`python tools/clip_check.py <holder> --pair <prey> [hold clips] [--spots a,b] [--times s,...]`:** for every pair the
+  prey's plan lists with the holder (`spots.pairs`: the hold clip, both sizes, the prey's clips then, each "once" or
+  "loop"; the lioness's `bite` on a cow of 0.9 standing or dying, her `takedown_pin` on a calf of 0.36 going down,
+  lying or dying), both animals posed together tick by tick exactly as the game places them: the prey's place from
+  its spot table, the holder facing in, its jaw at its bite on the spot, its bites one after another with their blend.
+  Each model is drawn where the game draws it, read from the Java (each plan's `checks.drawn_ahead`, a pattern read
+  out of `BuffaloEntity` or `LionEntity`, as the blend is read from the controller); `tools/spots.py report` reads it
+  the same way now (its own copy of the numbers is gone). Per prey clip and spot it prints, in sixteenths of a block:
+  the jaw against the hide at each bite (true 3D distance to the prey's boxes; + in the air), its head and the prey in
+  each other (the bite itself: reported), its body and the prey in each other (flagged over 1), and every holder
+  against every other at a bite, heads and bodies apart (bodies flagged over 1). With `--times`, pictures from three
+  sides (`pair_<holder>_<hold>_<prey>_<clip>_<spot>.png` and `..._all.png`, every holder at once): the spot a green
+  dot, the jaw blue, a body part inside the other red. About a minute for the lioness's two pairs.
+- **In the one command:** `tools/verify_animal.py` runs it as step "pairs" for an animal in any pair (holder or prey),
+  after checking the spot tables are current.
+- **What it found (the lioness on the buffalo; 10 flagged; all for step 3):**
+  - **Rump and flanks: right.** The jaw meets the hide at every bite (within 0.1), on a standing cow and on a calf going
+    down, lying and dying; only her muzzle sits in the hide (1.4 to 3.6, a bite). Step 1's report said her pin "hovers
+    0.16 over" a lying calf's spot: that was height alone; the hide goes on up the neck's side, and her jaw is on it.
+  - **A cow's throat (the neck spots): her jaw stops 1.5 short** (0.09 blocks): her muzzle meets the cow's own head
+    and jaw first, the throat being under it. One try moving the spots back behind the head (75 degrees out, from 3 px
+    farther back) brought her jaw to 0.7 but put her body 1.5 into the cow's, and on a calf the throat holder crowded
+    the flank holder: taken back (the first try's numbers kept). A throat hold is a clip made against the spot (a head
+    reaching up under the jaw), not a spot tuned by numbers: step 3.
+  - **A dying cow falls into her holders** (their bodies 1.2 to 2.0 in hers): they keep their places as it goes down
+    on its flank. The prey's own fall and the holders stepping off are step 3 (idea 38).
+  - **A calf lying down: its neck holders' bodies 1.1 into it** for a moment of the lie-down (0.4 to 0.8 once it lies).
+  - **Holders against each other:** bodies never meet; on a calf the two throat holders' heads meet (1.3) and the
+    flank pair's (0.7), as several lionesses on one small calf would. Reported, not flagged.
+- **Next:** the hunt film again (`tools/film/lion_hunt.film`, then `python tools/pair_report.py
+  run-film/screenshots/lion_hunt`): the same numbers measured in the game, before step 3.
+

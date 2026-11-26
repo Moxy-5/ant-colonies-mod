@@ -32,6 +32,18 @@ the game draws it, then in the game frame by frame.
                side on, from behind, head on); a strip each (cc_<model>_<clip>_held_<prey>_<angle>.png) with --times.
                It prints how much of the catch is buried in the hunter's body and any part of it in the ground.
 
+  --pair <prey> [--spots a,b]  (2026-11-26, the Motion Studio phase 3, step 2) the animal holding a prey as the game
+               places it (savanna LionHunt.ride, framework Spots): for every pair the prey's plan lists with it
+               ("spots.pairs": the hold clip, both sizes, the prey's clips then, once or loop), both posed together
+               tick by tick from the spot tables (tools/spots.py) and each model drawn where the game draws it (the
+               plans' "drawn_ahead", read from the Java). Name hold clips to check only those. It prints, per prey clip
+               and spot (in sixteenths of a block): the jaw against the hide at each bite (+ in the air), its head and
+               the prey in each other (the bite itself), its body and the prey in each other, and every holder against
+               every other at a bite (heads, bodies); flagged: a bite more than 1 in the air or 3 buried, bodies more
+               than 1 in each other. With --times (seconds of the prey's clip) a picture a spot and one of every
+               holder at once (pair_<holder>_<hold>_<prey>_<clip>_<spot>.png): the spot green, the jaw blue, a body
+               part in the other red.
+
 Reads only the game's own files: the geo model, the animation file (the moves' own paths and scenes are in their
 clips' notes: "path <root> t dy dz ...", "step <face z> <height>", "water <kind> <edge z> <bank top> <surface>
 <bottom>"), the body plan and the controller's blend length in the Java code.
@@ -118,6 +130,20 @@ class Animal:
         const = word.split('.')[-1]
         c = re.search(rf'\b{const}\s*=\s*(\d+)', text)
         return (int(c.group(1)), f'{os.path.basename(src)} ({word})') if c else (self.checks.get('blend', 4), 'the plan')
+
+
+    def drawn_ahead(self):
+        """How far toward its head the game draws its model (model px; the plan's "drawn_ahead": a "find" pattern
+        whose one group is the number, read from the Java file it names, or the controller's): the game's own number,
+        never a copy."""
+        spec = self.checks.get('drawn_ahead')
+        if spec is None:
+            return 0.0
+        src = spec.get('java', self.checks.get('controller'))
+        m = re.search(spec['find'], open(os.path.join(PROJECT, src), encoding='utf-8').read())
+        if not m:
+            raise SystemExit(f'{self.name}: "{spec["find"]}" not found in {src} (the checks.drawn_ahead of its plan)')
+        return float(m.group(1))
 
 
 class HingedModel(lab.Model):
@@ -956,6 +982,273 @@ def check_held(animal, pl, held, angles, times):
     return lines
 
 
+# --- two animals touching (the Motion Studio, phase 3, step 2, 2026-11-26) ------------------------------------------------
+def box_gap(p, corners):
+    """How far a point is from a posed box (its 8 corners, any turn): + outside (the true distance), - inside (to the
+    nearest face)."""
+    o = corners[0]
+    outside, inside = 0.0, 1e9
+    for k in (4, 2, 1):
+        e = [b - a for a, b in zip(o, corners[k])]
+        L = math.sqrt(sum(c * c for c in e)) or 1e-9
+        s = sum((pc - oc) * ec for pc, oc, ec in zip(p, o, e)) / L
+        if s < 0:
+            outside += s * s
+        elif s > L:
+            outside += (s - L) ** 2
+        else:
+            inside = min(inside, s, L - s)
+    return math.sqrt(outside) if outside > 0 else -inside
+
+
+class Boxes:
+    """A posed body's boxes with their outer bounds, so a point is tested only against boxes it could be in."""
+
+    def __init__(self, posed, boxes=None):
+        self.boxes = boxes if boxes is not None else [
+            (bone, cs, [min(p[i] for p in cs) for i in range(3)], [max(p[i] for p in cs) for i in range(3)])
+            for bone, cs, _ in posed]
+        self.lo = [min(b[2][i] for b in self.boxes) for i in range(3)] if self.boxes else [0.0] * 3
+        self.hi = [max(b[3][i] for b in self.boxes) for i in range(3)] if self.boxes else [-1.0] * 3
+
+    def near(self, other):
+        """Only the boxes that reach into another body's bounds."""
+        return Boxes(None, [b for b in self.boxes if all(b[2][i] <= other.hi[i] and other.lo[i] <= b[3][i] for i in range(3))])
+
+    def depth(self, p):
+        """How deep a point is inside the body (0 outside)."""
+        if any(p[i] < self.lo[i] or p[i] > self.hi[i] for i in range(3)):
+            return 0.0
+        best = 0.0
+        for _, cs, lo, hi in self.boxes:
+            if all(lo[i] <= p[i] <= hi[i] for i in range(3)):
+                best = max(best, box_depth(p, cs))
+        return best
+
+    def deepest(self, points):
+        """The deepest of these (bone, point) pairs inside the body, by bone group: {bone: depth}."""
+        out = {}
+        for bn, q in points:
+            d = self.depth(q)
+            if d > out.get(bn, 0.0):
+                out[bn] = d
+        return out
+
+    def gap(self, p):
+        """The point's distance to the body's skin: + outside, - buried."""
+        return min((box_gap(p, cs) for _, cs, _, _ in self.boxes), default=1e9)
+
+    def overlaps(self, other):
+        return all(self.lo[i] <= other.hi[i] and other.lo[i] <= self.hi[i] for i in range(3))
+
+
+def with_edges_all(posed):
+    return [(bn, q) for bn, cs, _ in posed for q in with_edges(cs)]
+
+
+class Pair:
+    """Two animals as the game places them while one holds the other (savanna animal/LionHunt.ride, framework
+    entity/body/Spots): the prey at its spot table's place for its clip and tick (a loop's middle place), the holder
+    facing in along the spot's way out, its jaw at its bite on the spot (flat), its feet on the ground. Everything here
+    is in blocks x 16 in the prey's frame (x to its left, y up, z toward its tail), so two animals of different sizes
+    are measured in one unit: a "px" in the lines below is a sixteenth of a block. Where each model is drawn (its
+    "drawn ahead" pixels) is read from the game's Java (each plan's checks.drawn_ahead)."""
+
+    def __init__(self, holder, prey_name, spec):
+        import spots
+        self.holder, self.prey, self.spec = holder, Animal(prey_name), spec
+        self.table = json.load(open(spots.table_path(prey_name), encoding='utf-8'))['spots']
+        self.hold = json.load(open(spots.table_path(holder.name), encoding='utf-8'))['holds'][spec['hold']]
+        self.hs, self.ps = spec['holder_size'], spec['size']
+        self.h_play = Played(holder, spec['hold'])
+        self.h_ticks = round(self.h_play.length * 20)
+        self.h_blend = holder.blend_ticks()[0]
+        self.da_h, self.da_p = holder.drawn_ahead(), self.prey.drawn_ahead()
+        self.head = lab_descendants(holder.model, holder.plan_data.get('head', {}).get('bone', 'head'))
+        self.jaw_bone = holder.plan_data.get('holds', {}).get('jaw', 'carry')
+        self._played = {}
+
+    def holder_tick(self, k):
+        """The holder's clip tick k ticks into the hold: each bite starts at the last one's end, after its blend (the
+        blend shown as the clip's first frame)."""
+        return max(0, k % (self.h_ticks + self.h_blend) - self.h_blend)
+
+    def bites(self, k):
+        return k % (self.h_ticks + self.h_blend) == self.h_blend + self.hold['hit']
+
+    def prey_place(self, clip, kind, k):
+        rows = self.table['clips'][clip]
+        if kind == 'loop':
+            return [sum(r[i] for r in rows) / len(rows) for i in range(len(rows[0]))]
+        return rows[min(k, len(rows) - 1)]
+
+    def prey_posed(self, clip, kind, k):
+        pl = self._played.get(clip) or self._played.setdefault(clip, Played(self.prey, clip))
+        t = (k / 20) % pl.length if kind == 'loop' else min(k / 20, pl.length)
+        return [(bn, [self.prey_point(p) for p in cs], col) for bn, cs, col in self.prey.model.posed(pl.pose(t))]
+
+    def prey_point(self, p):
+        s = self.ps
+        return (p[0] * s, p[1] * s, (p[2] - self.da_p) * s)
+
+    def holder_frame(self, spot, row):
+        """Where the holder stands (its feet, on the ground at y 0), its facing and its left (flat units), the spot."""
+        i = self.table['names'].index(spot)
+        sp = self.prey_point(row[3 * i:3 * i + 3])
+        a = math.radians(self.table['at'][spot]['out'] + 180.0)
+        d, left = (math.sin(a), -math.cos(a)), (math.cos(a), math.sin(a))
+        ahead, side = (-self.hold['jaw'][2] + self.da_h) * self.hs, self.hold['jaw'][0] * self.hs
+        feet = (sp[0] - d[0] * ahead - left[0] * side, sp[2] - d[1] * ahead - left[1] * side)
+        return feet, d, left, sp
+
+    def holder_point(self, frame, p):
+        (fx, fz), d, left, _ = frame
+        a, side = (-p[2] + self.da_h) * self.hs, p[0] * self.hs
+        return (fx + d[0] * a + left[0] * side, p[1] * self.hs, fz + d[1] * a + left[1] * side)
+
+    def holder_posed(self, frame, k):
+        pose = self.h_play.pose(self.holder_tick(k) / 20)
+        return [(bn, [self.holder_point(frame, p) for p in cs], col) for bn, cs, col in self.holder.model.posed(pose)], pose
+
+    def jaw(self, frame, pose):
+        b = self.jaw_bone
+        return self.holder_point(frame, self.holder.model.world(b, self.holder.model.by[b]['pivot'], pose))
+
+
+def check_pair(holder, prey_name, spec, spots_wanted, step=2):
+    """Each prey clip of a pair, each spot: the jaw against the skin at every bite, the holder's parts in the prey and the
+    prey's in the holder (deepest; its head apart from the rest: a bite's muzzle goes into the hide), and every holder
+    against every other at once (the spots crowding)."""
+    pair = Pair(holder, prey_name, spec)
+    names = [s for s in pair.table['names'] if not spots_wanted or s in spots_wanted]
+    lines = [f'== {holder.name} {spec["hold"]} (size {pair.hs}) holding {prey_name} (size {pair.ps})'
+             + (f': {spec["about"]}' if spec.get('about') else '') + f'; it bites at clip tick {pair.hold["hit"]} of '
+             f'{pair.h_ticks}, after a {pair.h_blend}-tick blend (px: a sixteenth of a block; drawn ahead {pair.da_h} and '
+             f'{pair.da_p} model px)']
+    flags = 0
+    for clip, kind in spec['clips'].items():
+        n = round(Played(pair.prey, clip).length * 20) if kind == 'once' else 2 * (pair.h_ticks + pair.h_blend)
+        lines.append(f'  {prey_name} {clip} ({kind}, {n} ticks):')
+        res = {s: {'gaps': [], 'head': 0.0, 'body': 0.0, 'prey_head': 0.0, 'prey': 0.0} for s in names}
+        for k in range(0, n + 1):
+            if k % step and not pair.bites(k):
+                continue
+            pposed = pair.prey_posed(clip, kind, k)
+            prey = Boxes(pposed)
+            ppts = with_edges_all(pposed)
+            row = pair.prey_place(clip, kind, k)
+            for s in names:
+                r = res[s]
+                frame = pair.holder_frame(s, row)
+                hposed, pose = pair.holder_posed(frame, k)
+                hb = Boxes(hposed)
+                if pair.bites(k):
+                    r['gaps'].append(prey.gap(pair.jaw(frame, pose)))
+                if not hb.overlaps(prey):
+                    continue
+                into = prey.near(hb).deepest(with_edges_all(hposed))
+                r['head'] = max([r['head']] + [d for bn, d in into.items() if bn in pair.head])
+                r['body'] = max([r['body']] + [d for bn, d in into.items() if bn not in pair.head])
+                near = hb.near(prey)
+                head = Boxes(None, [b for b in near.boxes if b[0] in pair.head])
+                body = Boxes(None, [b for b in near.boxes if b[0] not in pair.head])
+                if head.boxes:
+                    r['prey_head'] = max([r['prey_head']] + list(head.deepest(ppts).values()))
+                if body.boxes:
+                    r['prey'] = max([r['prey']] + list(body.deepest(ppts).values()))
+        for s in names:
+            r = res[s]
+            g = r['gaps']
+            bad = []
+            if g and max(g) > 1.0:
+                bad.append('bites the air')
+            if g and min(g) < -3.0:
+                bad.append('jaw buried')
+            if r['body'] > 1.0 or r['prey'] > 1.0:
+                bad.append('bodies in each other')      # (its head on the hide is the bite itself)
+            flags += bool(bad)
+            gs = f'{min(g):+.1f} to {max(g):+.1f}' if g else 'no bite'
+            lines.append(f'    {s:12s} jaw to the hide at its {len(g)} bites {gs} px (+ in the air); its head and the '
+                         f'{prey_name} in each other {max(r["head"], r["prey_head"]):.1f} px (a bite); its body and the {prey_name} '
+                         f'{max(r["body"], r["prey"]):.1f}' + (f'  << {", ".join(bad)}' if bad else ''))
+        # every holder at once, at a bite: the spots crowding each other
+        k = pair.h_blend + pair.hold['hit']
+        row = pair.prey_place(clip, kind, k)
+        placed = {s: pair.holder_posed(pair.holder_frame(s, row), k)[0] for s in names}
+        boxes = {s: Boxes(p) for s, p in placed.items()}
+        crowd, worst = {}, 0.0
+        for i, a in enumerate(names):
+            for b in names[i + 1:]:
+                if not boxes[a].overlaps(boxes[b]):
+                    continue
+                into = boxes[b].near(boxes[a])
+                pts = with_edges_all(placed[a])
+                both_heads = max(Boxes(None, [x for x in into.boxes if x[0] in pair.head]).deepest(
+                    [(bn, q) for bn, q in pts if bn in pair.head]).values(), default=0.0)
+                bodies = max(into.deepest([(bn, q) for bn, q in pts if bn not in pair.head]).values(), default=0.0)
+                bodies = max([bodies] + list(Boxes(None, [x for x in into.boxes if x[0] not in pair.head]).deepest(pts).values()))
+                if both_heads > 0.0 or bodies > 0.0:
+                    crowd[f'{a}+{b}'] = (both_heads, bodies)
+                    worst = max(worst, bodies)
+        flags += worst > 1.0
+        lines.append('    holders against each other at a bite (heads, bodies): '
+                     + (', '.join(f'{p} {h:.1f} {d:.1f} px' for p, (h, d) in sorted(crowd.items(), key=lambda kv: -max(kv[1])))
+                        or 'none touch') + ('  << bodies crowd' if worst > 1.0 else ''))
+    return lines, flags, pair
+
+
+def pair_strip(pair, clip, kind, spot, ticks, views, path, others=()):
+    """Both animals from each view at these ticks of the prey's clip: the spot a green dot, the jaw a blue one (red at a
+    bite in the air), parts of one inside the other red; others: more spots held at once."""
+    def scene(k):
+        out, marks = [], []
+        prey = pair.prey_posed(clip, kind, k)
+        out += prey
+        pb = Boxes(prey)
+        for s in (spot,) + tuple(others):
+            frame = pair.holder_frame(s, pair.prey_place(clip, kind, k))
+            hposed, pose = pair.holder_posed(frame, k)
+            out += hposed
+            jaw = pair.jaw(frame, pose)
+            marks.append((frame[3], GREEN, 4))
+            marks.append((jaw, BLUE, 3))
+            for bn, q in with_edges_all(hposed):
+                if bn not in pair.head and pb.depth(q) > 1.0:
+                    marks.append((q, RED, 2))
+        return out, marks
+
+    pts = [p for k in ticks for _, cs, _ in scene(k)[0] for p in cs]
+    ext = [(min(p[i] for p in pts) - 4, max(p[i] for p in pts) + 4) for i in range(3)]
+    cols = min(6, len(ticks))
+    cw, ch, lh = 380, 270, 20
+    rows_n = (len(ticks) + cols - 1) // cols
+    cv = lab.Canvas(cw * cols, (ch + lh) * rows_n * len(views) + 30)
+    held = '+'.join((spot,) + tuple(others))
+    cv.text(10, 8, f'{pair.holder.name} {pair.spec["hold"]} at {held} of {pair.prey.name} {clip} '
+                   f'(sizes {pair.hs}, {pair.ps})', scale=2)
+    for vi, vname in enumerate(views):
+        view = lab.VIEWS[vname]
+        corners = [(x, y, z) for x in ext[0] for y in (min(ext[1][0], -2), ext[1][1]) for z in ext[2]]
+        pr = [view.project(q) for q in corners]
+        bounds = ((min(a for a, _, _ in pr), max(a for a, _, _ in pr)), (min(b for _, b, _ in pr), max(b for _, b, _ in pr)))
+        for n, k in enumerate(ticks):
+            x0 = cw * (n % cols)
+            y0 = 30 + (ch + lh) * (vi * rows_n + n // cols)
+            cv.frame(x0, y0, cw, ch + lh)
+            ht = pair.holder_tick(k)
+            cv.text(x0 + 8, y0 + 6, f'{view.title} tick {k} ({pair.spec["hold"]} {ht}' + (' BITE' if ht == pair.hold['hit'] else '') + ')')
+            fr = lab.Frame(cv, (x0 + 4, y0 + lh, cw - 8, ch - 4), view, bounds)
+            posed, marks = scene(k)
+            fr.grid(0.0, 0.0, (ext[0], ext[2]), step=8.0)
+            fr.boxes(posed)
+            for p, col, r in marks:
+                x, y, _ = fr.px(p)
+                fr.canvas.dot(x, y, r, col, fr.cell)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    cv.save(path)
+    return path
+
+
 def scene_boxes(sc, ext_z):
     lo, hi = ext_z
     out = []
@@ -1098,6 +1391,34 @@ def switch_strip(animal, a, b, ticks, views, path):
     return path
 
 
+def run_pairs(holder, prey_name, holds, spots_wanted, times, views, out_dir):
+    """--pair: every pair its prey's plan lists for this holder (spots.pairs), or those of the hold clips named."""
+    prey = Animal(prey_name)
+    specs = [p for p in prey.plan_data.get('spots', {}).get('pairs', [])
+             if p['holder'] == holder.name and (not holds or any(fnmatch.fnmatch(p['hold'], h) for h in holds))]
+    if not specs:
+        print(f'the plan of {prey_name} lists no pairs with {holder.name} (spots.pairs)')
+        return 1
+    flags = 0
+    for spec in specs:
+        lines, f, pair = check_pair(holder, prey_name, spec, spots_wanted)
+        flags += f
+        print('\n'.join(lines))
+        if times:
+            names = [s for s in pair.table['names'] if not spots_wanted or s in spots_wanted]
+            ticks = [round(t * 20) for t in times]
+            for clip, kind in spec['clips'].items():
+                for spot in names:
+                    png = pair_strip(pair, clip, kind, spot, ticks, views, os.path.join(
+                        out_dir, f'pair_{holder.name}_{spec["hold"]}_{prey_name}_{clip}_{spot}.png'))
+                    print('  wrote', png)
+                png = pair_strip(pair, clip, kind, names[0], ticks, views, os.path.join(
+                    out_dir, f'pair_{holder.name}_{spec["hold"]}_{prey_name}_{clip}_all.png'), others=names[1:])
+                print('  wrote', png)
+    print(f'  {flags} flagged')
+    return 0
+
+
 # --- the command ------------------------------------------------------------------------------------------------------
 def main(argv):
     if not argv or argv[0] in ('-h', '--help'):
@@ -1107,6 +1428,7 @@ def main(argv):
     times, views, model, out_dir, names, switches = None, ('side', 'three', 'front'), None, None, [], False
     changes, write = False, False
     hold, angles = None, [90.0, 25.0, 155.0]
+    pair_with, spots_wanted = None, []
     i = 0
     while i < len(args):
         a = args[i]
@@ -1137,11 +1459,19 @@ def main(argv):
         elif a == '--caught':
             angles = [float(x) for x in args[i + 1].split(',')]
             i += 2
+        elif a == '--pair':
+            pair_with = args[i + 1]
+            i += 2
+        elif a == '--spots':
+            spots_wanted = args[i + 1].split(',')
+            i += 2
         else:
             names.append(a)
             i += 1
     animal = Animal(animal_name, model)
     out_dir = out_dir or os.path.join(PROJECT, 'references', 'anim_lab', animal_name)
+    if pair_with:
+        return run_pairs(animal, pair_with, names, spots_wanted, times, views, out_dir)
     every = list(animal.data)
     if changes:
         print(f'{animal_name}, clips of {animal.anim_stem}')

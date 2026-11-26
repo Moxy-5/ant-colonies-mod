@@ -153,7 +153,10 @@
    ["gore", "mood_angry"],
    ["mood_angry", "paw_ground"],
    ["drink", "rest_down"]
-  ]
+  ],
+  "drawn_ahead": {
+   "find": "DRAW_AHEAD_PX = (-?[\\d.]+)"
+  }
  },
  "course": {
   "buffalo": {
@@ -217,6 +220,31 @@
     ],
     "out": -90
    }
-  }
+  },
+  "pairs": [
+   {
+    "about": "a grown cow held standing, bitten (LionHunt.holdClip)",
+    "holder": "lioness",
+    "hold": "bite",
+    "holder_size": 0.97,
+    "size": 0.9,
+    "clips": {
+     "idle": "loop",
+     "death": "once"
+    }
+   },
+   {
+    "about": "a calf knocked down at the strike and pinned",
+    "holder": "lioness",
+    "hold": "takedown_pin",
+    "holder_size": 0.97,
+    "size": 0.36,
+    "clips": {
+     "rest_down": "once",
+     "rest": "loop",
+     "death": "once"
+    }
+   }
+  ]
  }
 }

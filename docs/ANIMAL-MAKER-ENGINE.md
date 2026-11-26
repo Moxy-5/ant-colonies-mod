@@ -250,7 +250,8 @@ the monitor's leftovers in its own row.
 1. The workshop's stages with the user's OK: brief, outline, plain 3D shape, detail, paint (`docs/plans/model-workshop.md`).
 2. A body plan (`assets/.../body_plans/<animal>.json`) naming its family, legs, feet, body chain, jaw, wings or fins:
    everything the checks read. No checker learns an animal by its name.
-3. Its clips, checked by the one offline checker (step A) as the game draws them.
+3. Its clips, checked by the one offline checker (step A) as the game draws them. An animal that holds another (or is held): its pairs too,
+   both posed as the game places them (`clip_check.py <holder> --pair <prey>`, the Motion Studio phase 3).
 4. Its family's course scenes (step A), run and read before the user sees it.
 5. If it walks on land: its own moves for a step up, a step down, into and out of the water (step B), or a reason it
    needs none (a frog's hop already clears a block).
