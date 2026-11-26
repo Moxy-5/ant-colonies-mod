@@ -478,6 +478,61 @@ public class LionHuntTests {
     }
 
     /**
+     * A leap never steers in the air (the hunt film, 2026-11-26: one followed a fleeing calf for 5 blocks at twice its
+     * clip's speed): the calf gone 3 blocks aside once she is off the ground, she lands where she aimed, no faster than
+     * her clip, never bites, and lets go when her leap is over.
+     */
+    @GameTest(template = "arena", timeoutTicks = 120, skyAccess = true)
+    public static void aLeapCannotSteerInTheAirAndMisses(GameTestHelper helper) {
+        TestClock.still(helper, 12.0);
+        field(helper, 0, 0, 48, 48);
+        BuffaloEntity calf = toughCalf(helper, 24.5, 24.5, 0.0F);
+        LionEntity she = lion(helper, SavannaEntities.LIONESS.get(), 24.5, 21.0, helper.absolutePos(new BlockPos(4, GROUND, 4)), 0);
+        var leap = she.spots().strike("stalk_leap_bite");
+        double reach = leap.reach() * she.getScale() / 16.0;
+        double fastest = fastestShare(leap) * reach + 0.01;
+        Vec3[] from = {null}, last = {null}, aimed = {null};
+        int[] start = {-1};
+        helper.runAtTickTime(2, () -> {
+            helper.assertTrue(LionHunt.strikeForTests(she, calf, LionEntity.LEAP_BITE), "no leap from within its reach: " + she.about());
+            from[0] = she.position();
+            last[0] = from[0];
+            start[0] = (int) helper.getTick();
+        });
+        helper.onEachTick(() -> {
+            if (from[0] == null || helper.getTick() <= 2) {
+                return;
+            }
+            int since = (int) helper.getTick() - start[0];
+            Vec3 now = she.position();
+            double step = Math.hypot(now.x - last[0].x, now.z - last[0].z);
+            last[0] = now;
+            if (since == leap.setsOff() + 2) {                  // off the ground: the calf is suddenly elsewhere
+                aimed[0] = LionHunt.placeForTests(she, calf);
+                calf.setPos(calf.getX() + 3.0, calf.getY(), calf.getZ());
+            }
+            if (since <= leap.landed()) {
+                helper.assertTrue(step <= fastest, String.format("she went %.3f in a tick, her leap's fastest %.3f (tick %d)", step, fastest, since));
+            }
+            if (since == leap.landed()) {
+                double off = Math.hypot(now.x - aimed[0].x, now.z - aimed[0].z);
+                helper.assertTrue(off < 0.05, String.format("she landed %.2f from where she aimed, steering after the calf", off));
+            }
+            if (since < LionEntity.BLEND + leap.ticks()) {
+                helper.assertTrue(calf.getHealth() >= 400.0F && she.doing() == LionEntity.LEAP_BITE,
+                        "a bite or a hold from a leap that missed: " + she.about() + "; calf " + calf.about());
+            } else {
+                // her leap over: no pin (she let go; in her own fight she may well strike again at once, the calf still near)
+                helper.assertTrue(she.doing() != LionEntity.PIN, "pinning after a miss: " + she.about());
+                if (since >= LionEntity.BLEND + leap.ticks() + 3) {
+                    helper.succeed();
+                }
+            }
+        });
+        helper.runAtTickTime(110, () -> helper.fail("the leap never played out: " + she.about() + "; calf " + calf.about()));
+    }
+
+    /**
      * The smack out of a gallop carries itself onto a cow walking away: on the move from its first tick (a running leap,
      * not a dead stop), never going back, it lands with her jaw on the cow's spot the tick its travel ends however far
      * the cow walked meanwhile, and grips from its hit.
@@ -670,6 +725,9 @@ public class LionHuntTests {
     /**
      * At dusk a hungry pride's lionesses spread, stalk a herd with a calf, take the calf; the pride comes to the carcass and
      * feeds; at least the male and two lionesses eat their fill (their hunger back to 0); the full lie by the kill.
+     * They feed lying at the carcass's feeding spots (the Motion Studio phase 3, step 5): one lying down onto its place is
+     * on it when it feeds (its jaw at its bite on the spot), no two feed at one spot, and feeding only ever ends in getting
+     * up (never a calm tick between its rounds, BUGS 376).
      */
     @GameTest(template = "arena", timeoutTicks = 7000, skyAccess = true, batch = "lion_hunt_dusk")
     public static void atDuskAHungryPrideTakesACalfAndFeeds(GameTestHelper helper) {
@@ -681,8 +739,28 @@ public class LionHuntTests {
         List<LionEntity> pride = scene.pride();
         boolean[] stalked = {false};
         long[] killedAt = {-1};
+        java.util.Map<LionEntity, Byte> was = new java.util.HashMap<>();
+        java.util.Set<LionEntity> fedOnPlace = new java.util.HashSet<>();
         helper.onEachTick(() -> {
             scene.tick();                                   // the cow grazes whenever calm
+            java.util.Map<String, LionEntity> spots = new java.util.HashMap<>();
+            for (LionEntity l : pride) {
+                byte d = l.doing();
+                helper.assertFalse(was.getOrDefault(l, LionEntity.CALM) == LionEntity.FEED && d != LionEntity.FEED && d != LionEntity.REST_UP,
+                        "feeding ended in something other than getting up (doing " + d + "): " + l.about());
+                was.put(l, d);
+                if (d == LionEntity.FEED) {
+                    String spot = LionHunt.feedSpotForTests(l);
+                    LionEntity other = spot == null ? null : spots.put(spot, l);
+                    helper.assertTrue(other == null, "two feed at " + spot + ": " + l.about() + " and " + (other == null ? "" : other.about()));
+                    double off = LionHunt.feedOffForTests(l);
+                    helper.assertTrue(off < 0.05, "feeding off its place by " + off + " (" + LionHunt.feedOffAbout(l) + "; the cow "
+                            + String.format("%.2f", l.distanceTo(cow)) + " away): " + l.about());
+                    if (off >= 0) {
+                        fedOnPlace.add(l);
+                    }
+                }
+            }
             for (LionEntity l : pride) {
                 stalked[0] |= l.doing() == LionEntity.STALK || l.doing() == LionEntity.FREEZE;
             }
@@ -706,6 +784,7 @@ public class LionHuntTests {
                 }
                 if (full >= 3 && maleFull && lying >= 2) {
                     helper.assertTrue(stalked[0], "a kill with no stalk");
+                    helper.assertTrue(fedOnPlace.size() >= 2, "fewer than two fed lying on a feeding place: " + fedOnPlace.size());
                     for (LionEntity l : pride) {
                         if (l.fedFull()) {
                             helper.assertTrue(l.sinceMeal() < LionHunt.HUNGRY / 10, "a full lion is still hungry: " + l.about());

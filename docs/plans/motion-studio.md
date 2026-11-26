@@ -147,6 +147,29 @@ missing the carcass, the head snap. The first job is to film them (see "The orde
 49. A rehearsal page per pair (lion and buffalo): reference, the offline pair, the game replay, the contact sheet. M.
 50. Duet watch: the pair scene refilmed by itself when a clip changes (`film.sh watch`). S.
 
+**G. The glue between a clip and the game (added 2026-11-26 after phase 3 step 5; the user: "add your ideas to the
+plan"). The clips were the easy part of step 5; nearly every fault came from putting them into the game.**
+51. **One "placed animal" mode in the framework.** Riding, holding, feeding and lying on a spot go through one piece
+    that turns off pushing, walking leftovers and body turning and sets the place after the game's own physics, on the
+    server and every screen alike. Today each force is found one bug at a time (the mother cow shoving feeders 0.05 a
+    tick; riders drawn at the mount's heading, BUGS 421). M, Claude.
+52. **A clip map in data that the game follows.** Each animal's plan says which clip is entered from which and left
+    by which ("feed" from lying, out by getting up). A goal asks only for the clip it wants; the body walks the path
+    itself. The offline checker reads the same map, so it checks exactly the changes the game can make. Removes the
+    hand-written orders in each goal (`onFeet`, the feast's lying down), where skipped clips and calm ticks come from. L.
+53. **The code's clip tables made from the clip files.** Clip lengths, which clips loop, the bite ticks: one source,
+    the build failing when the code is behind (as `checkSpotTables` does for the spots). Today they are typed into
+    `LionEntity` by hand; a counted loop also played at a random pace on screen until step 5. S-M.
+54. **A small test bench per interaction.** A 20-second scene (one carcass, one or two lions), a camera that follows
+    the actor up close by its size, takes that start when its clip changes, not after a guessed wait (step 5's film
+    missed the feeding and stood too far); the recording's clock in game ticks through stepped takes. M.
+55. **A whole-scene offline check that names the parts.** Everyone round the carcass at once at the real sizes, with
+    the bystanders, saying which parts are in each other ("mane in ribs", not "body 1.8 px": step 5 changed a reach
+    for nothing). Also faster (a pair check takes over 3 minutes). M.
+56. **The tools' traps closed.** `lion_models.py game` and `buffalo_models.py game` keep a plan's hand-added parts;
+    a clip that depends on another animal's clip (the lioness's holds on the buffalo's death) says so when that clip
+    changes. S.
+
 ## The order (my recommendation)
 - **Phase 0, eyes on the real hunt (a day or two, Claude):** 1, 2, 11, 12, 16, 14, plus the quick fixes 29 and 30.
   Then look at the films and the recording before changing anything ("find the cause before fixing jank").
@@ -156,7 +179,11 @@ missing the carcass, the head snap. The first job is to film them (see "The orde
 - **Phase 3, partner moves (the lion and buffalo first):** 31, 32, then 36 and 37 offline, then 33 with 34 or 35 in
   the game (pick after seeing the phase 0 films), then 38, 40, 41. The hunt's oval and fixed ticks go.
   **Started 2026-11-26: its own plan and steps in `docs/plans/motion-studio-phase3.md` (step 1, the hold on the prey's body, built).**
-- **Phase 4, the replay key (9)** and the tests (43 to 46).
+- **Phase 3b, the glue (my recommendation, 2026-11-26; not started):** 51, 52, 53 first, before the animations are
+  redone (the user plans to change them all later; each new clip goes through this glue), then 54 to 56. Check first
+  what the round 12 review's fixes already cover and do not work in the lion and engine code beside that chat.
+- **Phase 4, the replay key (9)** and the tests (43 to 46). **On hold (the user, 2026-11-26).** Its hold and strike
+  tests would be written against the placement code that 51 replaces; the replay key loses nothing by waiting.
 
 ## Phase 0, built (2026-11-25, branch `claude/motion-studio`, the user's go-ahead)
 **What was built (ideas 1, 2, 11, 12, 14, 16, 30; 29 looked at):**

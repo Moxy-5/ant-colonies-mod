@@ -77,9 +77,10 @@ public final class Spots {
 
     /**
      * Which clip a holder holds this prey with (the prey's body plan's pairs, step 3): the holder (its model's name), its
-     * hold clip, the prey's size the pair is made for, and the prey's clips and spots it goes with.
+     * hold clip, the prey's size the pair is made for, and the prey's clips and spots it goes with (the spots the best
+     * first: step 5, a carcass's feeding spots are taken in that order).
      */
-    public record Pair(String holder, String hold, double size, java.util.Set<String> clips, java.util.Set<String> spots) {
+    public record Pair(String holder, String hold, double size, java.util.Set<String> clips, List<String> spots) {
     }
 
     private final List<String> names = new ArrayList<>();
@@ -122,7 +123,8 @@ public final class Spots {
                 if (spots.has("pairs")) {
                     for (JsonElement e : spots.getAsJsonArray("pairs")) {
                         JsonObject p = e.getAsJsonObject();
-                        java.util.Set<String> on = new java.util.HashSet<>(), at = new java.util.HashSet<>();
+                        java.util.Set<String> on = new java.util.HashSet<>();
+                        List<String> at = new ArrayList<>();
                         p.getAsJsonArray("clips").forEach(c -> on.add(c.getAsString()));
                         p.getAsJsonArray("spots").forEach(c -> at.add(c.getAsString()));
                         pairs.add(new Pair(p.get("holder").getAsString(), p.get("hold").getAsString(), p.get("size").getAsDouble(), on, at));
@@ -236,6 +238,23 @@ public final class Spots {
             }
         }
         return best == null ? null : best.hold();
+    }
+
+    /**
+     * A holder's pair for a prey in this clip or still pose (step 5: a carcass and its feeders): of the holder's pairs
+     * naming it, the one made for the size nearest the prey's; its spots are the ones to take there, the best first, its
+     * hold the clip to play. Null: none.
+     */
+    @Nullable
+    public Pair pairFor(String holder, String preyClip, double size) {
+        Pair best = null;
+        for (Pair p : pairs) {
+            if (p.holder().equals(holder) && p.clips().contains(preyClip)
+                    && (best == null || Math.abs(p.size() - size) < Math.abs(best.size() - size))) {
+                best = p;
+            }
+        }
+        return best;
     }
 
     /** The heading (Minecraft's yaw) of a holder at a spot: facing in along the spot's way out. */

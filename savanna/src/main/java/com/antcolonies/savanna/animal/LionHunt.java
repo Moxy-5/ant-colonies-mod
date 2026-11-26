@@ -47,9 +47,11 @@ import net.minecraft.world.phys.Vec3;
  * backs off to {@link #BACK_OFF} blocks from it for {@link #BACK_OFF_TICKS}. The prey dead: the kill. The sprint spent:
  * the try is over, it lies down where it is for {@link #LIE_UP}.</li>
  * <li><b>FEAST:</b> any pride member goes to a mate's kill (the carcass with its den, near the kill), takes a place round it
- * by the feast order (males first, then lionesses, cubs last; one pushed back growls), feeds ({@code drink} head down and
- * {@code takedown_pin} by turns, a meat bite every {@link #BITE_EVERY}) until full (male 6, lioness 4, cub 2 bites) or
- * the meat is gone; then its hunger is 0 and it lies by the kill until 16:00 the next day.</li>
+ * by the feast order (males first, then lionesses, cubs last; one pushed back growls), feeds until full (male 6,
+ * lioness 4, cub 2 bites, a meat bite every {@link #BITE_EVERY}) or the meat is gone; then its hunger is 0 and it lies
+ * by the kill until 16:00 the next day. Its place is a feeding spot on the carcass's drawn body (the Motion Studio phase 3,
+ * step 5; the buffalo's spot table): it takes the best spot free for it and keeps it until one of a kind before it takes
+ * it; it lies down there ({@code rest_down}), set so its jaw at its bite is on the spot, and plays {@code feed}.</li>
  * </ul>
  * All numbers my picks.
  */
@@ -97,6 +99,13 @@ public final class LionHunt {
     static final int REJOIN = 6000;
     /** A try over, it lies where it is this long (ticks); the male and the cubs lie this long after the hunt too. */
     static final int LIE_UP = 600;
+    /** The clip it feeds with, lying at a carcass's feeding spot (its bite's tick in its spot table). */
+    static final String FEED_CLIP = "feed";
+    /**
+     * Within this of its feeding place (blocks) it lies down, shuffling the rest of the way as it goes down (a quarter of
+     * a block over the second its lying down takes).
+     */
+    static final double AT_PLACE = 0.25;
     /** Within this of a feeding or lying place (blocks) it steps straight onto it. */
     static final double STEP_IN = 2.5;
     /** A feeding or lying place not reached by this long (ticks: in a trunk, up a step) is given up: it stays near. */
@@ -135,7 +144,13 @@ public final class LionHunt {
         UUID feastId;
         @Nullable
         RemainsEntity carcass;
-        int ate, lastBite, lookedAt = -1000, growlUntil, placeIndex = -1;
+        int ate, lastBite, lookedAt = -1000, growlUntil;
+        /** The feeding spot of the carcass it has (the buffalo's spot table's index; -1: none), and whether it lies at it. */
+        int feedSpot = -1;
+        boolean lyingAt;
+        /** Its last shuffle onto its feeding place as it lies down (null: it lies where it got to). */
+        @Nullable
+        com.antcolonies.entity.body.Strikes.Ride feedSettle;
         boolean full;
         long feastEvening = Long.MIN_VALUE;
 
@@ -297,25 +312,6 @@ public final class LionHunt {
 
     // --- the hold: placed on the prey's body (the Motion Studio, phase 3) ---------------------------------------------
 
-    /**
-     * Onto its spot: where it set off (the world: a strike's start, or where it gripped) and its heading then; on a strike,
-     * the share of the strike's travel already gone when it was first placed (a screen that learns of the strike a tick
-     * late carries on from where it draws it; below 0: no strike, it settles over its blend), and the ticks it has settled.
-     */
-    static final class Settle {
-        final double x, z;
-        final float yaw;
-        final double from;
-        int k;
-
-        Settle(double x, double z, float yaw, double from) {
-            this.x = x;
-            this.z = z;
-            this.yaw = yaw;
-            this.from = from;
-        }
-    }
-
     /** Where a holder stands (its feet, flat: the height is the ground's) and its heading. */
     record Place(Vec3 at, float yaw) {
     }
@@ -396,7 +392,12 @@ public final class LionHunt {
 
     /** Whether a lion has room to stand at a place: ground under it and no block in its body there. */
     static boolean roomAt(LionEntity l, BuffaloEntity prey, Place p) {
-        double y = groundAt(l.level(), p.at().x, p.at().z, prey.getY());
+        return roomAt(l, prey.getY(), p);
+    }
+
+    /** The same, by the height its place is near (a carcass's). */
+    static boolean roomAt(LionEntity l, double nearY, Place p) {
+        double y = groundAt(l.level(), p.at().x, p.at().z, nearY);
         return !Double.isNaN(y) && l.level().noBlockCollision(l,
                 l.getBoundingBox().move(p.at().x - l.getX(), y - l.getY(), p.at().z - l.getZ()).deflate(0.05));
     }
@@ -405,9 +406,10 @@ public final class LionHunt {
      * Places a lion on its prey (the prey's {@code positionRider}, on the server and on every screen alike): at its spot,
      * its feet on the ground there. On a strike (step 4) it rides from the strike's start: each tick it is the strike's
      * share of the way (its clip's own travel, from its spot table) from where it set off to its place at the spot, so it
-     * stands through its coil, flies, and lands on its place however the prey moved, its heading turning with it; after
-     * any other grip it settles there over its blend. False when it has no spot to be placed on (not synced to this
-     * screen yet).
+     * stands through its coil, flies, and lands where it aimed at take-off (where its place would be, the prey going on as
+     * it went; it never steers in the air), gripping if its place is still near (then eased onto it), else missing; its
+     * heading turning with it; after any other grip it settles there over its blend. False when it has no spot to be
+     * placed on (not synced to this screen yet).
      */
     static boolean ride(LionEntity l, BuffaloEntity prey, Entity.MoveFunction move) {
         Place p = placeOn(l, prey, l.holdSpot());
@@ -415,27 +417,115 @@ public final class LionHunt {
             return false;
         }
         var strike = l.strike();
-        double share = strike == null ? 1.0 : strike.share(l.doingFor());
         if (l.settle == null) {
-            // where it stands is where the strike had it a tick ago (its start, on the server's first tick on it)
-            l.settle = new Settle(l.getX(), l.getZ(), l.yBodyRot, strike == null ? -1.0 : strike.share(l.doingFor() - 1));
+            l.settle = com.antcolonies.entity.body.Strikes.Ride.from(l, l.yBodyRot, strike, l.doingFor());
         }
-        Settle s = l.settle;
-        double f;
-        if (s.from >= 0.0) {
-            f = s.from >= 1.0 ? 1.0 : Mth.clamp((share - s.from) / (1.0 - s.from), 0.0, 1.0);
-        } else {
-            f = s.k >= LionEntity.BLEND ? 1.0 : (double) ++s.k / LionEntity.BLEND;
-            f = f * f * (3.0 - 2.0 * f);
+        double f = l.settle.along(strike, l.doingFor(), LionEntity.BLEND);
+        Vec3 preyStep = new Vec3(prey.getX() - prey.xo, 0.0, prey.getZ() - prey.zo);
+        if (l.level().isClientSide) {
+            l.settle.told(l.strikeWord());                       // hit or miss is the server's word (it sees the prey as it is)
         }
-        double x = Mth.lerp(f, s.x, p.at().x), z = Mth.lerp(f, s.z, p.at().z);
-        double ground = groundAt(l.level(), x, z, prey.getY());
-        move.accept(l, x, Double.isNaN(ground) ? l.getY() : ground, z);
-        float yaw = s.yaw + Mth.wrapDegrees(p.yaw() - s.yaw) * (float) f;
+        Vec3 at = l.settle.at(f, l.settle.target(strike, l.doingFor(), f, p.at(), preyStep, l.getScale(), LionEntity.BLEND));
+        if (!l.level().isClientSide) {
+            l.strikeWord(l.settle.word());
+        }
+        double ground = groundAt(l.level(), at.x, at.z, prey.getY());
+        move.accept(l, at.x, Double.isNaN(ground) ? l.getY() : ground, at.z);
+        float yaw = l.settle.yaw(f, p.yaw());
         l.setYRot(yaw);
         l.yBodyRot = yaw;
         l.yHeadRot = yaw;
         return true;
+    }
+
+    // --- the feast: lying at the carcass's feeding spots (the Motion Studio, phase 3, step 5) --------------------------
+
+    /** A lion counts as at a carcass within this of it (blocks): only then it holds a feeding spot. */
+    static double atCarcass(RemainsEntity carcass) {
+        return 1.9 * carcass.size() + 3.0;
+    }
+
+    /** Its pair with a carcass (the buffalo's spot table: its feeding spots there, the best first, and its clip); null: none. */
+    @Nullable
+    static com.antcolonies.entity.body.Spots.Pair feedPair(LionEntity l, RemainsEntity carcass) {
+        return BuffaloEntity.SPOTS.pairFor(l.form().clips, RemainsEntity.CARCASS_POSE, BuffaloEntity.MODEL_SCALE * carcass.size());
+    }
+
+    /** Where a lion feeding at this spot lies and faces: its jaw at its feed clip's bite on the spot, facing in. */
+    @Nullable
+    public static Place feedPlace(LionEntity l, RemainsEntity carcass, int spot) {
+        var pair = feedPair(l, carcass);
+        var hold = pair == null ? null : l.spots().hold(pair.hold());
+        if (hold == null || spot < 0 || spot >= BuffaloEntity.SPOTS.count()) {
+            return null;
+        }
+        float yaw = BuffaloEntity.SPOTS.holderYaw(spot, carcass.getYRot());
+        return new Place(com.antcolonies.entity.body.Spots.holderAt(carcass.spotAt(spot), yaw, hold, l.getScale(), l.measures.drawAheadPx()), yaw);
+    }
+
+    /** The feast order's kinds: males, lionesses, cubs. */
+    private static int feastKind(LionEntity l) {
+        return l.form().ordinal();
+    }
+
+    /**
+     * The pride mate that has this feeding spot before it: one of its own kind or of a kind before it in the feast order
+     * (males, then lionesses, then cubs), still feeding. Null: none (one after it has it at most: pushed off).
+     */
+    @Nullable
+    static LionEntity feederAt(LionEntity l, RemainsEntity carcass, int spot) {
+        for (LionEntity m : l.mates()) {
+            if (m != l && m.hunt.stage == Stage.FEAST && m.hunt.carcass == carcass && !m.hunt.full && m.hunt.feedSpot == spot
+                    && feastKind(m) <= feastKind(l)) {
+                return m;
+            }
+        }
+        return null;
+    }
+
+    /** Whether a feeding spot is free for it: none before it has it, and it has room to lie at its place there. */
+    static boolean freeToFeed(LionEntity l, RemainsEntity carcass, int spot) {
+        Place p = feedPlace(l, carcass, spot);
+        return p != null && feederAt(l, carcass, spot) == null && roomAt(l, carcass.getY(), p);
+    }
+
+    /** The best feeding spot free for it (its pair's order), or -1. */
+    static int bestFeedSpot(LionEntity l, RemainsEntity carcass) {
+        var pair = feedPair(l, carcass);
+        if (pair == null) {
+            return -1;
+        }
+        for (String name : pair.spots()) {
+            int spot = BuffaloEntity.SPOTS.index(name);
+            if (freeToFeed(l, carcass, spot)) {
+                return spot;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Tests: how far a lion set onto its feeding place is from it (blocks, flat), its heading's fault added (a degree
+     * counts as a hundredth of a block); -1: it has no place, or lay down where it got to.
+     */
+    public static double feedOffForTests(LionEntity l) {
+        Place p = l.hunt.carcass == null || l.hunt.feedSettle == null ? null : feedPlace(l, l.hunt.carcass, l.hunt.feedSpot);
+        return p == null ? -1 : HomeGroup.flat(l.position(), p.at().x, p.at().z)
+                + Math.abs(net.minecraft.util.Mth.wrapDegrees(l.yBodyRot - p.yaw())) / 100.0;
+    }
+
+    /** Tests: what {@link #feedOffForTests} is made of: its distance from its feeding place and its heading's fault. */
+    public static String feedOffAbout(LionEntity l) {
+        Place p = l.hunt.carcass == null ? null : feedPlace(l, l.hunt.carcass, l.hunt.feedSpot);
+        return p == null ? "no place" : String.format("%.3f blocks, body %.1f deg, head %.1f deg, speed %.3f",
+                HomeGroup.flat(l.position(), p.at().x, p.at().z), net.minecraft.util.Mth.wrapDegrees(l.yBodyRot - p.yaw()),
+                net.minecraft.util.Mth.wrapDegrees(l.yHeadRot - p.yaw()), l.getDeltaMovement().horizontalDistance());
+    }
+
+    /** Tests: the feeding spot it has (its name), or null. */
+    @Nullable
+    public static String feedSpotForTests(LionEntity l) {
+        return l.hunt.feedSpot < 0 ? null : BuffaloEntity.SPOTS.name(l.hunt.feedSpot);
     }
 
     // --- the strike: it carries itself (the Motion Studio, phase 3, step 4) ------------------------------------------
@@ -453,9 +543,8 @@ public final class LionHunt {
         if (p == null) {
             return -1;
         }
-        int lands = strike.landed();
-        double x = p.at().x + (prey.getX() - prey.xo) * lands, z = p.at().z + (prey.getZ() - prey.zo) * lands;
-        return HomeGroup.flat(l.position(), x, z) <= strike.reach() * l.getScale() / 16.0 ? spot : -1;
+        Vec3 moved = new Vec3(prey.getX() - prey.xo, 0.0, prey.getZ() - prey.zo);
+        return com.antcolonies.entity.body.Strikes.inReach(l.position(), p.at(), moved, strike, l.getScale()) ? spot : -1;
     }
 
     /**
@@ -465,8 +554,7 @@ public final class LionHunt {
     static void setOff(LionEntity l, BuffaloEntity prey, byte doing, int spot) {
         State s = l.hunt;
         l.getNavigation().stop();
-        l.setDoing(doing);
-        l.settle = null;
+        l.setDoing(doing);                                      // (a new ride from here: LionEntity.newStrike)
         s.holdSpot = spot;
         s.holding = true;
         s.struck = false;
@@ -475,6 +563,13 @@ public final class LionHunt {
             return;
         }
         l.setHoldSpot(spot);
+    }
+
+    /** Tests: where it stands to hold its spot on this prey now (flat), or null. */
+    @Nullable
+    public static Vec3 placeForTests(LionEntity l, BuffaloEntity prey) {
+        Place p = placeOn(l, prey, l.holdSpot());
+        return p == null ? null : p.at();
     }
 
     /**
@@ -571,7 +666,8 @@ public final class LionHunt {
                     s.to(Stage.FEAST, now);
                     s.lastBite = now;
                     s.arriveBy = now + ARRIVE_TICKS;
-                    s.placeIndex = -1;
+                    s.feedSpot = -1;
+                    s.lyingAt = false;
                     standUp();
                     return;
                 }
@@ -670,7 +766,8 @@ public final class LionHunt {
             s.feastId = kill.getUUID();
             s.ate = 0;
             s.full = false;
-            s.placeIndex = -1;
+            s.feedSpot = -1;
+            s.lyingAt = false;
             s.lastBite = now;
             s.arriveBy = now + ARRIVE_TICKS;
             s.feastEvening = LionGoals.eveningAt(time);
@@ -798,7 +895,7 @@ public final class LionHunt {
         /** Whether it is on its feet, getting up first from lying or sitting (a sniff or a stare ends). */
         private boolean onFeet() {
             byte d = l.doing();
-            if (d == LionEntity.REST || d == LionEntity.REST_DOWN || d == LionEntity.GROOM) {
+            if (d == LionEntity.REST || d == LionEntity.REST_DOWN || d == LionEntity.GROOM || d == LionEntity.FEED) {
                 l.setDoing(LionEntity.REST_UP);
                 return false;
             }
@@ -1049,10 +1146,18 @@ public final class LionHunt {
                     return;                                     // still on its way: not gripping yet
                 }
                 s.struck = true;                                // the strike's hit: its first bite, and from now it grips
-                bite(prey);
-                if (!prey.grownUp()) {
-                    prey.setDoing(BuffaloEntity.REST_DOWN);       // a calf is knocked down
+                if (!missed()) {
+                    bite(prey);
+                    if (!prey.grownUp()) {
+                        prey.setDoing(BuffaloEntity.REST_DOWN);   // a calf is knocked down
+                    }
                 }
+            }
+            if (missed()) {
+                if (!l.striking()) {
+                    s.holding = false;                          // landed where it aimed, the prey gone from there: a miss
+                }
+                return;
             }
             prey.heldBy(l);
             String name = holdClip(l, prey, s.holdSpot);
@@ -1073,6 +1178,11 @@ public final class LionHunt {
             }
         }
 
+        /** Its strike landed away from its place on the prey (the ride decides it at the hit, on every screen alike). */
+        private boolean missed() {
+            return s.struck && l.settle != null && l.settle.missed();
+        }
+
         // WAIT: the male and the cubs lie where they are while the lionesses hunt
         private void lieDown() {
             l.getNavigation().stop();
@@ -1082,7 +1192,7 @@ public final class LionHunt {
             }
         }
 
-        // FEAST: to its place round the carcass by the feast order, feeding till full, then lying by it
+        // FEAST: to a feeding spot of the carcass, lying there with its jaw on it, feeding till full, then lying by it
         private void feast(int now) {
             RemainsEntity carcass = s.carcass;
             if (carcass == null) {
@@ -1092,63 +1202,98 @@ public final class LionHunt {
                 lieByKill(carcass, now);
                 return;
             }
-            List<LionEntity> feeders = new ArrayList<>();
-            feeders.add(l);
-            double near = 1.9 * carcass.size() + 3.0;
-            for (LionEntity m : l.mates()) {
-                if (m.hunt.stage == Stage.FEAST && m.hunt.carcass == carcass && !m.hunt.full
-                        && HomeGroup.flat(m.position(), carcass.getX(), carcass.getZ()) <= near) {
-                    feeders.add(m);                             // only those at it: the male counts once he comes
+            byte d = l.doing();
+            boolean at = HomeGroup.flat(l.position(), carcass.getX(), carcass.getZ()) <= atCarcass(carcass);
+            if (!at) {
+                s.feedSpot = -1;                                // (only those at it hold a spot: the male takes his once he comes)
+            } else if (s.feedSpot < 0 ? now - s.lookedAt >= LOOK_EVERY : !freeToFeed(l, carcass, s.feedSpot)) {
+                // it keeps its spot while it may have it; with none, or pushed off it by one before it in the feast
+                // order (a growl), the best spot free for it
+                boolean pushed = s.feedSpot >= 0 && feederAt(l, carcass, s.feedSpot) != null;
+                s.lookedAt = now;
+                s.feedSpot = bestFeedSpot(l, carcass);
+                s.lyingAt = false;
+                s.arriveBy = now + ARRIVE_TICKS;
+                if (pushed) {
+                    s.growlUntil = now + GROWL_TICKS + (d == LionEntity.FEED || d == LionEntity.REST || d == LionEntity.REST_DOWN
+                            ? l.doingTicks(LionEntity.REST_UP) : 0);   // (it gets up first)
                 }
             }
-            feeders.sort(FEAST_ORDER);
-            int index = feeders.indexOf(l);
-            byte d = l.doing();
-            if (s.placeIndex >= 0 && index > s.placeIndex && now >= s.growlUntil) {
-                s.growlUntil = now + GROWL_TICKS;               // pushed back by one before it: a growl
-                l.getNavigation().stop();
-                l.setDoing(LionEntity.MOOD_ANGRY);
+            Place place = s.feedSpot < 0 ? null : feedPlace(l, carcass, s.feedSpot);
+            if (s.lyingAt && place != null && (d == LionEntity.REST_DOWN || d == LionEntity.REST || d == LionEntity.FEED)) {
+                feedLying(carcass, place, now);
+                return;
             }
-            if (s.placeIndex != index) {
-                s.arriveBy = now + ARRIVE_TICKS;                // a new place: so long to reach it
+            s.lyingAt = false;
+            if (!onFeet()) {
+                return;                                         // (lying elsewhere, or pushed off its spot: up first)
             }
-            s.placeIndex = index;
             if (now < s.growlUntil) {
+                l.getNavigation().stop();
+                if (d == LionEntity.CALM) {
+                    l.setDoing(LionEntity.MOOD_ANGRY);
+                }
                 l.face(carcass.getX(), carcass.getZ(), 10.0F);
                 return;
             }
             if (d == LionEntity.MOOD_ANGRY) {
                 l.setDoing(LionEntity.CALM);
             }
-            if (!onFeet() && d != LionEntity.DRINK && d != LionEntity.PIN) {
+            if (place == null) {
+                if (at) {
+                    l.getNavigation().stop();                   // no spot free for it: it waits by the carcass, watching
+                    l.faceYaw(yawTo(l.position(), carcass.position()), 10.0F);
+                } else {
+                    walkTo(carcass.position(), HomeGroup.flat(l.position(), carcass.getX(), carcass.getZ()) > 12.0 ? LionEntity.TROT : LionEntity.WALK);
+                }
                 return;
             }
-            Vec3 place = feedPlace(carcass, index);
-            boolean there = HomeGroup.flat(l.position(), place.x, place.z) <= 0.8
-                    || now > s.arriveBy && HomeGroup.flat(l.position(), carcass.getX(), carcass.getZ()) <= 1.9 * carcass.size() + 2.5;   // its place out of reach: it feeds where it got to
-            if (!there) {
-                if (d == LionEntity.DRINK || d == LionEntity.PIN) {
-                    return;                                     // a clip plays out first
-                }
-                walkTo(place, HomeGroup.flat(l.position(), place.x, place.z) > 12.0 ? LionEntity.TROT : LionEntity.WALK);
+            boolean there = HomeGroup.flat(l.position(), place.at().x, place.at().z) <= AT_PLACE;
+            if (!there && now <= s.arriveBy) {
+                walkTo(place.at(), LionEntity.WALK);
                 return;
             }
             l.getNavigation().stop();
-            if (!l.faceYaw(yawTo(l.position(), carcass.position()), 10.0F)) {
+            if (!l.faceYaw(there ? place.yaw() : yawTo(l.position(), carcass.position()), 10.0F)) {
                 return;
             }
-            if (now - s.lastBite >= BITE_EVERY) {
-                s.lastBite = now;
-                if (carcass.bite(l)) {
-                    s.ate++;
-                }
-                if (s.ate >= fill() || carcass.bitesLeft() <= 0 && s.ate > 0) {
-                    eaten();                                    // (the meat gone before its first bite: still hungry)
-                    return;
-                }
+            // it lies down at its place, shuffling the last bit onto it as it goes down (its place out of reach by its
+            // deadline: it lies down where it got to and feeds there)
+            s.lyingAt = true;
+            s.feedSettle = there ? com.antcolonies.entity.body.Strikes.Ride.from(l, l.yBodyRot, null, 0) : null;
+            l.setDoing(LionEntity.REST_DOWN);
+        }
+
+        /**
+         * Lying at its feeding spot: set onto its place as it lies down (so its jaw at its bite is on the spot), then the
+         * feed clip with no calm tick before it or between its rounds (BUGS 376), a meat bite at the clip's own bite, the
+         * tug, once {@link #BITE_EVERY} has passed.
+         */
+        private void feedLying(RemainsEntity carcass, Place place, int now) {
+            byte d = l.doing();
+            if (s.feedSettle != null) {
+                double f = s.feedSettle.along(null, 0, l.doingTicks(LionEntity.REST_DOWN));
+                Vec3 to = s.feedSettle.at(f, place.at());
+                float yaw = s.feedSettle.yaw(f, place.yaw());
+                l.setPos(to.x, l.getY(), to.z);
+                l.setYRot(yaw);
+                l.yBodyRot = yaw;
+                l.yHeadRot = yaw;
             }
-            if (d == LionEntity.CALM) {
-                l.setDoing(l.has(LionEntity.PIN) && l.getRandom().nextInt(3) == 0 ? LionEntity.PIN : LionEntity.DRINK);   // head down tearing; paws on it, tugging
+            if (d == LionEntity.REST || d == LionEntity.REST_DOWN && l.doingFor() >= l.doingTicks(d)) {
+                l.setDoing(LionEntity.FEED);                    // (before its lying down ends by itself into the rest clip)
+                return;
+            }
+            var bite = l.spots().hold(FEED_CLIP);
+            if (d != LionEntity.FEED || bite == null || !bite.bitesAt(l.clipTick()) || now - s.lastBite < BITE_EVERY) {
+                return;
+            }
+            s.lastBite = now;
+            if (carcass.bite(l)) {
+                s.ate++;
+            }
+            if (s.ate >= fill() || carcass.bitesLeft() <= 0 && s.ate > 0) {
+                eaten();                                        // (the meat gone before its first bite: still hungry)
             }
         }
 
@@ -1172,11 +1317,10 @@ public final class LionHunt {
         private void eaten() {
             s.full = true;
             s.sinceMeal = 0;
-            s.arriveBy = l.tickCount + ARRIVE_TICKS;
-            byte d = l.doing();
-            if (d == LionEntity.DRINK || d == LionEntity.PIN) {
-                l.setDoing(LionEntity.CALM);                    // done tearing at it
-            }
+            s.feedSpot = -1;                                    // its spot is free for the next
+            s.lyingAt = false;
+            s.arriveBy = l.tickCount + ARRIVE_TICKS + l.doingTicks(LionEntity.REST_UP);
+            onFeet();                                           // done tearing at it: up from its spot
         }
 
         private int fill() {
@@ -1187,33 +1331,19 @@ public final class LionHunt {
             };
         }
 
-        /** Its feeding place round a carcass: the chest, the rump, the two flanks, then two more beside them (by index). */
-        private Vec3 feedPlace(RemainsEntity carcass, int index) {
-            double size = carcass.size();
-            double[] angles = {60.0, 180.0, 100.0, -90.0, 20.0, -150.0};
-            double angle = angles[index % angles.length];
-            double rad = Math.toRadians(angle);
-            double along = 1.9 * size, across = 0.7 * size;
-            double ca = Math.cos(rad), sa = Math.sin(rad);
-            double body = Math.sqrt(along * along * ca * ca + across * across * sa * sa);
-            double out = body + l.measures.headFront() * l.getScale() - 0.3 + (index >= angles.length ? 1.5 : 0);
-            float yaw = carcass.getYRot() * Mth.DEG_TO_RAD;
-            double fx = -Mth.sin(yaw), fz = Mth.cos(yaw), lx = Mth.cos(yaw), lz = Mth.sin(yaw);
-            return carcass.position().add((fx * ca + lx * sa) * out, 0, (fz * ca + lz * sa) * out);
-        }
-
         /** Full: it lies a few blocks from the kill (by its rank), facing it. */
         private void lieByKill(RemainsEntity carcass, int now) {
             byte d = l.doing();
-            if (d == LionEntity.REST || d == LionEntity.REST_DOWN || d == LionEntity.GROOM) {
+            if (d == LionEntity.REST || d == LionEntity.REST_DOWN || d == LionEntity.GROOM || d == LionEntity.REST_UP) {
+                return;                                         // (lying by it, or still getting up from its feeding spot)
+            }
+            if (d == LionEntity.FEED) {
+                onFeet();                                       // (full since before a reload: up from its spot)
                 return;
             }
             Vec3 spot = carcass.position().add(HomeGroup.offset(l.rank(), LIE_OUT + l.rank() * 0.6));
             if (HomeGroup.flat(l.position(), spot.x, spot.z) > 1.0 && now <= s.arriveBy) {   // out of reach: it lies where it got to
-                if (d == LionEntity.DRINK || d == LionEntity.PIN || d == LionEntity.MOOD_ANGRY) {
-                    if (LionEntity.oneShot(d)) {
-                        return;
-                    }
+                if (d == LionEntity.MOOD_ANGRY) {
                     l.setDoing(LionEntity.CALM);
                 }
                 walkTo(spot, LionEntity.WALK);

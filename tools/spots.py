@@ -19,12 +19,18 @@ A prey's "spots" (model px, the geo file's own frame: x to its left, y up, z tow
   skin    the bones whose boxes make its skin for the rays (its trunk, neck and head: not its legs or tail)
   clips   the clips it can play while held; each is posed every tick (20 a second)
   pairs   the holds the game makes on it: holder, hold clip, both sizes, the prey's clips then ({clip: "once" or
-          "loop"}) and the spots it holds there ("spots"; all when left out). The game picks a holder's clip by them
+          "loop"}) and the spots it holds there ("spots", the best first; when left out, all that have no pose of
+          their own). The game picks a holder's clip by them
           (step 3): of the holder's pairs naming the prey's clip (none: its idle) and the spot, the one whose size is
           nearest the prey's. clip_check.py --pair checks each.
   at      {name: {"bone", "from", "out"}}: the spot moves with "bone"; it lies where a ray from "from" (a point inside
           the body) going "out" (degrees from straight ahead, + to its left, flat) last leaves the skin's boxes at rest.
           The holder faces in along "out" (it stands outside the body that way).
+          With "pose" (step 5, 2026-11-26: a carcass's feeding spots) the ray is cast on the body as it lies in that
+          pose instead ("from" and "out" in the posed body's frame: where the animal stood, x to its left, y up from
+          the ground, z toward its tail); such a spot belongs only to the pairs on its pose.
+  poses   {name: {"clip", "at": "end"}}: a still pose it is held in (a carcass: its death clip's last frame); the
+          table gets it as a clip of one row under that name, and a pair names it like a clip ({"carcass": "loop"}).
 
 A holder's "holds":
   jaw     the bone whose pivot is the point that bites (the plan's role name: carry)
@@ -40,7 +46,8 @@ The table (all model px, at size 1, the model's own frame; the game adds where i
   clips   {clip: [one row a tick: x, y, z of each spot in order]}
   holds   {clip: {"hit", "jaw": the jaw at the hit, "ticks": the clip's length, "loop"}} (a loop bites at its hit
           every time round)
-  pairs   [{"holder", "hold", "size", "clips": [prey clips], "spots": [spot names]}] (the plan's, for the game)
+  pairs   [{"holder", "hold", "size", "clips": [prey clips], "spots": [spot names, the best first]}] (the plan's,
+          for the game)
   trunk   the holder's shoulders and hips (z) and half its width: the line two holders keep a width apart
   strikes {clip: {"hit", "ticks": the clip's length, "lead": the blend (ticks) before its first frame shows, "reach":
           how far its path goes from the strike's start (px), "share": [one a tick from the strike's start, blend
@@ -60,7 +67,7 @@ sys.path.insert(0, HERE)
 import body_plan  # noqa: E402
 import clip_check as cc  # noqa: E402
 
-FORMAT = 3                  # changes when the table's layout or the way it is worked out changes
+FORMAT = 4                  # changes when the table's layout or the way it is worked out changes
 RAY_STEP, RAY_REACH = 0.05, 64.0
 
 
@@ -129,11 +136,63 @@ def skin_point(animal, name, spec, boxes):
     return [round(v, 3) for v in last]
 
 
+def held_poses(animal, spots):
+    """The still poses its plan names ({name: (its clip played, the time)}): a pose is a clip held at its end."""
+    out = {}
+    for name, spec in spots.get('poses', {}).items():
+        if name in animal.data or spec.get('at') != 'end' or spec.get('clip') not in animal.data:
+            raise SystemExit(f'{animal.name}: pose {name} must be {{"clip": one of its clips, "at": "end"}} and no clip\'s name')
+        pl = cc.Played(animal, spec['clip'])
+        out[name] = (pl, pl.length)
+    return out
+
+
+def posed_point(animal, name, spec, skin, pose):
+    """A spot found on the body as it lies in a pose: where the ray from 'from' going 'out' (both in the posed body's
+    frame) last leaves the skin's posed boxes, as a point of its bone at rest (so it moves with the bone like any spot)."""
+    boxes = [corners for bone, corners, _ in animal.model.posed(pose) if bone in skin]
+    start, d = spec['from'], direction(spec['out'])
+    if cc.body_depth(start, boxes) <= 0:
+        raise SystemExit(f'{animal.name}: spot {name} starts outside the skin at {start} in its pose')
+    last = None
+    for k in range(int(RAY_REACH / RAY_STEP) + 1):
+        p = tuple(s + d[i] * k * RAY_STEP for i, s in enumerate(start))
+        if cc.body_depth(p, boxes) > 0:
+            last = p
+    # back into the bone's own frame: the pose moves a point of the bone by a turn and a shift (o + A p)
+    bone = spec['bone']
+    o = animal.model.world(bone, (0.0, 0.0, 0.0), pose)
+    cols = [[w - oc for w, oc in zip(animal.model.world(bone, e, pose), o)] for e in ((1, 0, 0), (0, 1, 0), (0, 0, 1))]
+    b = [lc - oc for lc, oc in zip(last, o)]
+    a = [[cols[c][r] for c in range(3)] for r in range(3)]
+    det = (a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1]) - a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0])
+           + a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]))
+    out = []
+    for c in range(3):                      # Cramer's rule
+        m = [[b[r] if k == c else a[r][k] for k in range(3)] for r in range(3)]
+        out.append((m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+                    + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0])) / det)
+    return [round(v, 3) for v in out]
+
+
 def spot_table(animal, spots):
     boxes = skin_boxes(animal, spots['skin'])
     names = list(spots['at'])
-    rest = {n: skin_point(animal, n, spots['at'][n], boxes) for n in names}
+    poses = held_poses(animal, spots)
+    rest = {}
+    for n in names:
+        spec = spots['at'][n]
+        if 'pose' in spec:
+            if spec['pose'] not in poses:
+                raise SystemExit(f'{animal.name}: spot {n} names the pose {spec["pose"]}, which its plan does not list (spots.poses)')
+            pl, t = poses[spec['pose']]
+            rest[n] = posed_point(animal, n, spec, spots['skin'], pl.pose(t))
+        else:
+            rest[n] = skin_point(animal, n, spec, boxes)
     clips = {}
+    for name, (pl, t) in poses.items():     # a pose: a clip of one row
+        pose = pl.pose(t)
+        clips[name] = [[round(v, 2) for n in names for v in animal.model.world(spots['at'][n]['bone'], rest[n], pose)]]
     for clip in spots['clips']:
         if clip not in animal.data:
             raise SystemExit(f'{animal.name}: no clip {clip} for its spots')
@@ -202,10 +261,15 @@ def strike_table(animal, strikes):
     return out
 
 
+def pair_spots(pair, at):
+    """The spots a pair holds, the best first: its own list, or every spot with no pose of its own."""
+    return list(pair['spots']) if 'spots' in pair else [n for n in at if 'pose' not in at[n]]
+
+
 def game_pairs(pairs, at):
     """The pairs as the game reads them: who holds with which clip, at which prey size, on which clips and spots."""
     return [{'holder': p['holder'], 'hold': p['hold'], 'size': p['size'], 'clips': list(p['clips']),
-             'spots': p.get('spots', list(at))} for p in pairs]
+             'spots': pair_spots(p, at)} for p in pairs]
 
 
 # --- writing and checking ---------------------------------------------------------------------------------------------
@@ -282,6 +346,8 @@ def report(holder, prey, sizes):
     # where the game draws each model (model px toward its head), read from the game's Java (the plans' checks.drawn_ahead)
     draw = {holder: cc.Animal(holder).drawn_ahead(), prey: cc.Animal(prey).drawn_ahead()}
     tr = ht['trunk']
+    at = plan_data(prey)['spots']['at']
+    standing = [n for n in pt['spots']['names'] if 'pose' not in at[n]]     # (a pose's spots: clip_check.py --pair)
     for hs, ps in sizes:
         print(f'\n{holder} at size {hs} on {prey} at size {ps} (blocks):')
         for clip, hold in ht['holds'].items():
@@ -292,7 +358,7 @@ def report(holder, prey, sizes):
                 mid = [sum(r[k] for r in rows) / len(rows) for k in range(len(rows[0]))]
                 print(f'  {clip} (bites at tick {hold["hit"]}) on a {pclip} {prey}:')
                 placed = {}
-                for spot in pt['spots']['names']:
+                for spot in standing:
                     pos, face, sh, jh = placement(pt['spots'], spot, mid, ps, hold, hs, draw[prey], draw[holder])
                     placed[spot] = (pos, face)
                     print(f'    {spot:12s} stands {pos[0]:+5.2f} ahead {pos[1]:+5.2f} left, facing {face % 360:5.1f}; '

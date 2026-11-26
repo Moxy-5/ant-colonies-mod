@@ -21,7 +21,7 @@ from model_parts import (  # noqa: E402
     aim, clip, euler, mat_mul, mat_vec, rot, transpose, unit, vadd, vlen, vsub,
 )
 from motion_kit import (  # noqa: E402
-    digitigrade_leg, ease, foot_at, pulse, quadruped_gait, ramp, secondary_lag, two_bone,
+    digitigrade_leg, ease, foot_at, on_path, path_note, pulse, quadruped_gait, ramp, secondary_lag, travel, two_bone,
 )
 
 
@@ -352,29 +352,6 @@ class LionRig:
         pose["mane_chest"] = mc
 
 
-def _travel(t, v, start, up, down_from, end):
-    """How far a strike's root has gone forward at time t (px; the Motion Studio phase 3, step 4): still until start,
-    its speed easing up to v (px a second) by up, held, easing down to 0 from down_from to end (each ease a smoothstep
-    of the speed, so the travel has no jolt). start == up: it sets off at v (a leap out of a gallop)."""
-    a, b = up - start, end - down_from
-    if t <= start:
-        return 0.0
-    if t <= up:
-        u = (t - start) / a
-        return v * a * (u ** 3 - u ** 4 / 2.0)
-    if t <= down_from:
-        return v * a / 2.0 + v * (t - up)
-    u = min(1.0, (t - down_from) / b)
-    return v * a / 2.0 + v * (down_from - up) + v * b * (u - u ** 3 + u ** 4 / 2.0)
-
-
-def _strike_path_note(L, path):
-    """A strike's travel as a clip note ("path root t dy dz ...", one row a game tick, forward as -z): the game moves the
-    animal along it (from its spot table, tools/spots.py) and the lab adds it back to the root, as for a block move."""
-    n = round(L * 20)
-    return "path root " + " ".join(f"{k / 20:.4f} 0.000 {-path(k / 20):.3f}" for k in range(n + 1))
-
-
 def _bake_clip(rig, length, steps, frame_fn, loop=True, tail_lag=0.09, mane_lag=0.08):
     """Bake frames with 2nd-order damped spring physics (`secondary_lag`) for tail_1..5 & mane_*."""
     is_loop = (loop is True)
@@ -474,6 +451,101 @@ def _prey_heights(holder, hold_clip):
     return pair, out
 
 
+def _solve_jaw(rig, base, y, Z, guess, pitch=(-60.0, 70.0), shift=9.0):
+    """Her neck's pitch and her body's shift ahead so her jaw is at height y and reach Z (Newton, two unknowns);
+    base(pitch, shift) gives the pose. The limits: the pitch's range (degrees), the shift's (px at size 1, either way,
+    or a (back, ahead) pair)."""
+    lo, hi = (-shift, shift) if isinstance(shift, (int, float)) else shift
+    npitch, dz = guess
+    for _ in range(12):
+        def at(n, d):
+            j = _jaw(rig, base(n, d))
+            return j[1] - y, j[2] - Z
+        f0 = at(npitch, dz)
+        if abs(f0[0]) < 0.005 and abs(f0[1]) < 0.005:
+            break
+        h = 0.05
+        fa, fb = at(npitch + h, dz), at(npitch, dz + h)
+        j11, j21 = (fa[0] - f0[0]) / h, (fa[1] - f0[1]) / h
+        j12, j22 = (fb[0] - f0[0]) / h, (fb[1] - f0[1]) / h
+        det = j11 * j22 - j12 * j21
+        if abs(det) < 1e-9:
+            break
+        npitch -= (j22 * f0[0] - j12 * f0[1]) / det
+        dz -= (-j21 * f0[0] + j11 * f0[1]) / det
+        npitch, dz = _clamp(npitch, pitch[0], pitch[1]), _clamp(dz, lo * rig.sc, hi * rig.sc)
+    return npitch, dz
+
+
+def make_feeds(rig, holder, rest_frame):
+    """feed for a lion form (the Motion Studio phase 3, step 5; docs/plans/motion-studio-phase3.md): lying
+    at a carcass as it rests (its paws where its rest clip has them, so lying down with rest_down and getting up with
+    rest_up fit either side), its jaw on the carcass's feeding spot: bitten in, tugged at with its head tilted (shearing
+    with the side of its jaw), a piece torn free, its head lifted to chew, back in. Its neck's pitch is solved once, at
+    its bite, so its jaw is at the spot's height (the buffalo's spot table at its first feed pair's sizes, a
+    grown buffalo's carcass; a calf's feeding spots lie as high in the world, higher up its small body, so the one clip
+    fits both: a lying lion cannot get its jaw down to a third of a calf's height); the game places it by its jaw at
+    its bite's tick."""
+    import clip_check as cc
+    sc = rig.sc
+    hits = cc.Animal(holder).plan_data["holds"]["clips"]
+    lying = rest_frame(1.0, 0.0, False)[0]
+    Z = _jaw(rig, lying)[2] - 1.0 * sc                 # a little stretched from its resting head: clear of its forepaws
+    L, N = 3.0, 60
+    made = {}
+    for name in ("feed",):
+        pair, heights = _prey_heights(holder, name)
+        y = heights["carcass"][0][0]
+        t_hit = hits[name] / 20.0
+        state = {"at": None, "miss": 0.0}
+
+        def frame(i, t, y=y, t_hit=t_hit, state=state):
+            chew = pulse(t, 0.58 * L, 0.07 * L, 0.22 * L, 0.10 * L)     # 0 its jaws in the meat, 1 its head up chewing
+            on = 1.0 - chew
+            shake = on * math.sin(2.0 * math.pi * 2.0 * (t - t_hit))    # the tug (still at its bite: the game places it then)
+            pull = on * (0.5 - 0.5 * math.cos(2.0 * math.pi * 2.0 * (t - t_hit)))
+            chomp = chew * (0.5 - 0.5 * math.cos(2.0 * math.pi * 10.0 * t / L))
+            out = {}
+
+            def shape(p, targs):
+                rx = p["body"]["rotation"][0]
+                dy = p["body"]["position"][1]
+
+                def base(npitch, dz, shake=shake, pull=pull, on=on, chew=chew):
+                    p["body"] = {"position": [0.0, dy, dz], "rotation": [rx + 0.8 * pull, 0.7 * shake, 0.0]}
+                    p["chest"] = {"rotation": [-1.5 + 1.2 * pull, 1.6 * shake, 1.0 * shake]}
+                    p["neck"] = {"rotation": [npitch - 13.0 * chew + 2.0 * pull, 4.0 * shake, 6.0 * shake + 4.0 * on]}
+                    p["head"] = {"rotation": [0.5 * npitch - 2.5 - 9.0 * chew, -3.0 * shake, 12.0 * shake + 9.0 * on]}
+                    return p
+                if state["at"] is None:
+                    # solved once, at its bite (jaws in, the tug still), for its neck's pitch only: its body lies where
+                    # its rest clip has it (its hind legs lie folded to their limit: a body shifted under them made
+                    # them jump as it began to feed), so its jaw's reach is what that pitch gives (the game reads it
+                    # from the clip, tools/spots.py)
+                    still = lambda n, d: base(n, d, shake=0.0, pull=0.0, on=1.0, chew=0.0)
+                    npitch, _ = _solve_jaw(rig, still, y, Z, (20.0, 0.0), pitch=(-40.0, 80.0), shift=(-6.0, 4.0))
+                    state["at"] = (npitch, 0.0)
+                    j = _jaw(rig, still(*state["at"]))
+                    state["miss"], state["reach"] = abs(j[1] - y), -j[2]
+                base(*state["at"])
+                p["jaw"] = {"rotation": [7.0 * on - 3.0 * pull + 2.0 * chew + 10.0 * chomp, 0.0, 0.0]}
+                p["tongue"] = {"position": [0.0, 0.0, 0.0], "rotation": [2.0 * chomp, 0.0, 0.0]}
+                p["ear_left"] = {"rotation": [-22.0 * on - 8.0, -12.0 * on - 6.0, 8.0 * on - 8.0]}
+                p["ear_right"] = {"rotation": [-22.0 * on - 8.0, 12.0 * on + 6.0, -8.0 * on + 8.0]}
+                rig.set_eyes(p, squint=0.35 + 0.4 * on, blink=0.0)
+                rig.set_claws(p, fl=0.7 * on, fr=0.7 * on, bl=0.0, br=0.0, hook=0.0)
+                out["mane"] = [-20.0 - 4.0 * pull, -8.0 * shake, -6.0 * shake]
+            got = rest_frame(1.0, 0.0, False, shape=shape)
+            flick = math.sin(2.0 * math.pi * 2.0 * t / L)
+            return got[0], got[1], 32.0 + 12.0 * flick, 3.0 * shake, out["mane"], got[5]
+        frame(0, t_hit)                                 # (solves it at its bite before the bake)
+        made[name] = _bake_clip(rig, L, N, frame, loop=True, tail_lag=0.07, mane_lag=0.06)
+        npitch, dz = state["at"]
+        print(f"  {holder} {name}: jaw {y:.2f} px high at reach {state['reach']:.2f} (a carcass of size {pair['size']}), "
+              f"neck about {npitch:.0f} deg, its height missed by {state['miss']:.3f} px")
+    return made
+
+
 def make_holds(rig, bite, rest_targets):
     """throat_hold, hold_sink and hold_down for the lioness (see the comment where they are called)."""
     import clip_check as cc                             # the blends and her bite's tick, read where the game reads them
@@ -485,27 +557,7 @@ def make_holds(rig, bite, rest_targets):
     stand_y = reach[1]
 
     def solve(base, y, guess):
-        """Her neck's pitch and her body's shift ahead so her jaw is at height y and reach Z (Newton, two unknowns)."""
-        npitch, dz = guess
-        for _ in range(12):
-            def at(n, d):
-                q = base(n, d)
-                j = _jaw(rig, q)
-                return j[1] - y, j[2] - Z
-            f0 = at(npitch, dz)
-            if abs(f0[0]) < 0.005 and abs(f0[1]) < 0.005:
-                break
-            h = 0.05
-            fa, fb = at(npitch + h, dz), at(npitch, dz + h)
-            j11, j21 = (fa[0] - f0[0]) / h, (fa[1] - f0[1]) / h
-            j12, j22 = (fb[0] - f0[0]) / h, (fb[1] - f0[1]) / h
-            det = j11 * j22 - j12 * j21
-            if abs(det) < 1e-9:
-                break
-            npitch -= (j22 * f0[0] - j12 * f0[1]) / det
-            dz -= (-j21 * f0[0] + j11 * f0[1]) / det
-            npitch, dz = _clamp(npitch, -60.0, 70.0), _clamp(dz, -9.0 * sc, 9.0 * sc)
-        return npitch, dz
+        return _solve_jaw(rig, base, y, Z, guess)
 
     def hold_frame(t, y, low, shake, clamp_w, guess):
         """One frame of a hold: low 0 (standing, reaching) to 1 (crouched over prey on the ground); shake the tug of her
@@ -1120,7 +1172,7 @@ def build_all_clips(raw_bones, kind="male"):
         L, N = L0 - T0, 32
         v = walk_speeds["gallop"]
         def path(t):
-            return _travel(t + T0, v, T0, T0, 0.72, 0.80)
+            return travel(t + T0, v, T0, T0, 0.72, 0.80)
         dz_end = -path(L)
         def frame(i, t):
             dz = -path(t)
@@ -1194,7 +1246,7 @@ def build_all_clips(raw_bones, kind="male"):
             # against the path: a foot planted where it stood (its leg pushes back as the body goes), with the body in
             # the air, planted where it lands (it reaches forward for it)
             for tag, w in (("fr", fb_fr), ("fl", fb_air), ("bl", fb_air), ("br", fb_air)):
-                targs[tag]["pos"][2] += (1.0 - w) * (0.0 if t < 0.5 else dz_end) + w * dz
+                targs[tag]["pos"][2] += on_path(w, t >= 0.5, dz, dz_end)
             p["root"]["position"] = [0.0, 0.0, dz]
             rig.solve_legs(p, targs)
             p["root"]["position"] = [0.0, 0.0, 0.0]
@@ -1205,7 +1257,7 @@ def build_all_clips(raw_bones, kind="male"):
             mane_drv = [-14.0 * arc + 10.0 * land, cR[1] * 1.0, cR[2] * 1.0]
             return p, 34.0 * coil + 36.0 * arc + 14.0 * land, -cR[1] * 1.35, -5.0 * arc + 4.0 * land, mane_drv
         made = _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.05, mane_lag=0.045)
-        made["timeline"] = {"0.0": _strike_path_note(L, path)}
+        made["timeline"] = {"0.0": path_note(L, path)}
         return made
     if not is_cub:
         clips["jump_smack"] = make_jump_smack()
@@ -1219,7 +1271,7 @@ def build_all_clips(raw_bones, kind="male"):
         L, N = 1.45, 44
         v = walk_speeds["gallop"]
         def path(t):
-            return _travel(t, v, 0.26, 0.36, 0.70, 0.80)
+            return travel(t, v, 0.26, 0.36, 0.70, 0.80)
         dz_end = -path(L)
         def frame(i, t):
             dz = -path(t)
@@ -1297,7 +1349,7 @@ def build_all_clips(raw_bones, kind="male"):
             # against the path: a foot planted where it stood (its leg pushes back as the body goes), with the body in
             # the air, planted where it lands (it reaches forward for it)
             for tag in ("fl", "fr", "bl", "br"):
-                targs[tag]["pos"][2] += (1.0 - fb_air) * (0.0 if t < 0.54 else dz_end) + fb_air * dz
+                targs[tag]["pos"][2] += on_path(fb_air, t >= 0.54, dz, dz_end)
             p["root"]["position"] = [0.0, 0.0, dz]
             rig.solve_legs(p, targs)
             p["root"]["position"] = [0.0, 0.0, 0.0]
@@ -1311,7 +1363,7 @@ def build_all_clips(raw_bones, kind="male"):
             m_ch_t = [0.0, 1.4 * sc * (st_base * 0.5 + coil * 0.5), -0.6 * sc * coil]
             return p, 24.0 * st_base + 14.0 * coil + 36.0 * arc + 16.0 * clamp_b, twitch, -6.0 * arc + 5.0 * clamp_b, mane_drv, m_ch_t
         made = _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.05, mane_lag=0.045)
-        made["timeline"] = {"0.0": _strike_path_note(L, path)}
+        made["timeline"] = {"0.0": path_note(L, path)}
         return made
     if not is_cub:
         clips["stalk_leap_bite"] = make_stalk_leap_bite()
@@ -1643,7 +1695,9 @@ def build_all_clips(raw_bones, kind="male"):
     rest_drop = 9.75 if kind == "male" else (9.35 if is_lns else 4.65)
     rest_body_rx = -6.5 if kind == "male" else (-5.8 if is_lns else -4.0)
 
-    def rest_frame(f, t, loop_breath=False):
+    def rest_frame(f, t, loop_breath=False, shape=None):
+        # shape(pose, leg targets): another clip made lying as it rests (the feed clips) changes the pose before its
+        # legs are solved
         ph = 2.0 * math.pi * t / 3.8 if loop_breath else 0.0
         br = math.sin(ph) if loop_breath else 0.0
         blink = pulse(t, 0.9, 0.24, 1.15, 0.28) if loop_breath else 0.0
@@ -1689,6 +1743,8 @@ def build_all_clips(raw_bones, kind="male"):
                 "paw_yaw": s_sign * 14.0 * f,
                 "pole": [s_sign * 0.85, -0.18 * f, -0.50],
             }
+        if shape:
+            shape(p, targs)
         rig.solve_legs(p, targs)
         flick = pulse(t, 2.1, 0.18, 0.55, 0.30) * math.sin(2.0 * math.pi * (t - 2.1) * 2.0) if loop_breath else 0.0
         tail_y = (32.0 + 14.0 * flick) * f
@@ -1699,6 +1755,9 @@ def build_all_clips(raw_bones, kind="male"):
     clips["rest_down"] = _bake_clip(rig, 0.95, 24, lambda i, t: rest_frame(ease(t / 0.95), t, False), loop=False)
     clips["rest"] = _bake_clip(rig, 3.80, 38, lambda i, t: rest_frame(1.0, t, True), loop=True)
     clips["rest_up"] = _bake_clip(rig, 0.95, 24, lambda i, t: rest_frame(1.0 - ease(t / 0.95), t, False), loop=False)
+
+    # 11b. FEED (a 3.0 s loop; the Motion Studio phase 3, step 5): lying at a carcass, its jaw on a feeding spot
+    clips.update(make_feeds(rig, {"male": "lion", "lioness": "lioness", "cub": "lion_cub"}[kind], rest_frame))
 
     # 11b. REST_STRETCH_UP (3.80s) — Seamless 0-deg Chain from REST -> Slow Concave Bow-Stretch & Yawn -> Convex Cat-Arch Curl -> IDLE!
     def make_rest_stretch_up():

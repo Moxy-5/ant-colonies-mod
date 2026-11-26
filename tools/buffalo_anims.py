@@ -950,6 +950,7 @@ def build_clips(raw_bones):
         # down (death_down, the Motion Studio phase 3, step 3): dying where it lies (held down by lions, resting, a calf
         # pinned): no buckle (it is down already), a last gasp, then the same fall onto its flank and the same last pose.
         L, N = 1.40, 28
+        settle = [0.0]                  # how far its last pose hung over the ground (measured below), taken out as it falls
         def frame(i, t):
             if down:
                 buckle = 1.0
@@ -966,7 +967,7 @@ def build_clips(raw_bones):
             bounce = 0.45 * math.sin(math.pi * _clamp((t - b0) / 0.22, 0.0, 1.0)) if b0 <= t <= b0 + 0.22 else 0.0
             p = _grounded_rest_pose(rig, buckle, buckle, buckle, squint=0.0, blink=eyes)
             base_dy = p["hips"]["position"][1]
-            dy = base_dy + 0.85 * buckle + 4.2 * math.sin(math.pi * fall) + 0.4 * fall + bounce
+            dy = base_dy + 0.85 * buckle + 4.2 * math.sin(math.pi * fall) + 0.4 * fall + bounce - settle[0] * fall
             roll_z = -78.0 * fall
             p["hips"]  = {"position": [0.0, dy, 0.0], "rotation": [1.5 * buckle * (1.0 - 0.7 * fall), 0.0, roll_z]}
             p["chest"] = {"rotation": [0.8 * buckle, -4.0 * fall, 4.0 * fall]}
@@ -988,7 +989,20 @@ def build_clips(raw_bones):
                 p[f"leg_{tag}_2"]    = {"rotation": [r2[0] + ext[1] * f_rel, r2[1], r2[2]]}
                 p[f"leg_{tag}_foot"] = {"rotation": [rf[0] + ext[2] * f_rel, rf[1], rf[2]]}
             return p, 5.0 + 36.0 * buckle - 18.0 * fall, 16.0 * buckle
+        # The carcass lies on the ground (the Motion Studio phase 3, step 5, 2026-11-26): the last pose hung 3.4 px over it
+        # (the lions feed at its foot, and a dead buffalo floated a fifth of a block). Its lowest point is measured on
+        # the game's own model as the checks pose it, and the fall takes that much out.
+        settle[0] = _lowest(frame(N, L)[0])
         return _bake_clip(rig, L, N, frame, loop="hold", tail_lag=0.09)
+
+    def _lowest(p):
+        """The lowest point (px over the ground) of its body in a pose, tail left out (the tail lag lays it after): the
+        game's geo file posed as tools/clip_check.py poses it."""
+        import anim_lab as lab
+        model = lab.Model("buffalo")
+        one = {"animation_length": 0.05, "bones": {b: dict(ch) for b, ch in p.items()}}
+        posed = model.posed(lab.Clip("pose", model.plan.clip_to_roles(one) if model.plan else one).pose(0.0))
+        return min(q[1] for bone, corners, _ in posed if not bone.startswith("tail") for q in corners)
 
     clips["death"] = make_death()
     clips["death_down"] = make_death(down=True)

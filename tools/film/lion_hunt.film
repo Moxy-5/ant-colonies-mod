@@ -41,4 +41,13 @@ cam off
 cam south 0 3 -9
 cam east 9 3 0
 burst feast 30 4
+# the feast itself (phase 3, step 5): the lions lying at their feeding spots, one whole feed loop, then a later look
+cmd tick unfreeze
+wait 200
+cmd tick freeze
+burst feed 30 2
+cmd tick unfreeze
+wait 400
+cmd tick freeze
+burst feed_late 20 3
 record off

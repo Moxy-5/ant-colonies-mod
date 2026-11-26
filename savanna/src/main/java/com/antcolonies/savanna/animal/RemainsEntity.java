@@ -156,6 +156,19 @@ public class RemainsEntity extends Entity implements GeoEntity {
         return k == Kind.BUFFALO ? Math.max(1, Math.round(k.bites * size())) : k.bites;
     }
 
+    /** A carcass's pose in the buffalo's spot table (its death's last frame, {@code tools/spots.py}): its feeding spots lie there. */
+    public static final String CARCASS_POSE = "carcass";
+
+    /**
+     * A feeding spot of a buffalo's carcass (the Motion Studio phase 3, step 5): where it is in the world, on the carcass's
+     * drawn body as it lies (the buffalo's spot table, drawn as {@code RemainsRenderer} draws the carcass: the living
+     * buffalo's size and place).
+     */
+    public Vec3 spotAt(int spot) {
+        return com.antcolonies.entity.body.Spots.world(BuffaloEntity.SPOTS.at(spot, CARCASS_POSE, 0, false), position(), getYRot(),
+                BuffaloEntity.MODEL_SCALE * size(), BuffaloEntity.DRAW_AHEAD_PX);
+    }
+
     /** The den of the pride whose lion killed it (a carcass theirs to feed on), or null. */
     @Nullable
     public BlockPos killedBy() {

@@ -41,8 +41,8 @@ round one calf. All five come from the hold being placed by hand round the prey'
 4. **The strike carries itself (idea 41, BUGS 375). Built 2026-11-26 (the user: "Go to step 4"), below.** the leap's
    travel in its own clip (a path, as the block moves), aimed at the spot it will grip, so it lands there instead of
    gliding.
-5. **Feeding on the carcass (idea 40, BUGS 376's other half):** feeding spots on the carcass, the `feed` clips aimed at
-   them, the feeding turns with no calm tick between.
+5. **Feeding on the carcass (idea 40, BUGS 376's other half). Built 2026-11-26 (the user: "start step 5"), below.**
+   feeding spots on the carcass, the `feed` clips aimed at them, the feeding turns with no calm tick between.
 
 ## Step 1, built (2026-11-26)
 - **Spots** (`buffalo.json`, section `spots`): `rump` (the haunch, from behind), `neck_left`, `neck_right` (the throat
@@ -245,4 +245,76 @@ the clip leapt on the spot).
   for 0.2 s (every clip change while moving does); her paw at the smack's hit is not checked against the hide offline
   (`--pair` checks holds only); a strike's jaw at its hit is not in the table. The film (`tools/film/lion_hunt.film`,
   asked first) is the judge.
+- **Shared for every animal (2026-11-26, the user: "Yes, share them"):** the ways of building a strike went into the
+  engine's shared pieces, the lion keeping only its own numbers: the motion kit (`tools/motion_kit.py`) has `travel`
+  (the speed eased in and out), `path_note` (the clip's note) and `on_path` (a foot target kept planted while the body
+  goes), with how to make a strike in its comment; the framework has `entity/body/Strikes` (`inReach`, the one rule when
+  to strike, and `Ride`, the striker placed along the strike's share from where it set off to its place, on every
+  side alike); `tools/spots.py` and `Spots.Strike` already were. The lion's clips proved the same keyframes after the
+  move; `land` 44 of 44. A new hunter needs: its strike clips made with the kit, `strikes` in its plan, and its own code
+  choosing the strike and the spot.
+- **The hunt film's causes (2026-11-26, `claude/motion-phase3-film`, BUGS 421, 422):** the jaw gap was the drawing, not the game: a rider is drawn turned to its mount's heading (GeckoLib), fixed in `LionRenderer`; the stretched leap was step 4's homing with no limit: a strike now aims at take-off and never steers in the air, gripping at its hit only within `Strikes.GRIP` (0.6 blocks at size 1) of its aim, else missing (`Strikes.Ride.target`, shared). Any future animal that holds by riding its prey needs the renderer's override too.
 - **Next:** the hunt film, then step 5 (feeding on the carcass).
+- **Next (then):** the hunt film, then step 5 (feeding on the carcass).
+
+## Step 5, built (2026-11-26, branch `claude/motion-phase3-step5`)
+- **What a player sees:** lions no longer stand round the kill dipping their heads by turns. Each walks to a feeding
+  spot on the carcass (haunch first, then loin, ribs, shoulder: real lions open a carcass at the hindquarters and
+  belly), lies down there, and feeds lying: jaws in the meat, tugging with the head tilted, a piece torn free, the head
+  lifted to chew, back in. The male takes the best spot when he comes; a lioness lying there growls, gets up and takes
+  the next free one. Full, it gets up and lies down a few blocks off as before.
+- **The carcass's pose** is in the buffalo's spot table as a still pose, `carcass` (the death clip's last frame;
+  `spots.poses` in `buffalo.json`, `tools/spots.py` format 4): a spot with `"pose": "carcass"` is found by a ray on the
+  lying body. Four spots for a cow (`feed_haunch`, `feed_loin`, `feed_ribs`, `feed_shoulder`), four for a calf
+  (`calf_haunch`, `calf_back`, `calf_shoulder`, `calf_belly`; set higher up its small body so they are as high in the
+  world as a cow's: a lying lion cannot get its jaw down to a third of a calf's height, so one clip serves both). Six
+  pairs (three lion forms times cow and calf) name the spots in order, the best first; the cub has no `calf_shoulder`
+  (its body was 1.3 px inside the calf there).
+- **The dead buffalo now lies on the ground** (`tools/buffalo_anims.py`, `make_death`): its last frame hovered 3.4 px
+  over it; the fall now ends with its lowest part at 0. The lioness's `hold_sink` and `hold_down` follow the lower body
+  (remade; her jaws on the hide within 0.2 px).
+- **The clip** `feed` (3 s loop, bite tick 12, in each form's `holds.clips`; `tools/lion_anims.py`, `make_feeds`):
+  lying exactly as `rest` (so `rest_down` goes into it and `rest_up` out of it), its neck's pitch solved once so its
+  jaw at the bite is at the spot's height (male 7.20 px, lioness 7.42, cub 7.74; its body is not shifted: a first
+  version shifted it and the male's hind legs jumped 99 degrees going into it). New commands
+  `python tools/lion_models.py clips` and `python tools/buffalo_models.py clips` write the clip files only (`game`
+  rewrites the body plan and loses its hand-added parts).
+- **The game** (`LionHunt.feast`, `feedLying`; `RemainsEntity.spotAt`; `Spots.pairFor`; the lion's new doing `FEED`):
+  a lion at the carcass (within `atCarcass`) takes the best spot of its pair that is free for it: no pride mate of
+  its own kind or of a kind before it in the feast order (males, lionesses, cubs) has it, and its place there has room.
+  It keeps it until one before it takes it (then: a growl, up, the next free spot; none free: it waits watching). It
+  walks to its place, turns to face, and within `AT_PLACE` (0.25 block) lies down, eased the rest of the way over
+  `rest_down` (`Strikes.Ride`); then `feed` with no calm tick (BUGS 376 fixed in full). A meat bite falls on the clip's
+  bite tick once `BITE_EVERY` has passed. Lying at its spot nothing shoves it (`LionEntity.isPushable`, `doPush`). A clip in a spot
+  table's holds plays at its own pace, not `loopRate()` (the server counts its bite in ticks). Gone: the oval of
+  hand-set places, `placeIndex`, feeding with `drink` and `takedown_pin`.
+- **Measured offline** (`clip_check.py <form> --pair buffalo feed`): every jaw on the hide at every bite (0.0 px) for
+  all three forms on cow and calf. Flagged and left, said plainly: the male's body is 1.1 to 1.8 px in the carcass at
+  every spot (the same at three different reaches, so it is his mane round his head, not his chest); neighbours lie
+  pressed together (bodies 1 to 2 px in each other for lionesses, 2 to 3 for males: lions do feed flank to flank, but
+  the film must judge it). The blends `rest_down`→`feed`, `rest`→`feed`, `feed`→`rest_up` are in the three plans'
+  switches, none flagged.
+- **Game test** (`atDuskAHungryPrideTakesACalfAndFeeds`, more checks in the same scene): every feeding lion that lay
+  down onto its place is within 0.05 of it, no two feed at one spot, feeding only ever ends in getting up, and at
+  least two fed lying on a place. `land` 45 of 45 (after the merge with `claude/review-round-12`).
+- **A feeder shoved off its place (found by the test, measured):** a lioness lying at her spot was 0.05 blocks off it,
+  moving at 0.027 a tick, the dead calf's mother standing 1.4 blocks away: a cow pushes a lion that is not holding, and
+  a push moves both. A lying feeder is now out of pushing both ways (`LionEntity.isPushable` and `doPush`). My first
+  guard (overriding `push`) covered only the cow's own push, not the lion's push back onto itself, and failed 3 of 3
+  after the merge with the film session's fixes.
+- **Not done:** the carcass tilted to a slope (idea 40's other part; it lies level as before); the dead buffalo's head
+  hangs about 4.5 px over the ground; forepaws holding the carcass; a feeding spot through a save (a reloaded feeder
+  gets up, picks a spot and lies down again); the film (another session was filming; films never run side by side).
+- **Seen in the last hunt film and not looked into:** a cow standing at the carcass among the feeding lions. (The
+  film's 1.4 to 1.8 block jaw gap was found and fixed meanwhile by the film's own session: riders drawn at the
+  mount's heading.)
+- **Next:** the hunt film (it now shows the feast too), then phase 1 (the replay page).
+- **The hunt film with the feast (2026-11-26, the user: "Yes, film it"; two new takes in `tools/film/lion_hunt.film`,
+  `feed` and `feed_late`):** the lions do lie down at the carcass and feed lying, and the full ones get up and lie
+  down a few blocks off. Three things spoil it, none fixed yet: the dead calf's mother stands right over the carcass
+  through the whole feast, hiding it, the lions lying round her feet (the scene keeps her grazing at her place 2 blocks
+  from the kill; what a herd does in play after a kill is not checked); round a calf's small carcass three grown
+  lions lie in a heap, their bodies well inside each other (the offline check's 2 to 3 px was for neighbours only, not
+  for everyone at once round so small a body); the cameras stand too far and the new takes come too late (the
+  lionesses were full and up again by `feed`). Lying down and the feed loop themselves could not be judged frame by
+  frame for those reasons.

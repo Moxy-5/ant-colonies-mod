@@ -492,6 +492,18 @@
    [
     "drink",
     "walk"
+   ],
+   [
+    "rest_down",
+    "feed"
+   ],
+   [
+    "rest",
+    "feed"
+   ],
+   [
+    "feed",
+    "rest_up"
    ]
   ],
   "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/LionEntity.java",
@@ -500,10 +512,11 @@
   }
  },
  "holds": {
-  "about": "The clips it grips prey with and the tick each bites (moved here from LionHunt's BITE_HIT and PIN_HIT, 2026-11-26: one place); its jaw is the carry bone's point. tools/spots.py writes assets/antcolonies/spots/<model>.json from this; the game places a holder so its jaw at the bite meets the prey's spot (docs/plans/motion-studio-phase3.md).",
+  "about": "The clips it grips prey with and the tick each bites (moved here from LionHunt's BITE_HIT and PIN_HIT, 2026-11-26: one place); its jaw is the carry bone's point. tools/spots.py writes assets/antcolonies/spots/<model>.json from this; the game places a holder so its jaw at the bite meets the prey's spot (docs/plans/motion-studio-phase3.md). Step 5: feed is made lying at a carcass's feeding spots (tools/lion_anims.py make_feeds; the tick is the bite its jaw is placed by).",
   "jaw": "carry",
   "clips": {
-   "bite": 7
+   "bite": 7,
+   "feed": 12
   }
  }
 }

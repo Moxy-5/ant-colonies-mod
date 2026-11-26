@@ -1070,7 +1070,9 @@ class Pair:
         # how its clip runs against the prey's: on one clock with the prey's one-shot ("together": both start on the
         # same tick, so its tick is the prey's plus the blends' difference), looped, or bitten again and again
         self.mode = 'together' if spec.get('together') else ('loop' if self.hold.get('loop') else 'repeat')
-        self.spots = spec.get('spots')
+        prey_spots = self.prey.plan_data['spots']
+        self.spots = spots.pair_spots(spec, prey_spots['at'])
+        self.poses = prey_spots.get('poses', {})        # still poses a pair names like a clip (a carcass: step 5)
         self.da_h, self.da_p = holder.drawn_ahead(), self.prey.drawn_ahead()
         self.head = lab_descendants(holder.model, holder.plan_data.get('head', {}).get('bone', 'head'))
         self.jaw_bone = holder.plan_data.get('holds', {}).get('jaw', 'carry')
@@ -1099,8 +1101,9 @@ class Pair:
         return rows[min(k, len(rows) - 1)]
 
     def prey_posed(self, clip, kind, k):
-        pl = self._played.get(clip) or self._played.setdefault(clip, Played(self.prey, clip))
-        t = (k / 20) % pl.length if kind == 'loop' else min(k / 20, pl.length)
+        held = self.poses.get(clip)
+        pl = self._played.get(clip) or self._played.setdefault(clip, Played(self.prey, held['clip'] if held else clip))
+        t = pl.length if held else ((k / 20) % pl.length if kind == 'loop' else min(k / 20, pl.length))
         return [(bn, [self.prey_point(p) for p in cs], col) for bn, cs, col in self.prey.model.posed(pl.pose(t))]
 
     def prey_point(self, p):
@@ -1136,7 +1139,7 @@ def check_pair(holder, prey_name, spec, spots_wanted, step=2):
     prey's in the holder (deepest; its head apart from the rest: a bite's muzzle goes into the hide), and every holder
     against every other at once (the spots crowding)."""
     pair = Pair(holder, prey_name, spec)
-    names = [s for s in pair.table['names'] if (not spots_wanted or s in spots_wanted) and (not pair.spots or s in pair.spots)]
+    names = [s for s in pair.table['names'] if (not spots_wanted or s in spots_wanted) and s in pair.spots]
     lines = [f'== {holder.name} {spec["hold"]} (size {pair.hs}) holding {prey_name} (size {pair.ps})'
              + (f': {spec["about"]}' if spec.get('about') else '') + f'; it bites at clip tick {pair.hold["hit"]} of '
              f'{pair.h_ticks} ({ {"together": "on the prey clip's clock", "loop": "a loop", "repeat": "again and again"}[pair.mode]}), '
@@ -1422,7 +1425,7 @@ def run_pairs(holder, prey_name, holds, spots_wanted, times, views, out_dir):
         flags += f
         print('\n'.join(lines))
         if times:
-            names = [s for s in pair.table['names'] if not spots_wanted or s in spots_wanted]
+            names = [s for s in pair.table['names'] if (not spots_wanted or s in spots_wanted) and s in pair.spots]
             ticks = [round(t * 20) for t in times]
             for clip, kind in spec['clips'].items():
                 for spot in names:

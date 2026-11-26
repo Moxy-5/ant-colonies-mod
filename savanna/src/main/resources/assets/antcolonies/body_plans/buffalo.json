@@ -227,6 +227,86 @@
      12
     ],
     "out": -90
+   },
+   "feed_haunch": {
+    "bone": "hips",
+    "pose": "carcass",
+    "from": [
+     -3,
+     8,
+     21
+    ],
+    "out": -140
+   },
+   "feed_loin": {
+    "bone": "hips",
+    "pose": "carcass",
+    "from": [
+     -3,
+     8,
+     20
+    ],
+    "out": -90
+   },
+   "feed_ribs": {
+    "bone": "chest",
+    "pose": "carcass",
+    "from": [
+     -3,
+     8,
+     -1
+    ],
+    "out": -90
+   },
+   "feed_shoulder": {
+    "bone": "chest",
+    "pose": "carcass",
+    "from": [
+     -3,
+     8,
+     -6
+    ],
+    "out": -70
+   },
+   "calf_haunch": {
+    "bone": "hips",
+    "pose": "carcass",
+    "from": [
+     -3,
+     20,
+     21
+    ],
+    "out": -140
+   },
+   "calf_back": {
+    "bone": "hips",
+    "pose": "carcass",
+    "from": [
+     -3,
+     20,
+     5
+    ],
+    "out": -90
+   },
+   "calf_shoulder": {
+    "bone": "chest",
+    "pose": "carcass",
+    "from": [
+     -3,
+     20,
+     -8
+    ],
+    "out": -45
+   },
+   "calf_belly": {
+    "bone": "hips",
+    "pose": "carcass",
+    "from": [
+     2,
+     20,
+     13
+    ],
+    "out": 90
    }
   },
   "pairs": [
@@ -284,7 +364,79 @@
      "rest_down": "once",
      "rest": "loop"
     }
+   },
+   {
+    "about": "a grown buffalo's carcass: a male lies at it and feeds, its jaw on a feeding spot (step 5; the spots the best first)",
+    "holder": "lion",
+    "hold": "feed",
+    "holder_size": 1.0,
+    "size": 0.9,
+    "spots": ["feed_haunch", "feed_loin", "feed_ribs", "feed_shoulder"],
+    "clips": {
+     "carcass": "loop"
+    }
+   },
+   {
+    "about": "a calf's carcass: a male feeds at spots higher up its small body, as high in the world as a cow's (step 5)",
+    "holder": "lion",
+    "hold": "feed",
+    "holder_size": 1.0,
+    "size": 0.36,
+    "spots": ["calf_haunch", "calf_back", "calf_shoulder", "calf_belly"],
+    "clips": {
+     "carcass": "loop"
+    }
+   },
+   {
+    "about": "a grown buffalo's carcass: a lioness lies at it and feeds, its jaw on a feeding spot (step 5; the spots the best first)",
+    "holder": "lioness",
+    "hold": "feed",
+    "holder_size": 0.97,
+    "size": 0.9,
+    "spots": ["feed_haunch", "feed_loin", "feed_ribs", "feed_shoulder"],
+    "clips": {
+     "carcass": "loop"
+    }
+   },
+   {
+    "about": "a calf's carcass: a lioness feeds at spots higher up its small body, as high in the world as a cow's (step 5)",
+    "holder": "lioness",
+    "hold": "feed",
+    "holder_size": 0.97,
+    "size": 0.36,
+    "spots": ["calf_haunch", "calf_back", "calf_shoulder", "calf_belly"],
+    "clips": {
+     "carcass": "loop"
+    }
+   },
+   {
+    "about": "a grown buffalo's carcass: a cub lies at it and feeds, its jaw on a feeding spot (step 5; the spots the best first)",
+    "holder": "lion_cub",
+    "hold": "feed",
+    "holder_size": 0.93,
+    "size": 0.9,
+    "spots": ["feed_haunch", "feed_loin", "feed_ribs", "feed_shoulder"],
+    "clips": {
+     "carcass": "loop"
+    }
+   },
+   {
+    "about": "a calf's carcass: a cub feeds at spots higher up its small body, as high in the world as a cow's (step 5)",
+    "holder": "lion_cub",
+    "hold": "feed",
+    "holder_size": 0.93,
+    "size": 0.36,
+    "spots": ["calf_haunch", "calf_back", "calf_belly"],
+    "clips": {
+     "carcass": "loop"
+    }
    }
-  ]
+  ],
+  "poses": {
+   "carcass": {
+    "clip": "death",
+    "at": "end"
+   }
+  }
  }
 }
