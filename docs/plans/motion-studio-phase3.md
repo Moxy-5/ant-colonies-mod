@@ -285,7 +285,7 @@ the clip leapt on the spot).
   It keeps it until one before it takes it (then: a growl, up, the next free spot; none free: it waits watching). It
   walks to its place, turns to face, and within `AT_PLACE` (0.25 block) lies down, eased the rest of the way over
   `rest_down` (`Strikes.Ride`); then `feed` with no calm tick (BUGS 376 fixed in full). A meat bite falls on the clip's
-  bite tick once `BITE_EVERY` has passed. Lying at its spot nothing shoves it (`LionEntity.push`). A clip in a spot
+  bite tick once `BITE_EVERY` has passed. Lying at its spot nothing shoves it (`LionEntity.isPushable`, `doPush`). A clip in a spot
   table's holds plays at its own pace, not `loopRate()` (the server counts its bite in ticks). Gone: the oval of
   hand-set places, `placeIndex`, feeding with `drink` and `takedown_pin`.
 - **Measured offline** (`clip_check.py <form> --pair buffalo feed`): every jaw on the hide at every bite (0.0 px) for
@@ -296,11 +296,12 @@ the clip leapt on the spot).
   switches, none flagged.
 - **Game test** (`atDuskAHungryPrideTakesACalfAndFeeds`, more checks in the same scene): every feeding lion that lay
   down onto its place is within 0.05 of it, no two feed at one spot, feeding only ever ends in getting up, and at
-  least two fed lying on a place. `land` 44 of 44.
-- **One failure seen once, cause likely, not proved:** in the first run a lioness 4 ticks into feeding was 0.05 off
-  her place (passed alone 3 of 3, then 6 of 6). Nothing in the feast moves her after she is set; a shove does (a cow
-  pushes a lion that is not holding, 0.05 a tick, and the mother cow stands by the carcass). After `LionEntity.push`
-  the run was clean; the test's message now says distance, headings, speed and how far the cow is, should it return.
+  least two fed lying on a place. `land` 45 of 45 (after the merge with `claude/review-round-12`).
+- **A feeder shoved off its place (found by the test, measured):** a lioness lying at her spot was 0.05 blocks off it,
+  moving at 0.027 a tick, the dead calf's mother standing 1.4 blocks away: a cow pushes a lion that is not holding, and
+  a push moves both. A lying feeder is now out of pushing both ways (`LionEntity.isPushable` and `doPush`). My first
+  guard (overriding `push`) covered only the cow's own push, not the lion's push back onto itself, and failed 3 of 3
+  after the merge with the film session's fixes.
 - **Not done:** the carcass tilted to a slope (idea 40's other part; it lies level as before); the dead buffalo's head
   hangs about 4.5 px over the ground; forepaws holding the carcass; a feeding spot through a save (a reloaded feeder
   gets up, picks a spot and lies down again); the film (another session was filming; films never run side by side).

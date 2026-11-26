@@ -873,16 +873,15 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
     }
 
     /** Lions never shove each other (a pride lies touching, in a row; a shove slid them off their beds). */
+    /** Lying at its feeding spot nothing shoves it off (the dead calf's mother standing by): no other's push finds it. */
     @Override
-    public void push(Entity other) {
-        if (!hunt.lyingAt) {
-            super.push(other);                          // lying at its feeding spot nothing shoves it off (a cow brushing by)
-        }
+    public boolean isPushable() {
+        return !hunt.lyingAt && super.isPushable();
     }
 
     @Override
     protected void doPush(Entity other) {
-        if (!(other instanceof LionEntity) && !(other instanceof BuffaloEntity && holding())) {
+        if (!hunt.lyingAt && !(other instanceof LionEntity) && !(other instanceof BuffaloEntity && holding())) {
             super.doPush(other);                        // nor does a lion clinging to prey shove it about
         }
     }

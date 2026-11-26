@@ -122,6 +122,7 @@ ahungryottergulpsdownasmallfishatonce 0.82
 ahungrysharkprowlsatnightandswallowsatilapia 0.00
 ahungryworkereatsoneseedfromthefoodstore 9.13
 alarvathatisnotfedfortwodaysstarves 0.02
+aleapcannotsteerintheairandmisses 0.02
 aleapcarriesitselfontoitsspotandbites 0.04
 algaegrowsbydepthspreadsandisgrazed 0.00
 alimperfollowsthetrailhomeandraiderscalledtodefendrejointheraid 0.10
