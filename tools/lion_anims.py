@@ -21,7 +21,7 @@ from model_parts import (  # noqa: E402
     aim, clip, euler, mat_mul, mat_vec, rot, transpose, unit, vadd, vlen, vsub,
 )
 from motion_kit import (  # noqa: E402
-    digitigrade_leg, ease, foot_at, pulse, quadruped_gait, ramp, secondary_lag, two_bone,
+    digitigrade_leg, ease, foot_at, on_path, path_note, pulse, quadruped_gait, ramp, secondary_lag, travel, two_bone,
 )
 
 
@@ -350,29 +350,6 @@ class LionRig:
         pose["mane_shoulders"] = {"rotation": list(sh_r)}
         mc = {"rotation": list(chest_r), "position": list(chest_t) if chest_t is not None else [0.0, 0.0, 0.0]}
         pose["mane_chest"] = mc
-
-
-def _travel(t, v, start, up, down_from, end):
-    """How far a strike's root has gone forward at time t (px; the Motion Studio phase 3, step 4): still until start,
-    its speed easing up to v (px a second) by up, held, easing down to 0 from down_from to end (each ease a smoothstep
-    of the speed, so the travel has no jolt). start == up: it sets off at v (a leap out of a gallop)."""
-    a, b = up - start, end - down_from
-    if t <= start:
-        return 0.0
-    if t <= up:
-        u = (t - start) / a
-        return v * a * (u ** 3 - u ** 4 / 2.0)
-    if t <= down_from:
-        return v * a / 2.0 + v * (t - up)
-    u = min(1.0, (t - down_from) / b)
-    return v * a / 2.0 + v * (down_from - up) + v * b * (u - u ** 3 + u ** 4 / 2.0)
-
-
-def _strike_path_note(L, path):
-    """A strike's travel as a clip note ("path root t dy dz ...", one row a game tick, forward as -z): the game moves the
-    animal along it (from its spot table, tools/spots.py) and the lab adds it back to the root, as for a block move."""
-    n = round(L * 20)
-    return "path root " + " ".join(f"{k / 20:.4f} 0.000 {-path(k / 20):.3f}" for k in range(n + 1))
 
 
 def _bake_clip(rig, length, steps, frame_fn, loop=True, tail_lag=0.09, mane_lag=0.08):
@@ -1120,7 +1097,7 @@ def build_all_clips(raw_bones, kind="male"):
         L, N = L0 - T0, 32
         v = walk_speeds["gallop"]
         def path(t):
-            return _travel(t + T0, v, T0, T0, 0.72, 0.80)
+            return travel(t + T0, v, T0, T0, 0.72, 0.80)
         dz_end = -path(L)
         def frame(i, t):
             dz = -path(t)
@@ -1194,7 +1171,7 @@ def build_all_clips(raw_bones, kind="male"):
             # against the path: a foot planted where it stood (its leg pushes back as the body goes), with the body in
             # the air, planted where it lands (it reaches forward for it)
             for tag, w in (("fr", fb_fr), ("fl", fb_air), ("bl", fb_air), ("br", fb_air)):
-                targs[tag]["pos"][2] += (1.0 - w) * (0.0 if t < 0.5 else dz_end) + w * dz
+                targs[tag]["pos"][2] += on_path(w, t >= 0.5, dz, dz_end)
             p["root"]["position"] = [0.0, 0.0, dz]
             rig.solve_legs(p, targs)
             p["root"]["position"] = [0.0, 0.0, 0.0]
@@ -1205,7 +1182,7 @@ def build_all_clips(raw_bones, kind="male"):
             mane_drv = [-14.0 * arc + 10.0 * land, cR[1] * 1.0, cR[2] * 1.0]
             return p, 34.0 * coil + 36.0 * arc + 14.0 * land, -cR[1] * 1.35, -5.0 * arc + 4.0 * land, mane_drv
         made = _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.05, mane_lag=0.045)
-        made["timeline"] = {"0.0": _strike_path_note(L, path)}
+        made["timeline"] = {"0.0": path_note(L, path)}
         return made
     if not is_cub:
         clips["jump_smack"] = make_jump_smack()
@@ -1219,7 +1196,7 @@ def build_all_clips(raw_bones, kind="male"):
         L, N = 1.45, 44
         v = walk_speeds["gallop"]
         def path(t):
-            return _travel(t, v, 0.26, 0.36, 0.70, 0.80)
+            return travel(t, v, 0.26, 0.36, 0.70, 0.80)
         dz_end = -path(L)
         def frame(i, t):
             dz = -path(t)
@@ -1297,7 +1274,7 @@ def build_all_clips(raw_bones, kind="male"):
             # against the path: a foot planted where it stood (its leg pushes back as the body goes), with the body in
             # the air, planted where it lands (it reaches forward for it)
             for tag in ("fl", "fr", "bl", "br"):
-                targs[tag]["pos"][2] += (1.0 - fb_air) * (0.0 if t < 0.54 else dz_end) + fb_air * dz
+                targs[tag]["pos"][2] += on_path(fb_air, t >= 0.54, dz, dz_end)
             p["root"]["position"] = [0.0, 0.0, dz]
             rig.solve_legs(p, targs)
             p["root"]["position"] = [0.0, 0.0, 0.0]
@@ -1311,7 +1288,7 @@ def build_all_clips(raw_bones, kind="male"):
             m_ch_t = [0.0, 1.4 * sc * (st_base * 0.5 + coil * 0.5), -0.6 * sc * coil]
             return p, 24.0 * st_base + 14.0 * coil + 36.0 * arc + 16.0 * clamp_b, twitch, -6.0 * arc + 5.0 * clamp_b, mane_drv, m_ch_t
         made = _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.05, mane_lag=0.045)
-        made["timeline"] = {"0.0": _strike_path_note(L, path)}
+        made["timeline"] = {"0.0": path_note(L, path)}
         return made
     if not is_cub:
         clips["stalk_leap_bite"] = make_stalk_leap_bite()
