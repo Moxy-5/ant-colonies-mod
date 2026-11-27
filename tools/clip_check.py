@@ -109,12 +109,13 @@ class Animal:
         self.data = json.load(open(lab.model_file(self.anim_stem, 'animations', 'entity', f'{self.anim_stem}.animation.json'),
                                    encoding='utf-8'))['animations']
         self.legs = self.plan_data.get('legs', {})
+        self.wings = self.plan_data.get('wings', {})
         self.feet = {k: chain[-1] for k, chain in self.legs.items()}
         self.px = self.checks.get('px', 1 / 16)          # a model pixel in blocks in the game (a grown animal of size 1)
 
     def kind(self, clip):
-        """'water', 'dig' or 'land' (the plan's lists of patterns; land when none matches)."""
-        for kind in ('water', 'dig'):
+        """'water', 'dig', 'air', 'perch' or 'land' (the plan's lists of patterns; land when none matches)."""
+        for kind in ('water', 'dig', 'air', 'perch'):
             if any(fnmatch.fnmatch(clip, p) for p in self.checks.get(kind, [])):
                 return kind
         return 'land'
@@ -222,7 +223,7 @@ class Scene:
     out to when it starts afloat)."""
 
     def __init__(self, clip, kind, animal):
-        self.kind, self.surface, self.step, self.bank = 'flat', None, None, None
+        self.kind, self.surface, self.step, self.bank, self.perch = 'flat', None, None, None, None
         for note in clip.notes.values():
             w = note.split()
             if w[0] == 'step':
@@ -244,16 +245,32 @@ class Scene:
             self.block = (self.surface - self.bank['bottom']) * 9 / 8
         if self.kind == 'flat' and kind == 'water':
             self.kind, self.surface = 'open_water', animal.checks.get('surface', 8.0)
+        elif self.kind == 'flat' and kind == 'air':
+            self.kind = 'air'
+        elif self.kind == 'flat' and kind == 'perch':
+            self.kind = 'perch'
+            p = animal.checks.get('perch_bar', animal.checks.get('perch', {}))
+            if not isinstance(p, dict):
+                p = {}
+            self.perch = {'y': float(p.get('y', 0.0)), 'r': float(p.get('r', 2.0)), 'z': float(p.get('z', 0.0))}
 
     def land(self, z):
         b = self.bank
         return z < b['edge'] if b['land_ahead'] else z > b['edge']
 
     def solid(self, y, z):
-        """How deep (px) a point lies inside the ground, the step, the bank or the bottom (0 if not)."""
+        """How deep (px) a point lies inside the ground, the step, the bank, the perch branch core or the bottom."""
         if self.kind == 'flat':
             return max(0.0, -y)
-        if self.kind == 'open_water':
+        if self.kind in ('open_water', 'air'):
+            return 0.0
+        if self.kind == 'perch':
+            # Horizontal branch bar along X, top at perch['y'], radius perch['r'] centred at (y - r, z):
+            # gripping toes/talons wrap around the bark; flag bones plunging into the inner solid wood core.
+            top, r, pz = self.perch['y'], self.perch['r'], self.perch['z']
+            dz = abs(z - pz)
+            if dz < r and (top - 2.0 * r) < y < top:
+                return min(top - y, y - (top - 2.0 * r), r - dz)
             return 0.0
         if self.kind == 'step':
             zf, h = self.step
@@ -278,12 +295,14 @@ class Scene:
         return None
 
     def floor(self, z):
-        """The ground's height under z (the bank's top or the bottom in the water)."""
+        """The ground's height under z (the bank's top, perch top or the bottom in the water)."""
         if self.kind == 'step':
             zf, h = self.step
             return h if z < zf else 0.0
         if self.kind == 'water':
             return self.bank['top'] if self.land(z) else self.bank['bottom']
+        if self.kind == 'perch':
+            return self.perch['y']
         return 0.0 if self.kind == 'flat' else -1e9
 
     def on_face(self, zs, y, near=1.5):
@@ -523,12 +542,15 @@ def check_clip(animal, name, flagged):
     sc = pl.scene
     lines = []
     out = lines.append
-    where = {'flat': 'on land', 'open_water': 'in the water', 'step': 'a step', 'water': 'a bank and water'}[sc.kind]
+    where = {'flat': 'on land', 'open_water': 'in the water', 'step': 'a step',
+             'water': 'a bank and water', 'air': 'in flight', 'perch': 'perched'}[sc.kind]
     if pl.kind == 'dig':
         where = 'digging'
     out(f'== {name}  {pl.length:g} s  ({where}' + (', tail dragged' if pl.tail else '') + (', thrown' if pl.flight else '') + ')')
     if sc.step:
         out(f'  scene: a step at z {sc.step[0]:g}, {sc.step[1]:.2f} px high')
+    if sc.perch:
+        out(f'  scene: branch perch top y {sc.perch["y"]:g}, radius {sc.perch["r"]:g} px at z {sc.perch["z"]:g}')
     if sc.bank:
         b = sc.bank
         out(f'  scene: edge z {b["edge"]:g}, bank top {b["top"]:.1f}, surface {sc.surface:.2f}, bottom {b["bottom"]:.1f}, '
@@ -537,7 +559,7 @@ def check_clip(animal, name, flagged):
     feet_parts = ck.get('feet_parts', [])
     skip = set(ck.get('skip_bones', []))
     tail_bones = {b['name'] for b in pl.tail[0]} if pl.tail else set()
-    judge_ground = pl.kind != 'dig' and sc.kind != 'open_water'
+    judge_ground = pl.kind not in ('dig', 'air') and sc.kind not in ('open_water', 'air')
 
     def grounded(t):
         u = t / pl.length
@@ -545,12 +567,16 @@ def check_clip(animal, name, flagged):
 
     body_bones = set(ck.get('body_bones', []))
     joints = {k: chain[1] for k, chain in animal.legs.items() if len(chain) >= 3}
+    wing_joints = {f'{k}:{b}': b for k, chain in animal.wings.items() for b in chain[1:]}
     rest_posed = animal.model.posed({})
     rest_body = [cs for b, cs, _ in rest_posed if b in body_bones]
     rest_joint = {k: body_depth(animal.model.world(j, animal.model.by[j]['pivot'], {}), rest_body) for k, j in joints.items()}
+    rest_wing_joint = {k: body_depth(animal.model.world(j, animal.model.by[j]['pivot'], {}), rest_body)
+                       for k, j in wing_joints.items()}
 
-    hits, tail_hits, jumps, deepest = {}, {}, {}, {}
+    hits, tail_hits, jumps, deepest, wing_deepest = {}, {}, {}, {}, {}
     moves = {}                                    # each part's move in every 1/80 s, for judging pops (R12-2)
+    wing_cross = (0.0, '', 0.0)
     feet_high = 0.0
     hang = {}
     planted = {k: [] for k in animal.feet}
@@ -605,6 +631,21 @@ def check_clip(animal, name, flagged):
                 d = max(0.0, body_depth(pl.world(j, animal.model.by[j]['pivot'], t), bodies)) - max(0.0, rest_joint[key])
                 if d > deepest.get(j, (-99, 0))[0]:
                     deepest[j] = (d, t)
+        if wing_joints and k % 4 == 0 and not animal.matches(name, 'wing_tuck_ok'):
+            if body_bones:
+                bodies = [cs[i:i + 8] for b, cs in now.items() if b in body_bones for i in range(0, len(cs), 8)]
+                for wkey, wj in wing_joints.items():
+                    d = max(0.0, body_depth(pl.world(wj, animal.model.by[wj]['pivot'], t), bodies)) - max(0.0, rest_wing_joint[wkey])
+                    if d > wing_deepest.get(wj, (-99, 0))[0]:
+                        wing_deepest[wj] = (d, t)
+            # Left/right wing crossing the midline (x=0) collides opposite wings overhead or folded behind the back
+            for wkey, chain in animal.wings.items():
+                side_sign = 1.0 if wkey.startswith('l') else -1.0
+                for wb in chain[1:]:
+                    for p in now.get(wb, ()):
+                        cross_d = -side_sign * p[0]
+                        if cross_d > wing_cross[0]:
+                            wing_cross = (cross_d, wb, t)
         if pl.kind == 'dig' and k % 8 == 0:
             marks_dug.append((t, [mark_value(m, posed, pl, t) for m in ck.get('dig_marks', [])]))
         if last:
@@ -724,6 +765,21 @@ def check_clip(animal, name, flagged):
             for b, (d, t) in worst:
                 if d > 0.5:
                     flagged.add(round(t, 2))
+    # wings against the body and across the midline (flier family check)
+    if wing_joints:
+        if animal.matches(name, 'wing_tuck_ok'):
+            out('  wings against the body: not judged (folded in on purpose)')
+        else:
+            if wing_deepest:
+                worst = sorted(wing_deepest.items(), key=lambda kv: -kv[1][0])[:2]
+                out('  wing joints deeper into the body than at rest (px at time; over 0.6 flagged): ' + ', '.join(
+                    f'{b} {d:.1f} at {t:.2f}' + (' FLAGGED' if d > 0.6 else '') for b, (d, t) in worst))
+                for b, (d, t) in worst:
+                    if d > 0.6:
+                        flagged.add(round(t, 2))
+            if wing_cross[0] > 0.5:
+                out(f'  wings crossing midline (opposite wing clash): {wing_cross[1]} {wing_cross[0]:.1f} px past x=0 at {wing_cross[2]:.2f} FLAGGED')
+                flagged.add(round(wing_cross[2], 2))
 
     # the water's surface
     marks = ck.get('surface_marks', [])
@@ -782,6 +838,10 @@ def check_clip(animal, name, flagged):
     # the body's sideways wave (the plan's "wave": the swimming clips whose body chain should wave; step C, 2026-11-20)
     if name in ck.get('wave', []):
         for line in wave_lines(animal, pl):
+            out(line)
+    # wingbeat vertical whip/lag check (the plan's "wing_wave": flapping flight clips; flier family, 2026-11-25)
+    if name in ck.get('wing_wave', []):
+        for line in wing_wave_lines(animal, pl):
             out(line)
 
     # jumps, turns
@@ -881,6 +941,40 @@ def wave_lines(animal, pl):
         f'{b} {amp[b]:.1f}/{lag[b]:.2f}' for b in chain)]
     out.append('    ' + ('; '.join(flags) if flags else
                          f'grows to the tail ({amp[chain[0]]:.1f} to {amp[chain[-1]]:.1f} px) and runs back along it'))
+    return out
+
+
+def wing_wave_lines(animal, pl):
+    """Vertical wingbeat stroke check over one loop of a flapping clip (flier family piece, 2026-11-25):
+    each wing bone's vertical sweep (half peak-to-peak Y travel, px) and peak phase after the shoulder.
+    A natural bird wingbeat grows outward toward the wingtip and trails slightly in phase (never stiff or reversed)."""
+    if not animal.wings:
+        return ['  wingbeat wave: no wings in the body plan']
+    out = []
+    n = 80
+    for key, chain in sorted(animal.wings.items()):
+        bones = [b for b in chain if b in animal.model.by]
+        if len(bones) < 2:
+            continue
+        ys = {b: [] for b in bones}
+        for k in range(n):
+            t = pl.length * k / n
+            for b in bones:
+                ys[b].append(pl.world(b, animal.model.by[b]['pivot'], t)[1])
+        amp, peak = {}, {}
+        for b in bones:
+            c = sum(y * math.cos(2 * math.pi * k / n) for k, y in enumerate(ys[b])) * 2 / n
+            s = sum(y * math.sin(2 * math.pi * k / n) for k, y in enumerate(ys[b])) * 2 / n
+            amp[b] = (max(ys[b]) - min(ys[b])) / 2
+            peak[b] = math.atan2(s, c) / (2 * math.pi)
+        lag = {b: ((peak[b] - peak[bones[0]]) % 1.0 if i else 0.0) for i, b in enumerate(bones)}
+        flags = []
+        if amp[bones[-1]] < amp[bones[0]] + 0.5:
+            flags.append(f'wingtip sweeps less than shoulder ({amp[bones[-1]]:.1f} vs {amp[bones[0]]:.1f} px) FLAGGED')
+        out.append(f'  wingbeat wave ({key}: vertical swing px / peak lag): ' + ', '.join(
+            f'{b} {amp[b]:.1f}/{lag[b]:.2f}' for b in bones))
+        out.append('    ' + ('; '.join(flags) if flags else
+                             f'grows cleanly outward ({amp[bones[0]]:.1f} to {amp[bones[-1]]:.1f} px)'))
     return out
 
 
@@ -1553,6 +1647,9 @@ def scene_boxes(sc, ext_z):
         z0, z1 = (lo, zf) if h > 0 else (zf, hi)
         top, bot = (h, 0.0) if h > 0 else (0.0, h)
         out.append((-16.0, bot, z0, 16.0, top, z1))
+    elif sc.kind == 'perch':
+        top, r, pz = sc.perch['y'], sc.perch['r'], sc.perch['z']
+        out.append((-16.0, top - 2.0 * r, pz - r, 16.0, top, pz + r))
     elif sc.kind == 'water':
         b = sc.bank
         if b['land_ahead']:
@@ -1627,7 +1724,7 @@ def strip(animal, pl, planted, times, views, flagged, path, title, held=None, an
                     for xx in ext_x:
                         fr.canvas.line(fr.px((xx, yy, wz[0])), fr.px((xx, yy, wz[1])), col, fr.cell, depth=False)
             # parts inside a block: red dots
-            if sc.kind not in ('open_water',) and pl.kind != 'dig':
+            if sc.kind not in ('open_water', 'air') and pl.kind != 'dig':
                 feet_parts = animal.checks.get('feet_parts', [])
                 for bone, cs, _ in posed:
                     allowed = 1.05 if any(f in bone for f in feet_parts) else 0.6

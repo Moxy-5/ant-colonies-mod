@@ -95,7 +95,10 @@ def picture(stem, key, label, note=""):
             views[name] = cut_view(img, v["box"], v.get("head"), spec.get("background_tolerance", 40))
     if "side" not in views:
         raise ValueError(str(views_file) + " needs a side view: the scale comes from it")
-    px_per_block = views["side"].width / spec["length_blocks"]
+    if "height_blocks" in spec and "length_blocks" not in spec:
+        px_per_block = views["side"].height / spec["height_blocks"]
+    else:
+        px_per_block = views["side"].width / spec["length_blocks"]
     return {"key": key, "label": label, "note": note,
             "pxPerBlock": px_per_block,
             "views": {n: {"uri": _uri(v), "w": v.width, "h": v.height} for n, v in views.items()}}

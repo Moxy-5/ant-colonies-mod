@@ -54,8 +54,12 @@ The files are <mod>/src/main/resources/assets/<mod name>/body_plans/<model>.json
               controller    the Java file whose body controller sets GeckoLib's blend length between clips (read from
                             it: "new SteadyController<>(this, "body", N" or a constant it names)
               animations    the animation file's name when it is not the model's
-              water, dig    clip names or patterns played in open water or digging in (others are on land); a move
-                            with its own scene in its notes (step, water) is judged against that scene
+              water, dig, air, perch  clip names or patterns played in open water, digging, open air (no ground
+                            checks) or perched on a horizontal branch bar (others are on land); a move with its own
+                            scene in its notes (step, water) is judged against that scene
+              perch         {"y": 0.0, "r": 2.0, "z": 0.0} horizontal branch bar for perch clips (top at y, radius r)
+              wing_wave     [clip, ...] flapping flight clips whose wing chains should whip/trail cleanly outward
+              wing_tuck_ok  clips whose wings fold tightly into the flanks on purpose (skips wing-body clip check)
               surface       open water's surface over the model's floor when it floats (model px)
               float_depth   how far the feet line hangs under the surface afloat (a move's end height is judged by it)
               surface_marks the points judged against the water's surface: {"label", "bone", "at": [x, y, z]} a point
@@ -173,6 +177,7 @@ class Plan:
         self.to_bone = dict(data['bones'])               # role -> bone
         self.to_role = {b: r for r, b in self.to_bone.items()}
         self.legs = {k: list(v) for k, v in data.get('legs', {}).items()}
+        self.wings = {k: list(v) for k, v in data.get('wings', {}).items()}
         self.root = data.get('root', 'body')
         self.forebody = data.get('forebody', 'forebody')
         head = data.get('head', {})
@@ -325,9 +330,18 @@ def problems(plan, bones):
         out.append(f'the model\'s bone "{name}" is not in the plan\'s bones table')
     used = [plan.root, plan.forebody, plan.head] + plan.jaws + sorted(plan.antenna_bones()) + list(plan.sockets.values())
     used += plan.head_player + [j for p in plan.spine for j, _ in p['joints']] + [b for chain in plan.legs.values() for b in chain]
+    used += [b for chain in plan.wings.values() for b in chain]
     for role in used:
         if role not in plan.to_bone:
             out.append(f'role "{role}" is used in the plan but missing from its bones table')
+    for key, chain in plan.wings.items():
+        if not re.match(r'[lr]\d*$', key):
+            out.append(f'wing key "{key}" should be l or r (or l1/r1)')
+        if len(chain) < 2:
+            out.append(f'wing {key} has {len(chain)} bone(s); expected at least 2 (inner to outer)')
+        other = ('r' if key[0] == 'l' else 'l') + key[1:]
+        if other not in plan.wings:
+            out.append(f'wing {key} has no partner {other} on the other side')
     for key, chain in plan.legs.items():
         if not re.match(r'[lr]\d+$', key):
             out.append(f'leg key "{key}" should be l or r and a pair number (l1 is the front left leg)')
@@ -552,9 +566,9 @@ def plan_text(data):
 def keep_gaits(path, data):
     """The plan to write over the file at path, with that file's gait table kept (2026-11-25, the Motion Studio phase 2).
     The game reads each walker's gaits from its plan (framework/.../entity/body/Gaits.java) and will not make the animal
-    without them, but the model makers (buffalo_models.py, lion_models.py) write plans without that section: rerunning
-    one dropped it. Kept where it stood among the file's sections. After a gait clip is remade, find its gait change
-    moments again: python tools/clip_check.py <animal> --gait-changes --write."""
+    without them, but the model makers write plans without that section: rerunning one dropped it. Kept where it stood
+    among the file's sections. After a gait clip is remade, find its gait change moments again:
+    python tools/clip_check.py <animal> --gait-changes --write."""
     if 'gaits' in data or not os.path.exists(path):
         return data
     try:
@@ -647,7 +661,7 @@ BOX_KIND = [('worker_ant', 'colony insect'), ('termite_', 'colony insect'), ('ma
             ('crocodile', 'large animal'), ('monitor', 'large animal'), ('hippo', 'large animal'),
             ('otter', 'medium animal'), ('bull_shark', 'large animal'),
             ('lion', 'large animal'), ('lioness', 'large animal'), ('lion_cub', 'medium animal'),
-            ('buffalo', 'large animal')]
+            ('buffalo', 'large animal'), ('martial_eagle', 'large animal')]
 
 
 def box_kind(model):

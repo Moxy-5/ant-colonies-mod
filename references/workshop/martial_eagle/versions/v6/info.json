@@ -1,0 +1,15 @@
+{
+ "note": "Stage 3 shape detail v6: 2-tier crest, sculpted cheeks/orbital rim/brows, nape hackles, V-bib scallops, layered folded cape + 5-tip spears, 3-feather alula, fine-tapered slotted primaries, tail coverts, plush trousers & scaly talon pads",
+ "date": "2026-11-25",
+ "boxes": 221,
+ "numbers": {
+  "BODY_PITCH": 48.0,
+  "CHEST_HW": 6.5,
+  "WING_SPAN_SCALE": 1.0,
+  "CREST_RAISE": 0.38,
+  "TAIL_SPREAD": 0.15,
+  "BEAK_LEN": 5.4,
+  "TALON_SCALE": 1.0,
+  "JAW_OPEN": 0.0
+ }
+}

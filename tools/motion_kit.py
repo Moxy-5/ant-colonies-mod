@@ -329,6 +329,176 @@ def secondary_lag(samples, dt, lag_s, damping=0.82, loop=True):
     return out if is_vec else [c[0] for c in out]
 
 
+# --- bird flight, wingbeat & intelligent avian motion (Animal Maker Engine Fliers upgrade, 2026-11-25) ----------------
+def wing_cycle(phase, flap_amp=42.0, up_fold=36.0, wrist_lead=0.14, feather_twist=22.0,
+               tip_flex=18.0, body_heave=1.8, asymmetry=0.56):
+    """Parameterized figure-8 avian wingbeat evaluator (Rule 5: shared method, each bird sets its own timings).
+    phase:          0..1 (0 = top of stroke starting power downstroke, asymmetry = bottom turning into recovery upstroke)
+    flap_amp:       shoulder up/down excursion in degrees (+/- flap_amp)
+    up_fold:        elbow/wrist inward fold during recovery upstroke (spills air cleanly, avoids stiff-plank flapping)
+    wrist_lead:     phase lag (0..0.3) of outer wing behind inner wing so primaries whip and trail organically
+    feather_twist:  wing pitch-up feathering degrees on the upstroke to slice back up through the air
+    tip_flex:       outer primary upward aero-flex under downstroke lift load (degrees)
+    body_heave:     subtle opposite vertical body bob (model px; body rises slightly as wings push air down)
+    asymmetry:      share of cycle spent on power downstroke (e.g. 0.56 for heavy eagles, 0.50 for agile small birds)
+
+    Returns a dict of joint angles (degrees) and body heave (px) for the maker to map onto left/right wing bones."""
+    ph = phase % 1.0
+
+    def _stroke_wave(p):
+        """Smooth asymmetric wave: +1 at top (p=0), -1 at bottom (p=asymmetry), back to +1 at p=1."""
+        p %= 1.0
+        if p < asymmetry:
+            u = p / max(1e-6, asymmetry)
+            return math.cos(math.pi * u)
+        u = (p - asymmetry) / max(1e-6, 1.0 - asymmetry)
+        return -math.cos(math.pi * u)
+
+    def _recovery_bell(p):
+        """0 during power downstroke, smooth 0->1->0 bell peaking mid-upstroke."""
+        p %= 1.0
+        if p <= asymmetry:
+            return 0.0
+        u = (p - asymmetry) / max(1e-6, 1.0 - asymmetry)
+        return math.sin(math.pi * u) ** 1.3
+
+    def _power_bell(p):
+        """0 during upstroke, smooth 0->1->0 bell peaking mid-downstroke."""
+        p %= 1.0
+        if p >= asymmetry:
+            return 0.0
+        u = p / max(1e-6, asymmetry)
+        return math.sin(math.pi * u) ** 1.2
+
+    s_in = _stroke_wave(ph)
+    s_mid = _stroke_wave(ph - wrist_lead * 0.55)
+    s_out = _stroke_wave(ph - wrist_lead)
+    rec = _recovery_bell(ph)
+    pwr = _power_bell(ph)
+
+    # Shoulder moves forward & down on power stroke, back & up on recovery (real avian figure-8 path)
+    shoulder_roll = s_in * flap_amp
+    shoulder_yaw = pwr * (flap_amp * 0.24) - rec * (flap_amp * 0.16)
+    shoulder_pitch = rec * feather_twist - pwr * (feather_twist * 0.28)
+    # Elbow stays extended during power stroke, tucks inward smoothly on recovery upstroke
+    elbow_fold = rec * up_fold
+    elbow_roll = (s_mid - s_in) * (flap_amp * 0.45) - pwr * (tip_flex * 0.25)
+    # Outer hand/primaries trail the elbow and flex upward under downstroke air load
+    wrist_flex = (s_out - s_mid) * (flap_amp * 0.55) + pwr * tip_flex - rec * (up_fold * 0.55)
+    wrist_twist = rec * (feather_twist * 0.65) - pwr * (feather_twist * 0.22)
+    primary_splay = pwr * 1.0 + (1.0 - rec) * 0.25
+    # Body reacts slightly upward during downstroke push
+    body_y = -s_in * body_heave * 0.6 + pwr * body_heave * 0.4
+    body_pitch = pwr * 4.5 - rec * 3.0
+    return {
+        'stroke': s_in,
+        'power': pwr,
+        'recovery': rec,
+        'shoulder_roll': shoulder_roll,
+        'shoulder_yaw': shoulder_yaw,
+        'shoulder_pitch': shoulder_pitch,
+        'elbow_fold': elbow_fold,
+        'elbow_roll': elbow_roll,
+        'wrist_flex': wrist_flex,
+        'wrist_twist': wrist_twist,
+        'primary_splay': max(0.0, min(1.0, primary_splay)),
+        'body_y': body_y,
+        'body_pitch': body_pitch,
+    }
+
+
+def soar_bank(t, bank_deg=0.0, gust_amp=2.6, dihedral_deg=6.0, glide_sweep=6.0, tail_spread=0.45):
+    """Live soaring / thermal-gliding pose evaluator: gentle asymmetric thermal micro-corrections in wingtips,
+    subtle dihedral lift, and avian tail-fan rudder tilt matching `bank_deg` (+ = banking right)."""
+    g1 = math.sin(2.0 * math.pi * t * 0.42) * 0.6 + math.sin(2.0 * math.pi * t * 1.07 + 0.8) * 0.4
+    g2 = math.sin(2.0 * math.pi * t * 0.53 + 1.9) * 0.6 + math.sin(2.0 * math.pi * t * 1.31) * 0.4
+    b_norm = max(-1.0, min(1.0, bank_deg / 35.0))
+    return {
+        'body_roll': bank_deg + g1 * (gust_amp * 0.35),
+        'wing_l_roll': dihedral_deg + g1 * gust_amp - b_norm * 4.5,
+        'wing_r_roll': dihedral_deg + g2 * gust_amp + b_norm * 4.5,
+        'wing_l_tip_flex': 8.0 + g1 * (gust_amp * 1.2),
+        'wing_r_tip_flex': 8.0 + g2 * (gust_amp * 1.2),
+        'wing_sweep': glide_sweep + abs(b_norm) * 5.0,
+        'tail_roll': -bank_deg * 0.48,
+        'tail_yaw': b_norm * 10.0,
+        'tail_pitch': -4.0 - abs(b_norm) * 5.0,
+        'tail_spread': min(1.0, tail_spread + abs(b_norm) * 0.35),
+    }
+
+
+def head_stabilize(body_pitch, body_yaw, body_roll=0.0, neck_weights=(0.32, 0.33, 0.35), gain=0.92):
+    """Distributes inertial counter-rotation across a bird's neck chain + head (e.g. neck_1, neck_2, head)
+    so the eyes stay gimbal-locked on target while the body walks, heaves in flight, or sways on a branch."""
+    total = sum(neck_weights) or 1.0
+    out = []
+    for w in neck_weights:
+        f = -gain * (w / total)
+        out.append([body_pitch * f, body_yaw * f, body_roll * f])
+    return out
+
+
+def bird_look(t, waypoints, snap_s=0.14):
+    """Authentic avian saccadic gaze evaluator: crisp rapid turns between steady visual fixation holds.
+    waypoints: list of (time_s, yaw_deg, pitch_deg, roll_tilt_deg, crest_01, brow_01) sorted by time_s.
+    Returns (yaw, pitch, roll_tilt, crest_01, brow_01)."""
+    if not waypoints:
+        return (0.0, 0.0, 0.0, 0.0, 0.0)
+    if t <= waypoints[0][0]:
+        return tuple(waypoints[0][1:])
+    for i in range(1, len(waypoints)):
+        t_cur = waypoints[i][0]
+        if t < t_cur:
+            prev = waypoints[i - 1]
+            # Stay locked on previous fixation until `snap_s` before the next waypoint, then saccade briskly!
+            t_start = max(prev[0], t_cur - snap_s)
+            if t <= t_start:
+                return tuple(prev[1:])
+            u = ease((t - t_start) / max(1e-6, t_cur - t_start))
+            nxt = waypoints[i]
+            return tuple(prev[k] + (nxt[k] - prev[k]) * u for k in range(1, len(prev)))
+    return tuple(waypoints[-1][1:])
+
+
+def biped_bird_gait(phase, duty=0.62, stride_len=10.0, lift_h=3.2, waddle_roll=6.5,
+                    body_pitch_amp=4.0, head_bob_amp=2.2, cycle_s=0.9):
+    """Parameterized 2-legged bird walk / raptor strut / ostrich run evaluator (Rule 5: shared method, unique numbers).
+    duty < 0.5 produces real airborne sprint frames (e.g. Ostrich run); duty > 0.5 gives proud bipedal walk/strut.
+    Includes natural lateral weight shift (`waddle_roll`) and classic bird head-bob (`head_dz`: hold then thrust)."""
+    ph = phase % 1.0
+    feet = {}
+    planted_count = 0
+    for key, off in (('l', 0.0), ('r', 0.5)):
+        p = (ph + off) % 1.0
+        sw, lf = stride(p, duty)
+        planted = p < duty
+        if planted:
+            planted_count += 1
+        feet[key] = {'swing': sw, 'dz': -sw * (stride_len * 0.5), 'lift': lf, 'dy': lf * lift_h, 'planted': planted}
+    # Shift weight gently over the planted leg (left leg planted -> roll slightly toward +X left)
+    l_support = 1.0 if feet['l']['planted'] else 0.0
+    r_support = 1.0 if feet['r']['planted'] else 0.0
+    body_roll = waddle_roll * math.sin(2.0 * math.pi * ph) * (0.65 + 0.35 * abs(l_support - r_support))
+    # Two bobs per stride cycle (one per step)
+    step_ph = (ph * 2.0) % 1.0
+    body_y = (1.0 - math.cos(2.0 * math.pi * step_ph)) * (lift_h * 0.14)
+    body_pitch = -math.sin(2.0 * math.pi * step_ph) * body_pitch_amp
+    # Classic avian head-bob: holds steady backward relative to torso during stance, thrusts forward during swing
+    if step_ph < 0.58:
+        head_dz = (step_ph / 0.58 - 0.5) * head_bob_amp
+    else:
+        head_dz = (0.5 - ease((step_ph - 0.58) / 0.42)) * head_bob_amp
+    return {
+        'feet': feet,
+        'body_y': body_y,
+        'body_roll': body_roll,
+        'body_pitch': body_pitch,
+        'head_dz': head_dz,
+        'airborne': planted_count == 0,
+        'speed_px_s': stride_len / max(1e-6, duty * cycle_s),
+    }
+
+
 # --- feet over time ------------------------------------------------------------------------------------------------------
 def stride(ph, duty):
     """One foot's step at phase ph (0 to 1): its swing (+1 forward, -1 back) and lift (0 to 1). Planted for the first
@@ -498,4 +668,20 @@ if __name__ == '__main__':
     wave = [math.sin(2.0 * math.pi * k / 24.0) * 10.0 for k in range(24)]
     lagged = secondary_lag(wave, 1 / 24.0, 0.12, loop=True)
     assert len(lagged) == len(wave) and abs(lagged[0] - lagged[-1]) < 3.0
-    print('motion_kit: limbs, digitigrade_leg, quadruped_gait, secondary_lag, path chain and stride all check out')
+    # Bird flight & intelligent avian motion checks
+    w_down = wing_cycle(0.25)
+    w_up = wing_cycle(0.78)
+    assert w_down['power'] > 0.7 and w_down['elbow_fold'] == 0.0 and w_up['elbow_fold'] > 15.0
+    sb = soar_bank(0.5, bank_deg=20.0)
+    assert sb['tail_roll'] < 0.0 and sb['wing_r_roll'] > sb['wing_l_roll']
+    hs = head_stabilize(12.0, -8.0, 4.0)
+    assert abs(sum(r[0] for r in hs) + 12.0 * 0.92) < 1e-6
+    bl = bird_look(0.5, [(0.0, 0.0, 0.0, 0.0, 0.0, 0.0), (1.0, 30.0, -5.0, 12.0, 0.8, 0.4)], snap_s=0.15)
+    assert bl == (0.0, 0.0, 0.0, 0.0, 0.0)
+    bl2 = bird_look(0.95, [(0.0, 0.0, 0.0, 0.0, 0.0, 0.0), (1.0, 30.0, -5.0, 12.0, 0.8, 0.4)], snap_s=0.15)
+    assert 10.0 < bl2[0] < 30.0
+    bg_walk = biped_bird_gait(0.25, duty=0.62)
+    bg_run = [biped_bird_gait(k / 40.0, duty=0.38)['airborne'] for k in range(40)]
+    assert not bg_walk['airborne'] and any(bg_run) and not all(bg_run)
+    print('motion_kit: limbs, digitigrade_leg, quadruped_gait, secondary_lag, wing_cycle, soar_bank, '
+          'head_stabilize, bird_look, biped_bird_gait, path chain and stride all check out')

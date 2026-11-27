@@ -75,6 +75,11 @@ its checks are about things that look broken (gaps, sliding feet, pops), never a
   building only, never an animal's numbers; `python tools/motion_kit.py` checks itself. The game faces rule runs
   inside `model_parts.write_assets` for every game model (BUGS 245). `clip_check.py` checks a swimmer's body wave
   (the plan's `checks.wave`).
+- **Built in step D — Fliers / Birds foundation (2026-11-25, ahead of the first bird, Martial Eagle):**
+  - `tools/model_parts.py`: `feather_grain()` (barbule/chevron/raptor barring texture helper), `feather_fan()` (anti-Z-fighting layered feather fans for slotted wingtips, secondaries, tail fans & crests), `raptor_beak()` (curved hooked beak + cere/nostrils + sealed nested jaw/tongue), and `bird_talon_foot()` (anisodactyl 3+1 gripping raptor toes & curved talons).
+  - `tools/motion_kit.py`: `wing_cycle()` (asymmetric figure-8 power/recovery wingbeat with elbow fold & tip flex), `soar_bank()` (thermal micro-corrections + tail-fan rudder tilt), `head_stabilize()` (multi-bone inertial gimbal neck counter-rotation), `bird_look()` (crisp avian saccades + curious head-tilt + crest/brow modulation), and `biped_bird_gait()` (2-legged bird walk/strut/run with head-bob & lateral balance).
+  - `tools/body_plan.py`, `tools/clip_check.py`, `tools/body_course.py`: optional `wings` skeleton field, `'air'` and `'perch'` clip kinds & scenes (horizontal branch perch collision check, no false ground-clip in open flight), wing-vs-body and midline opposite-wing self-clipping checks, `wing_wave` vertical wingbeat whip/lag checker, and `flier` family course scenes (`perch_idle`, `takeoff`, `cruise_flight`, `soar_turn`, `landing_perch`).
+  - `tools/viewer_common.js`, `tools/viewer_page.py`, `tools/workshop.py`: `doubleSide` thin-feather rendering + `perchProp()` branch prop, and `height_blocks` scale anchor for upright perched birds.
 - **Planned, not built:** the tools review `docs/plans/animal-kit-tools-review.md` (2026-11-08) holds the animation
   half of this engine as ideas: K1 clips remade only when changed, K5 lab checks for every family, K6 the pose viewer
   for any model, G1 an animated body for any creature (not an ant), G2 an animal's clips listed in data, G4 the live

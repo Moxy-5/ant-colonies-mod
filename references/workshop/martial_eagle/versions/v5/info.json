@@ -1,0 +1,15 @@
+{
+ "note": "Stage 2 remake v5: fuller perched chest/mantle/folded cape (40px H), tucked flight legs, elongated slotted primary wingtips",
+ "date": "2026-11-25",
+ "boxes": 155,
+ "numbers": {
+  "BODY_PITCH": 48.0,
+  "CHEST_HW": 6.5,
+  "WING_SPAN_SCALE": 1.0,
+  "CREST_RAISE": 0.38,
+  "TAIL_SPREAD": 0.15,
+  "BEAK_LEN": 5.4,
+  "TALON_SCALE": 1.0,
+  "JAW_OPEN": 0.0
+ }
+}

@@ -954,6 +954,499 @@ def feline_mouth(upper_cubes, jaw_cubes, tongue_cubes, cx=0.0, y_palate=0.0, z_h
     return [cx, y_palate - 0.16, z_mid]
 
 
+# --- bird plumage & raptor anatomy (Animal Maker Engine Fliers upgrade, 2026-11-25) ----------------------------------
+def feather_grain(x, y, z, scale=2.0, flow=(0.0, 0.0, 1.0), bar_freq=0.0, shaft_pos=None):
+    """Directional feather barbule & optional raptor barring offset in [-1.0, +1.0].
+    Deterministic in 3D coordinates: creates subtle V-angled barbules along `flow`, optional transverse dark/light
+    barring (`bar_freq` cycles per model pixel along flow), and an optional central rachis shaft accent."""
+    fx, fy, fz = unit(flow)
+    along = x * fx + y * fy + z * fz
+    up = (0.0, 1.0, 0.0) if abs(fy) < 0.9 else (1.0, 0.0, 0.0)
+    u = unit(cross(up, (fx, fy, fz)))
+    v = cross((fx, fy, fz), u)
+    pu = x * u[0] + y * u[1] + z * u[2]
+    pv = x * v[0] + y * v[1] + z * v[2]
+    # V-chevron slant mimics barbs angling backward off the central rachis shaft
+    across = abs(pu - (shaft_pos if shaft_pos is not None else 0.0))
+    chevron = along - across * 0.65
+    ia = int(math.floor(chevron * scale * 0.75))
+    iu = int(math.floor(pu * scale * 1.4))
+    iv = int(math.floor(pv * scale))
+    barb = hash3(iu, iv, ia) * 0.70 + hash3(iu, iv, ia + 1) * 0.30
+    fine = hash3(int(math.floor(x * scale * 2.2)), int(math.floor(y * scale * 2.2)), int(math.floor(z * scale * 2.2)))
+    val = (barb * 0.76 + fine * 0.24) * 2.0 - 1.0
+    if bar_freq > 1e-6:
+        bar = math.sin(along * bar_freq * 2.0 * math.pi)
+        val = max(-1.0, min(1.0, val * 0.55 + bar * 0.55))
+    if shaft_pos is not None and across < 0.28 / max(0.5, scale * 0.5):
+        val = min(1.0, val + 0.32)
+    return val
+
+
+def feather_fan(cubes, origin, count, length, width, thickness=0.35, spread_deg=55.0, sweep_deg=0.0,
+                camber_deg=6.0, pitch_deg=0.0, axis='tail', side=1, taper=0.22, slot_gap=0.0,
+                stagger=0.03, part='feather', tip_part=None, layer=0.0):
+    """Builds an overlapping fan of sculpted bird feathers with anti-Z-fighting stagger and per-feather metadata.
+
+    axis='tail'   fans across X pointing backward (+Z): tail fans, rump coverts.
+    axis='wing'   fans outward along side*X and backward (+Z): slotted eagle primaries, secondaries, wing coverts.
+    axis='crest'  fans upward/backward (+Y/+Z) from crown: Martial Eagle occipital crest, Secretarybird quills.
+
+    Every feather cube carries `_feather_idx`, `_feather_n`, `_feather_frac` (0..1), `_feather_layer`, `_feather_side`
+    so the painter can render shafts, raptor barring, scalloped edges, and dark subterminal tips cleanly."""
+    created = []
+    ox, oy, oz = origin
+    n = max(1, int(count))
+    for i in range(n):
+        frac = 0.5 if n == 1 else i / (n - 1)           # 0..1 across the fan
+        sym_f = (frac - 0.5) * 2.0                      # -1..+1 centred
+        edge_taper = 1.0 - taper * (sym_f * sym_f if axis == 'tail' else abs(frac - 0.35) / 0.65)
+        fl = max(0.6, length * max(0.45, edge_taper))
+        fw = max(0.35, width * (1.0 - 0.14 * abs(sym_f)))
+        ft = max(0.18, thickness)
+        eps = ((i % 3) - 1) * stagger + i * (stagger * 0.35)
+        meta = {'_feather_idx': i, '_feather_n': n, '_feather_frac': round(frac, 3),
+                '_feather_layer': round(layer, 3), '_feather_side': side}
+        fpart = tip_part if (tip_part and axis == 'wing' and frac > 0.65) else part
+
+        if axis == 'tail':
+            yaw = sym_f * (spread_deg * 0.5)
+            pit = pitch_deg + camber_deg * (1.0 - sym_f * sym_f)
+            roll = sym_f * camber_deg * 0.35
+            px = ox + sym_f * (slot_gap * max(1, n - 1) * 0.5)
+            py = oy + eps
+            pz = oz
+            lo = [px - fw * 0.5, py - ft * 0.5, pz]
+            hi = [px + fw * 0.5, py + ft * 0.5, pz + fl]
+            c = rot_cube(lo, hi, fpart, rotation=[-pit, yaw, roll], pivot=[px, py, pz], **meta)
+        elif axis == 'crest':
+            yaw = sym_f * (spread_deg * 0.5)
+            pit = pitch_deg + (1.0 - abs(sym_f)) * camber_deg
+            px = ox + sym_f * (width * 0.45 * max(1, n - 1) * 0.35)
+            py = oy + eps
+            pz = oz + abs(sym_f) * 0.25
+            lo = [px - fw * 0.5, py - ft * 0.5, pz]
+            hi = [px + fw * 0.5, py + ft * 0.5, pz + fl]
+            c = rot_cube(lo, hi, fpart, rotation=[pit, yaw, 0.0], pivot=[px, py, pz], **meta)
+        else:  # axis == 'wing': feather extends along +Z (trailing) and fans outward toward side*X
+            yaw = side * (sweep_deg + frac * spread_deg)
+            pit = pitch_deg - camber_deg * (0.4 + 0.6 * frac)
+            roll = side * (camber_deg * 0.45 * frac)
+            px = ox + side * (i * (fw * 0.55 + slot_gap))
+            py = oy + eps
+            pz = oz + (1.0 - frac) * 0.25
+            lo = [px - fw * 0.5, py - ft * 0.5, pz]
+            hi = [px + fw * 0.5, py + ft * 0.5, pz + fl]
+            c = rot_cube(lo, hi, fpart, rotation=[-pit, yaw, roll], pivot=[px, py, pz], **meta)
+        cubes.append(c)
+        created.append(c)
+    return created
+
+
+# --- Reusable Bird Beak & Eye Systems (Animal Maker Engine — Fliers, 2026-11-25) --------------------------------------
+BIRD_BEAK_PRESETS = {
+    # (crown_slope, hook_drop, hook_pow, keel_ratio, cere_frac, festoon, segments, tip_w_frac, jaw_drop)
+    'raptor_hook':     (0.06, 0.28, 2.85, 0.52, 0.30, 0.08, 6, 0.14, 0.06),  # Eagles, hawks, falcons, vultures, owls
+    'straight_spear':  (0.06, 0.02, 1.50, 0.56, 0.14, 0.00, 4, 0.10, 0.02),  # Cranes, herons, storks, kingfishers
+    'curved_scimitar': (0.12, 0.44, 1.85, 0.54, 0.16, 0.00, 6, 0.12, 0.30),  # Hornbills, ibises, bee-eaters, sunbirds
+    'conical_seed':    (0.18, 0.06, 1.75, 0.62, 0.12, 0.04, 4, 0.16, 0.04),  # Weavers, finches, oxpeckers, sparrows
+    'bent_filter':     (0.10, 0.72, 3.00, 0.66, 0.24, 0.00, 6, 0.26, 0.54),  # Flamingos, spoonbills
+}
+
+
+def bird_beak(upper_cubes, jaw_cubes, tongue_cubes, cx=0.0, y_base=0.0, z_base=0.0,
+              length=4.1, width=2.45, height=2.95, style='raptor_hook',
+              arch=None, hook_drop=None, hook_pow=None, keel_ratio=None, cere_frac=None,
+              festoon=None, segments=None, tip_w_frac=None, jaw_drop=None, hook_curl=0.18,
+              cere_part='cere', beak_part='beak', tip_part='beak_tip',
+              inner_part='mouth_inner', tongue_part='tongue', nostril_part='nostril'):
+    """Reusable arc-length spline, keeled-cross-section bird beak builder pointing toward -Z.
+
+    Works across bird families via `style` presets ('raptor_hook', 'straight_spear',
+    'curved_scimitar', 'conical_seed', 'bent_filter') or explicit overrides:
+      - True arc-length-equalized curve sampling so the curved hook bends smoothly across multiple short
+        tapered segments instead of one long blunt rod (ZERO hanging 'nob' / ZERO tip overhang!).
+      - Flush forehead -> sloped keeled cere -> bold high-arched culmen -> tight recurved eagle tip.
+      - Keeled inverted-V cross-section (deep powerful curved tomium cutting edges + narrow dorsal culmen ridge).
+      - Sleek angled recessed oval nares (nostrils) on upper cere flanks.
+      - Matching tapered nested lower mandible + 100%-hidden-at-rest palate & tongue (passes hidden_at_rest).
+    Returns (jaw_pivot, tongue_pivot)."""
+    p = BIRD_BEAK_PRESETS.get(style, BIRD_BEAK_PRESETS['raptor_hook'])
+    c_slope  = (height * p[0]) if arch is None else arch
+    h_drop   = (height * p[1]) if hook_drop is None else hook_drop
+    h_pow    = p[2] if hook_pow is None else hook_pow
+    k_rat    = p[3] if keel_ratio is None else keel_ratio
+    c_frac   = p[4] if cere_frac is None else cere_frac
+    fest     = (height * p[5]) if festoon is None else festoon
+    n_seg    = max(3, int(p[6] if segments is None else segments))
+    tw_frac  = p[7] if tip_w_frac is None else tip_w_frac
+    j_drop   = (height * p[8]) if jaw_drop is None else jaw_drop
+
+    hw = width * 0.5
+    cere_l = length * c_frac
+    z_cere = z_base - cere_l
+
+    # --- 1. Sculpted sloped cere (2-tier keeled sheath flush with culmen top — ZERO vertical cliff!) ---
+    cere_y_front = y_base + height * 0.94
+    # Lower broader cere cheek sheath (embeds into skull +Z and wraps cleanly onto maxilla sides)
+    upper_cubes.append(rot_cube(
+        [cx - hw * 1.00, y_base - height * 0.02, z_cere - 0.14],
+        [cx + hw * 1.00, y_base + height * 0.64, z_base + 0.72],
+        cere_part, rotation=[4.0, 0.0, 0.0], pivot=[cx, y_base + height * 0.30, z_cere],
+    ))
+    # Upper narrower keeled cere bridge sloping smoothly down from forehead (+Z) to exact cere_y_front (-Z)
+    upper_cubes.append(rot_cube(
+        [cx - hw * 0.68, y_base + height * 0.44, z_cere - 0.10],
+        [cx + hw * 0.68, cere_y_front, z_base + 0.78],
+        cere_part, rotation=[5.5, 0.0, 0.0], pivot=[cx, cere_y_front, z_cere],
+    ))
+    # Sleek crisp angled oval nostril slits (nares) recessed cleanly into upper-front cere sides
+    for s in (-1, 1):
+        nx0 = cx + s * hw * 0.84
+        nx1 = cx + s * (hw * 1.00 + 0.04)
+        nz0 = z_cere + cere_l * 0.18
+        nz1 = z_cere + cere_l * 0.68
+        upper_cubes.append(rot_cube(
+            [min(nx0, nx1), y_base + height * 0.48, nz0],
+            [max(nx0, nx1), y_base + height * 0.66, nz1],
+            nostril_part, rotation=[16.0, s * -6.0, 0.0],
+            pivot=[cx + s * hw * 0.92, y_base + height * 0.57, (nz0 + nz1) * 0.5],
+        ))
+
+    # --- 2. Arc-Length-Equalized Smooth Curved Aquiline Maxilla (ZERO hanging rod / ZERO tip overhang!) ---
+    beak_l = length - cere_l
+
+    def _raw_profile(u):
+        uc = max(0.0, min(1.0, u))
+        # Smooth forward march curving cleanly INWARD/BACKWARD at the raptor hook point!
+        curl = hook_curl * (max(0.0, (uc - 0.52) / 0.48) ** 2.1) * (h_drop / max(0.5, height * 0.35))
+        z = z_cere - beak_l * (u - curl)
+        # Smooth continuous dorsal culmen arch starting flush at cere_y_front -> plunging cleanly into curved hook!
+        y_top = cere_y_front - c_slope * uc - (height * 0.94 - c_slope + h_drop) * (uc ** h_pow)
+        # Strong level cutting-edge tomium with subtle raptor festoon curve tapering cleanly into pointed tip!
+        fest_bump = fest * math.sin(max(0.0, min(1.0, (uc - 0.06) / 0.56)) * math.pi)
+        y_bot = y_base + height * 0.04 - fest_bump - (h_drop + height * 0.04) * (uc ** (h_pow + 0.55))
+        # Taper vertical thickness crisply down to a razor eagle point at uc=1 (no blunt club tip!)
+        min_thick = max(0.14, height * (0.045 + 0.52 * ((1.0 - uc) ** 1.10)))
+        if y_top - y_bot < min_thick:
+            y_bot = y_top - min_thick
+        # Smooth lateral taper from cere width to sharp pointed blade tip
+        w_half = hw * (tw_frac + (0.94 - tw_frac) * ((1.0 - uc) ** 0.88))
+        return z, y_top, y_bot, w_half
+
+    # Re-parameterize dorsal-centerline by true arc length so curved hook gets dense short segments!
+    N_TAB = 64
+    tab_u = [k / N_TAB for k in range(N_TAB + 1)]
+    tab_s = [0.0]
+    prev_z, prev_yt, prev_yb, _ = _raw_profile(0.0)
+    prev_y = (prev_yt + prev_yb) * 0.5
+    for k in range(1, N_TAB + 1):
+        zk, ytk, ybk, _ = _raw_profile(tab_u[k])
+        yk = (ytk + ybk) * 0.5
+        tab_s.append(tab_s[-1] + math.hypot(zk - prev_z, yk - prev_y))
+        prev_z, prev_y = zk, yk
+    total_s = max(1e-4, tab_s[-1])
+
+    def _u_at_arc(frac):
+        target = max(0.0, min(1.0, frac)) * total_s
+        for k in range(1, N_TAB + 1):
+            if tab_s[k] >= target:
+                ds = max(1e-6, tab_s[k] - tab_s[k - 1])
+                t = (target - tab_s[k - 1]) / ds
+                return tab_u[k - 1] + t * (tab_u[k] - tab_u[k - 1])
+        return 1.0
+
+    for i in range(n_seg):
+        f0 = i / n_seg
+        f1 = (i + 1) / n_seg
+        u0 = -0.05 if i == 0 else _u_at_arc(f0)
+        u1 = _u_at_arc(f1)
+        um = _u_at_arc((f0 + f1) * 0.5)
+        z0, yt0, yb0, w0 = _raw_profile(u0)
+        z1, yt1, yb1, w1 = _raw_profile(u1)
+        zm, ytm, ybm, wm = _raw_profile(um)
+        yc0, yc1 = (yt0 + yb0) * 0.5, (yt1 + yb1) * 0.5
+        dz = z0 - z1
+        dy_c = yc1 - yc0
+        dy_t = yt1 - yt0
+        seg_len = math.hypot(dz, dy_c)
+        # Allow steep downward/inward hook angles (up to ~88 deg) so the tip curves back like a real eagle!
+        pitch_c = max(2.0, math.degrees(math.atan2(-dy_c, dz)))
+        pitch_t = max(2.0, math.degrees(math.atan2(-dy_t, dz)))
+        thick = max(0.16, ytm - ybm)
+        # Overlap backward cleanly into previous segment, NEVER overhang past the final tip!
+        back_olap = max(0.12, seg_len * 0.24)
+        front_olap = 0.0 if i == n_seg - 1 else max(0.10, seg_len * 0.18)
+        part_i = tip_part if f1 >= 0.58 else beak_part
+        # Shift center slightly backward when front_olap < back_olap so front face stops EXACTLY at z1/yc1!
+        shift = (back_olap - front_olap) * 0.5
+        half_l = seg_len * 0.5 + (back_olap + front_olap) * 0.5
+        piv = [cx, (yc0 + yc1) * 0.5, (z0 + z1) * 0.5]
+        seg_meta = {'_beak_f': round((f0 + f1) * 0.5, 3)}
+
+        # Lower wider deep cutting-edge cheeks (tomium blade)
+        lo_h = thick * (0.64 if i < n_seg - 1 else 0.85)
+        upper_cubes.append(rot_cube(
+            [cx - wm, piv[1] - thick * 0.50, piv[2] - half_l + shift],
+            [cx + wm, piv[1] - thick * 0.50 + lo_h, piv[2] + half_l + shift],
+            part_i, rotation=[round(pitch_c, 2), 0.0, 0.0], pivot=piv, **seg_meta,
+        ))
+        # Upper narrower dorsal culmen keel aligned to exact dorsal ridge slope!
+        if i < n_seg - 1:
+            kw = max(0.16, wm * k_rat)
+            tpiv = [cx, (yt0 + yt1) * 0.5, (z0 + z1) * 0.5]
+            tseg = math.hypot(dz, dy_t)
+            tback = max(0.10, tseg * 0.22)
+            tfront = max(0.08, tseg * 0.16)
+            tshift = (tback - tfront) * 0.5
+            thalf = tseg * 0.5 + (tback + tfront) * 0.5
+            upper_cubes.append(rot_cube(
+                [cx - kw, tpiv[1] - thick * 0.54, tpiv[2] - thalf + tshift],
+                [cx + kw, tpiv[1] + 0.02, tpiv[2] + thalf + tshift],
+                part_i, rotation=[round(pitch_t, 2), 0.0, 0.0], pivot=tpiv, **seg_meta,
+            ))
+
+    # Recessed dark upper palate roof (narrowed & shortened so ZERO pink EVER pokes through closed beak!)
+    upper_cubes.append(cube(
+        [cx - hw * 0.40, y_base + height * 0.12, z_cere - beak_l * 0.30],
+        [cx + hw * 0.40, y_base + height * 0.32, z_base + 0.05],
+        inner_part,
+    ))
+
+    # --- 3. Sleek Tapered Nested Lower Mandible (seals 100% cleanly inside upper rim, slender tip when open!) ---
+    jaw_piv = [cx, y_base + height * 0.04, z_base - 0.05]
+    jaw_len = length * 0.65
+    n_j = 2 if n_seg <= 4 else 3
+    for ji in range(n_j):
+        t0, t1 = ji / n_j, (ji + 1) / n_j
+        tm = (t0 + t1) * 0.5
+        jz0 = z_base - jaw_len * t0
+        jz1 = z_base - jaw_len * t1
+        jy0 = y_base - height * 0.04 - j_drop * (t0 ** 2.2)
+        jy1 = y_base - height * 0.04 - j_drop * (t1 ** 2.2)
+        jw = hw * (0.72 * (1.0 - 0.60 * tm))
+        jh = max(0.28, height * (0.30 * (1.0 - 0.45 * tm)))
+        jlen = math.hypot(jz0 - jz1, jy1 - jy0)
+        jpit = math.degrees(math.atan2(-(jy1 - jy0), max(1e-4, jz0 - jz1)))
+        jpv = [cx, (jy0 + jy1) * 0.5, (jz0 + jz1) * 0.5]
+        jol = max(0.10, jlen * 0.14)
+        jfront = 0.0 if ji == n_j - 1 else jol
+        jshift = (jol - jfront) * 0.5
+        jhalf = jlen * 0.5 + (jol + jfront) * 0.5
+        jaw_cubes.append(rot_cube(
+            [cx - jw, jpv[1] - jh * 0.60, jpv[2] - jhalf + jshift],
+            [cx + jw, jpv[1] + jh * 0.40, jpv[2] + jhalf + jshift],
+            beak_part if tm < 0.62 else tip_part,
+            rotation=[round(jpit, 2), 0.0, 0.0], pivot=jpv,
+        ))
+    jaw_cubes.append(cube(
+        [cx - hw * 0.36, y_base - height * 0.08, z_base - jaw_len * 0.60],
+        [cx + hw * 0.36, y_base + height * 0.06, z_base - 0.08],
+        inner_part,
+    ))
+
+    # --- 4. Slender Raptor Tongue (completely sealed inside closed beak!) ---
+    tongue_piv = [cx, y_base - height * 0.01, z_base - 0.25]
+    tongue_cubes.append(cube(
+        [cx - hw * 0.26, y_base - height * 0.08, z_base - jaw_len * 0.52],
+        [cx + hw * 0.26, y_base + height * 0.05, z_base - 0.28],
+        tongue_part,
+    ))
+    return jaw_piv, tongue_piv
+
+
+def raptor_beak(upper_cubes, jaw_cubes, tongue_cubes, cx=0.0, y_base=0.0, z_base=0.0, length=4.5, width=2.4,
+                height=2.6, hook_drop=1.5, cere_frac=0.30, cere_part='cere', beak_part='beak',
+                tip_part='beak_tip', inner_part='mouth_inner', tongue_part='tongue', nostril_part='nostril'):
+    """Backwards-compatible raptor preset wrapper around the reusable bird_beak() spline system."""
+    return bird_beak(
+        upper_cubes, jaw_cubes, tongue_cubes, cx=cx, y_base=y_base, z_base=z_base,
+        length=length, width=width, height=height, style='raptor_hook',
+        hook_drop=hook_drop, cere_frac=cere_frac,
+        cere_part=cere_part, beak_part=beak_part, tip_part=tip_part,
+        inner_part=inner_part, tongue_part=tongue_part, nostril_part=nostril_part,
+    )
+
+
+def bird_eye(s, side, parent, pos, radius_y=0.80, radius_z=0.92, yaw_deg=16.0, pitch_deg=2.0,
+             brow_pitch=14.0, brow_roll=-18.0, brow_overhang=0.58, ring_detail='full',
+             eye_part='eye', pupil_part='pupil', lid_part='eyelid', brow_part='hood',
+             ring_part='eyelid', pupil_scale=0.48):
+    """Reusable sculpted avian eye & socket rig returning standard bones:
+      [brow_{side}, eye_{side}, pupil_{side}, ulid_{side}, lid_{side}]
+    compatible with body_plan.py, motion_kit.bird_look(), and clip_check.py.
+
+    Features:
+      - True binocular forward angle (`yaw_deg`: 14-20 deg for raptors, 6-10 for songbirds, 45+ for owls).
+      - Sculpted dark orbital ring framing an almond/oval iris aperture (eliminates flat yellow square!).
+      - Recessed glossy iris + tracking pupil parented directly to eye_{side} (slides cleanly in angled plane!).
+      - Flush upper & lower eyelids aligned to the exact socket plane for natural avian blinks & squints.
+      - Tapered 2-piece overhanging supraorbital predator brow ridge (when brow_overhang > 0).
+    s = +1 left (+X), -1 right (-X)."""
+    ex, ey, ez = pos
+    # Socket orientation: on left (+X), positive yaw rotates +X outward normal FORWARD (-Z)!
+    sock_rot = [round(pitch_deg, 3), round(s * yaw_deg, 3), 0.0]
+
+    out = []
+
+    # 1. Expressive overhanging supraorbital brow ridge (2-piece sculpted arch tapering smoothly toward cere!)
+    if brow_overhang > 0.05:
+        bx_in = ex - s * (0.48 + brow_overhang * 0.25)
+        bx_out = ex + s * (0.14 + brow_overhang)
+        bx0, bx1 = sorted((bx_in, bx_out))
+        brow_cubes = [
+            cube([bx0, ey + radius_y * 0.78, ez - radius_z * 1.48],
+                 [bx1, ey + radius_y * 1.56, ez + radius_z * 1.38], brow_part),
+        ]
+        if ring_detail != 'clean':
+            # Tapered anterior brow bevel curving down toward the loral groove & cere
+            ax0, ax1 = sorted((ex - s * 0.72, ex + s * (0.06 + brow_overhang * 0.72)))
+            brow_cubes.append(rot_cube(
+                [ax0, ey + radius_y * 0.56, ez - radius_z * 2.18],
+                [ax1, ey + radius_y * 1.28, ez - radius_z * 0.85], brow_part,
+                rotation=[12.0, s * -10.0, 0.0], pivot=[ex, ey + radius_y * 0.95, ez - radius_z * 1.2],
+            ))
+        out.append({
+            'name': f'brow_{side}', 'parent': parent,
+            'pivot': [ex, ey + radius_y * 1.15, ez],
+            'rotation': [round(brow_pitch, 3), round(s * (yaw_deg - 4.0), 3), round(s * brow_roll, 3)],
+            'cubes': brow_cubes,
+        })
+
+    # 2. Recessed sculpted eye socket + almond/oval dark orbital bezel + golden iris
+    ex0, ex1 = sorted((ex - s * 0.42, ex + s * 0.08))
+    eye_cubes = [
+        # Core golden iris sitting slightly recessed inside the dark orbital bezel
+        cube([ex0, ey - radius_y, ez - radius_z], [ex1, ey + radius_y, ez + radius_z], eye_part),
+    ]
+    # Dark orbital aperture frame cropping the 4 square corners into a sharp, alive almond/oval raptor eye!
+    rx0, rx1 = sorted((ex - s * 0.26, ex + s * 0.16))
+    # Anterior (front/loral) & posterior (rear) corner canthus wedges
+    eye_cubes.append(rot_cube(
+        [rx0, ey - radius_y * 0.92, ez - radius_z * 1.18],
+        [rx1, ey + radius_y * 0.92, ez - radius_z * 0.72], ring_part,
+        rotation=[0.0, 0.0, 0.0], pivot=[ex, ey, ez - radius_z],
+    ))
+    eye_cubes.append(rot_cube(
+        [rx0, ey - radius_y * 0.92, ez + radius_z * 0.72],
+        [rx1, ey + radius_y * 0.92, ez + radius_z * 1.18], ring_part,
+        rotation=[0.0, 0.0, 0.0], pivot=[ex, ey, ez + radius_z],
+    ))
+    if ring_detail == 'full':
+        # 4 diagonal corner eyelid bevels turning the rectangle cleanly into a crisp octagonal almond eye!
+        for sy in (-1, 1):
+            for sz in (-1, 1):
+                cy = ey + sy * radius_y * 0.78
+                cz = ez + sz * radius_z * 0.74
+                eye_cubes.append(rot_cube(
+                    [rx0, cy - radius_y * 0.28, cz - radius_z * 0.34],
+                    [rx1, cy + radius_y * 0.28, cz + radius_z * 0.34], ring_part,
+                    rotation=[sy * sz * 36.0, 0.0, 0.0], pivot=[ex, cy, cz],
+                ))
+    elif ring_detail == 'bold':
+        # Thick upper/lower graphic hooded rims for bold stylized readability
+        eye_cubes.append(cube([rx0, ey - radius_y * 1.24, ez - radius_z * 1.12],
+                              [rx1, ey - radius_y * 0.82, ez + radius_z * 1.12], ring_part))
+        eye_cubes.append(cube([rx0, ey + radius_y * 0.82, ez - radius_z * 1.12],
+                              [rx1, ey + radius_y * 1.24, ez + radius_z * 1.12], ring_part))
+
+    out.append({
+        'name': f'eye_{side}', 'parent': parent, 'pivot': [ex, ey, ez],
+        'rotation': sock_rot, 'cubes': eye_cubes,
+    })
+
+    # 3. Crisp dark tracking pupil parented to eye_{side} (inherits binocular yaw automatically!)
+    pr_y = radius_y * pupil_scale
+    pr_z = radius_z * pupil_scale
+    px0, px1 = sorted((ex + s * 0.06, ex + s * 0.14))
+    out.append({
+        'name': f'pupil_{side}', 'parent': f'eye_{side}', 'pivot': [ex + s * 0.10, ey, ez],
+        'cubes': [cube([px0, ey - pr_y, ez - pr_z], [px1, ey + pr_y, ez + pr_z], pupil_part)],
+    })
+
+    # 4. Flush upper & lower blinking eyelids parented to eye_{side} (aligned cleanly with socket plane!)
+    lx0, lx1 = sorted((ex - s * 0.20, ex + s * 0.19))
+    out.append({
+        'name': f'ulid_{side}', 'parent': f'eye_{side}', 'pivot': [ex, ey + radius_y * 1.02, ez],
+        'cubes': [cube([lx0, ey + radius_y * 0.68, ez - radius_z * 1.04],
+                       [lx1, ey + radius_y * 1.08, ez + radius_z * 1.04], lid_part)],
+    })
+    out.append({
+        'name': f'lid_{side}', 'parent': f'eye_{side}', 'pivot': [ex, ey - radius_y * 1.02, ez],
+        'cubes': [cube([lx0, ey - radius_y * 1.08, ez - radius_z * 1.04],
+                       [lx1, ey - radius_y * 0.70, ez + radius_z * 1.04], lid_part)],
+    })
+    return out
+
+
+def bird_talon_foot(s, side, parent, ankle, foot_y=0.0, toe_lens=(3.2, 4.2, 3.0, 2.8),
+                    toe_fans=(-28.0, 0.0, 28.0), toe_r=0.44, claw_len=1.8, claw_drop=48.0,
+                    part='foot', claw_part='talon', prefix='leg'):
+    """Builds an anisodactyl gripping bird foot (3 forward toes + opposing rear hallux, each with its own
+    articulated curved scimitar talon bone) mounted at `ankle` = (ax, ay, az), resting flat at `foot_y`.
+    s = 1 left (+X), -1 right (-X). Returns a list of bones ready to append to the skeleton."""
+    ax, ay, az = ankle
+    out = []
+    foot_name = f'{prefix}_foot_{side}'
+    # Central scaly tarsometatarsus pad / knuckle hub
+    pad_w = max(1.1, toe_r * 3.1)
+    pad_h = max(0.85, ay - foot_y)
+    foot_cubes = [
+        cube([ax - pad_w * 0.5, foot_y, az - pad_w * 0.55],
+             [ax + pad_w * 0.5, foot_y + min(pad_h, toe_r * 2.3), az + pad_w * 0.55], part),
+    ]
+    out.append({'name': foot_name, 'parent': parent, 'pivot': [ax, ay, az], 'cubes': foot_cubes})
+
+    def _curved_talon(tx, ty, tz, direction_z, r_base, clen):
+        # 2-segment tapered scimitar talon pointing toward direction_z (-1 forward, +1 rear hallux)
+        z_mid = tz + direction_z * clen * 0.52
+        z_end = tz + direction_z * clen
+        lo1 = [tx - r_base * 0.55, ty - r_base * 0.55, min(tz, z_mid)]
+        hi1 = [tx + r_base * 0.55, ty + r_base * 0.55, max(tz, z_mid)]
+        lo2 = [tx - r_base * 0.34, ty - r_base * 0.45 - clen * 0.25, min(z_mid, z_end)]
+        hi2 = [tx + r_base * 0.34, ty + r_base * 0.22, max(z_mid, z_end)]
+        p2 = [tx, ty, z_mid]
+        return [
+            cube(lo1, hi1, claw_part),
+            rot_cube(lo2, hi2, claw_part, rotation=[direction_z * -26.0, 0.0, 0.0], pivot=p2),
+        ]
+
+    # 3 forward toes (inner, middle, outer)
+    ty = foot_y + toe_r
+    for idx in range(3):
+        tl = toe_lens[idx]
+        fan = toe_fans[idx]
+        off_x = s * (idx - 1) * (toe_r * 1.45)
+        tx = ax + off_x
+        tz = az - pad_w * 0.42
+        toe_cubes = [
+            cube([tx - toe_r, foot_y, tz - tl * 0.56], [tx + toe_r, foot_y + toe_r * 1.95, tz + 0.35], part),
+            cube([tx - toe_r * 0.82, foot_y, tz - tl], [tx + toe_r * 0.82, foot_y + toe_r * 1.65, tz - tl * 0.48], part),
+        ]
+        tname = f'{prefix}_toe{idx + 1}_{side}'
+        out.append({'name': tname, 'parent': foot_name, 'pivot': [tx, ty, tz],
+                    'rotation': [0.0, round(-s * fan, 3), 0.0], 'cubes': toe_cubes})
+        cz = tz - tl + 0.12
+        cname = f'{prefix}_talon{idx + 1}_{side}'
+        out.append({'name': cname, 'parent': tname, 'pivot': [tx, ty, cz],
+                    'rotation': [round(claw_drop * 0.35, 3), 0.0, 0.0],
+                    'cubes': _curved_talon(tx, ty, cz, -1.0, toe_r * 0.85, claw_len)})
+
+    # Opposing rear hallux (the raptor's power-locking rear talon!)
+    hl = toe_lens[3] if len(toe_lens) > 3 else toe_lens[0] * 0.85
+    hz = az + pad_w * 0.42
+    h_cubes = [
+        cube([ax - toe_r * 0.92, foot_y, hz - 0.30], [ax + toe_r * 0.92, foot_y + toe_r * 1.85, hz + hl], part),
+    ]
+    hname = f'{prefix}_hallux_{side}'
+    out.append({'name': hname, 'parent': foot_name, 'pivot': [ax, ty, hz], 'cubes': h_cubes})
+    hcz = hz + hl - 0.12
+    out.append({'name': f'{prefix}_hallux_talon_{side}', 'parent': hname, 'pivot': [ax, ty, hcz],
+                'rotation': [round(-claw_drop * 0.35, 3), 0.0, 0.0],
+                'cubes': _curved_talon(ax, ty, hcz, 1.0, toe_r * 0.95, claw_len * 1.15)})
+    return out
+
+
 # --- self-check: python tools/model_parts.py ---------------------------------------------------------------------------
 if __name__ == '__main__':
     # 1. Rotated cube world_point & face_point consistency
@@ -975,4 +1468,20 @@ if __name__ == '__main__':
     assert -1.0 <= g <= 1.0
     st_col = stamp_2d(['.A', 'B.'], {'A': (255, 200, 0), 'B': (20, 15, 10)}, 0.75, 0.25)
     assert st_col == (255, 200, 0)
-    print('model_parts: rot_cube, world_point, mane_layer, padded_paw, feline_mouth, fur_grain, stamp_2d all check out')
+    # 5. Bird plumage & raptor anatomy (feather_grain, feather_fan, bird_beak, raptor_beak, bird_eye, bird_talon_foot)
+    fg = feather_grain(0.5, 10.0, 3.2, bar_freq=0.35, shaft_pos=0.5)
+    assert -1.0 <= fg <= 1.0
+    for ax in ('tail', 'wing', 'crest'):
+        fc = []
+        feather_fan(fc, (0.0, 12.0, 4.0), count=6, length=8.0, width=1.8, axis=ax, side=1)
+        assert len(fc) == 6 and all('_feather_idx' in c for c in fc)
+    for st in BIRD_BEAK_PRESETS:
+        bu, bj, bt = [], [], []
+        jp, tp = bird_beak(bu, bj, bt, y_base=18.0, z_base=-8.0, style=st)
+        assert len(bu) >= 10 and len(bj) >= 3 and len(bt) == 1 and jp[2] > tp[2]
+    ebones = bird_eye(1, 'left', 'head', (2.6, 20.0, -10.0))
+    assert len(ebones) == 5 and ebones[1]['name'] == 'eye_left'
+    tbones = bird_talon_foot(1, 'left', 'leg_lower_left', (3.0, 1.5, 0.0))
+    assert len(tbones) == 9 and tbones[0]['name'] == 'leg_foot_left'
+    print('model_parts: rot_cube, world_point, mane_layer, padded_paw, feline_mouth, fur_grain, stamp_2d, '
+          'feather_grain, feather_fan, bird_beak, bird_eye, bird_talon_foot all check out')

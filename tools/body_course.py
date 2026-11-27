@@ -175,6 +175,16 @@ SCENES.update({
                  [(2, BED, -4), (2, BED, 3), (-4, BED, 3)], 'walk'),
     'shore_out': ('walking from a river bed one block under water up a one-block bank onto the shore',
                   ['cmd fill -12 -61 -7 0 -61 7 minecraft:water'], (-4.5, -61, 0.5), [(5, G, 0)], 'walk'),
+    # Flier family scenes (2026-11-25, Animal Maker Engine step D): perch, takeoff, level cruise, soaring turn, landing
+    'perch_idle': ('perched upright on an acacia fence/branch post (head look, crest, talons)',
+                   ['cmd setblock 0 -60 0 minecraft:acacia_fence'], (0.5, G + 1, 0.5), [(0, G + 1, 0)], 'walk'),
+    'takeoff': ('launching off a raised perch into powered wingbeat flight',
+                ['cmd fill -6 -60 -1 -6 -58 1 minecraft:acacia_log'], (-5.5, G + 3, 0.5), [(8, G + 8, 0)], 'walk'),
+    'cruise_flight': ('level wingbeat and soaring flight across open air', [], (-8.5, G + 8, 0.5), [(8, G + 8, 0)], 'walk'),
+    'soar_turn': ('banked soaring flight through two wide turns', [], (-7.5, G + 10, -5.5),
+                  [(4, G + 10, -5), (4, G + 10, 5), (-7, G + 10, 5)], 'walk'),
+    'landing_perch': ('descending flare and talon landing onto a raised branch perch',
+                      ['cmd fill 6 -60 -1 6 -58 1 minecraft:acacia_log'], (-6.5, G + 8, 0.5), [(6, G + 3, 0)], 'walk'),
 })
 # The scene sets by body family, and each set's quick preset (the scenes that catch the most).
 SETS = {
@@ -182,14 +192,17 @@ SETS = {
     'hoppers': ['flat', 'step_up', 'step_down', 'stairs', 'bank_level', 'bank_high', 'dash', 'climb_out', 'turn'],
     'swimmers': ['open_water', 'shallows', 'surface', 'school_turn'],
     'bed_walkers': ['bed_flat', 'bed_step_up', 'bed_step_down', 'bed_turn', 'shore_out'],
+    'fliers': ['perch_idle', 'takeoff', 'cruise_flight', 'soar_turn', 'landing_perch'],
 }
 QUICK = {'walkers': ['step_up', 'step_down', 'bank_level'], 'hoppers': ['step_up', 'bank_level', 'climb_out'],
-         'swimmers': ['school_turn', 'shallows'], 'bed_walkers': ['bed_step_up', 'shore_out']}
+         'swimmers': ['school_turn', 'shallows'], 'bed_walkers': ['bed_step_up', 'shore_out'],
+         'fliers': ['takeoff', 'cruise_flight', 'landing_perch']}
 FAMILY_SETS = {'four_legged_long_body': 'walkers', 'hopper': 'hoppers', 'fish': 'swimmers', 'crab': 'bed_walkers',
-               'shell': 'bed_walkers'}
-# where each set's scare starts: on a level bank by water (it runs for it), in the pool, or on the bed
+               'shell': 'bed_walkers', 'flier': 'fliers'}
+# where each set's scare starts: on a level bank by water (it runs for it), in the pool, on the bed, or on a branch
 SCARES = {'walkers': ([WATER_POOL], (-4.5, G, 0.5)), 'hoppers': ([WATER_POOL], (-4.5, G, 0.5)),
-          'swimmers': ([POOL], (-4.5, D, 0.5)), 'bed_walkers': ([BED_POOL], (-4.5, BED, 0.5))}
+          'swimmers': ([POOL], (-4.5, D, 0.5)), 'bed_walkers': ([BED_POOL], (-4.5, BED, 0.5)),
+          'fliers': (['cmd fill -5 -60 -1 -5 -58 1 minecraft:acacia_log'], (-4.5, G + 3, 0.5))}
 
 
 def set_of(animal):

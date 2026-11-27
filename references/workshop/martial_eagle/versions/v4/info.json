@@ -1,0 +1,15 @@
+{
+ "note": "Stage 2 remake v4: dedicated sculpted teardrop folded cape + seamless soaring airfoil + rounded body/thighs + proud eagle head",
+ "date": "2026-11-25",
+ "boxes": 155,
+ "numbers": {
+  "BODY_PITCH": 46.0,
+  "CHEST_HW": 5.9,
+  "WING_SPAN_SCALE": 1.0,
+  "CREST_RAISE": 0.35,
+  "TAIL_SPREAD": 0.15,
+  "BEAK_LEN": 5.3,
+  "TALON_SCALE": 1.0,
+  "JAW_OPEN": 0.0
+ }
+}

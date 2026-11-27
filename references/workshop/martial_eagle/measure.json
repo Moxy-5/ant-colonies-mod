@@ -1,0 +1,175 @@
+{
+ "animal": "martial_eagle",
+ "length_blocks": 2.356,
+ "picture_px_per_block": 41.6,
+ "views": {
+  "side": {
+   "width_blocks": 2.356,
+   "height_blocks": 2.5
+  },
+  "front": {
+   "width_blocks": 1.25,
+   "height_blocks": 2.452
+  }
+ },
+ "side_profile": [
+  {
+   "at": 0.021,
+   "top": 0.673,
+   "under": 0.505
+  },
+  {
+   "at": 0.062,
+   "top": 0.793,
+   "under": 0.409
+  },
+  {
+   "at": 0.104,
+   "top": 0.986,
+   "under": 0.409
+  },
+  {
+   "at": 0.146,
+   "top": 1.106,
+   "under": 0.288
+  },
+  {
+   "at": 0.188,
+   "top": 1.25,
+   "under": 0.264
+  },
+  {
+   "at": 0.229,
+   "top": 1.346,
+   "under": 0.288
+  },
+  {
+   "at": 0.271,
+   "top": 1.49,
+   "under": 1.418
+  },
+  {
+   "at": 0.312,
+   "top": 1.587,
+   "under": 1.418
+  },
+  {
+   "at": 0.354,
+   "top": 1.659,
+   "under": 0.529
+  },
+  {
+   "at": 0.396,
+   "top": 1.731,
+   "under": 0.577
+  },
+  {
+   "at": 0.438,
+   "top": 1.755,
+   "under": 0.649
+  },
+  {
+   "at": 0.479,
+   "top": 1.851,
+   "under": 0.601
+  },
+  {
+   "at": 0.521,
+   "top": 1.875,
+   "under": 0.457
+  },
+  {
+   "at": 0.562,
+   "top": 1.947,
+   "under": 0.264
+  },
+  {
+   "at": 0.604,
+   "top": 1.947,
+   "under": 0.072
+  },
+  {
+   "at": 0.646,
+   "top": 2.38,
+   "under": 2.332
+  },
+  {
+   "at": 0.688,
+   "top": 2.452,
+   "under": 2.404
+  },
+  {
+   "at": 0.729,
+   "top": 2.5,
+   "under": 2.476
+  },
+  {
+   "at": 0.771,
+   "top": 2.5,
+   "under": 2.356
+  },
+  {
+   "at": 0.812,
+   "top": 2.476,
+   "under": 2.284
+  },
+  {
+   "at": 0.854,
+   "top": 2.476,
+   "under": 2.043
+  },
+  {
+   "at": 0.896,
+   "top": 2.428,
+   "under": 2.091
+  },
+  {
+   "at": 0.938,
+   "top": 2.356,
+   "under": 2.163
+  },
+  {
+   "at": 0.979,
+   "top": 2.284,
+   "under": 2.163
+  }
+ ],
+ "height_blocks": 2.5,
+ "belly_clearance_blocks": 0.601,
+ "length_to_height": 0.94,
+ "marks": {
+  "snout": 1.0,
+  "head_back": 0.633,
+  "shoulders": 0.653,
+  "hips": 0.327,
+  "tail_base": 0.224
+ },
+ "head_share": 0.367,
+ "tail_share": 0.224,
+ "colours": [
+  {
+   "hex": "#3f302c",
+   "share": 0.242
+  },
+  {
+   "hex": "#251c1a",
+   "share": 0.239
+  },
+  {
+   "hex": "#51423c",
+   "share": 0.148
+  },
+  {
+   "hex": "#827269",
+   "share": 0.136
+  },
+  {
+   "hex": "#65564e",
+   "share": 0.121
+  },
+  {
+   "hex": "#ab9b8f",
+   "share": 0.114
+  }
+ ]
+}
