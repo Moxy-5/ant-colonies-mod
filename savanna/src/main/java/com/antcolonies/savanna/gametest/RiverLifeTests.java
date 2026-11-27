@@ -207,8 +207,13 @@ public class RiverLifeTests {
         BlockPos seed = new BlockPos(X0 + 2, TOP - 1, Z0 + 3);
         helper.setBlock(seed, SavannaBlocks.ALGAE.get().whole(AlgaeBlock.LUSH));
         BlockPos absSeed = helper.absolutePos(seed);
-        for (int i = 0; i < 1000; i++) {
-            level.getBlockState(absSeed).randomTick(level, absSeed, level.random);
+        AlgaeBlock.spreadsInAnyBiome = true; // (review R10-5: algae spreads only in the savanna's waters; the test world is none)
+        try {
+            for (int i = 0; i < 1000; i++) {
+                level.getBlockState(absSeed).randomTick(level, absSeed, level.random);
+            }
+        } finally {
+            AlgaeBlock.spreadsInAnyBiome = false;
         }
         int spread = 0;
         for (int x = X0; x <= SHALLOW_TO; x++) {

@@ -105,6 +105,8 @@ public class FightGoal extends Goal {
     private LivingEntity struck;
     private int lookingOver;
     private int idleTicks;
+    /** The body's tick of the next look round for a foe (review R3-10). */
+    private int pickAt;
     /** Whether its walking is the search round the spot (not a chase), and the idle tick it picks its next walk at. */
     private boolean searching;
     private int nextStep;
@@ -149,6 +151,7 @@ public class FightGoal extends Goal {
     @Override
     public void start() {
         walkingTo = null;
+        pickAt = 0;
         idleTicks = 0;
         searching = false;
     }
@@ -195,7 +198,10 @@ public class FightGoal extends Goal {
             ant.getNavigator().stop();
             return;
         }
-        if (foe == null || !Fights.mayAttack(ant, foe) || (ant.tickCount + ant.getId()) % 20 == 0) {
+        // Review R3-10: one look round a second, with a foe or without (a foe lost is looked for at once): with none it
+        // looked on every goal tick, each look an entity search and a walk of cells for every termite under cover.
+        if (foe != null && !Fights.mayAttack(ant, foe) || ant.tickCount >= pickAt) {
+            pickAt = ant.tickCount + 20;
             LivingEntity was = foe;
             LivingEntity next = pickFoe(level);
             // Kept until caught or lost: a new one only if it is much nearer (it turned from one to another every second).

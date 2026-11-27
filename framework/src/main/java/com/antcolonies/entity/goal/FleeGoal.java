@@ -78,11 +78,7 @@ public class FleeGoal extends Goal {
             return false;
         }
         ant.hideUntil(level.getGameTime() + flee.hideTicks());
-        Colony home = colony;
-        BlockPos towards = colony.foragingHoles().waysOut(level).stream().map(ForagingHoles.WayOut::mouth)
-                .min(Comparator.comparingDouble(mouth -> mouth.distSqr(ant.blockPosition()))).orElse(colony.getCenter().below());
-        return errand.setOff(at -> home.nest().isInside(level, at.cell()) && !home.foragingHoles().isDoorway(level, at.cell()),
-                towards, flee.speed());
+        return true;
     }
 
     @Override
@@ -94,6 +90,17 @@ public class FleeGoal extends Goal {
     public void start() {
         ticks = 0;
         errand.begin();
+        // Review R3-30: the walk is planned here, not in canUse: the goal this one pushes out stops the shared legs as
+        // it ends, after canUse and before start, and wiped the route (a fleeing worker's first try always failed, and
+        // one carrying food never fled at all). With no way in, the goal ends on its next look.
+        if (ant.level() instanceof ServerLevel level && colony != null) {
+            FightNumbers.Flee flee = flee();
+            Colony home = colony;
+            BlockPos towards = colony.foragingHoles().waysOut(level).stream().map(ForagingHoles.WayOut::mouth)
+                    .min(Comparator.comparingDouble(mouth -> mouth.distSqr(ant.blockPosition()))).orElse(colony.getCenter().below());
+            errand.setOff(at -> home.nest().isInside(level, at.cell()) && !home.foragingHoles().isDoorway(level, at.cell()),
+                    towards, flee == null ? 1.0 : flee.speed());
+        }
     }
 
     @Override

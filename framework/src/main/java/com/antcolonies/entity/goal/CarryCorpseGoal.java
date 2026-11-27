@@ -216,7 +216,7 @@ public class CarryCorpseGoal extends Goal {
         Errand.At at = errand.at(paralysed, REACH);
         if (at == Errand.At.THERE) {
             colony.refuse().releaseBody(paralysed.getUUID());
-            paralysed.discard();
+            paralysed.carriedOff(level); // (review R3-18: off the headcount too, as one a hunter takes; a plain discard left a ghost in the count)
             paralysed = null;
             ant.setCarryingCorpse(true);
             level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 0.8F);

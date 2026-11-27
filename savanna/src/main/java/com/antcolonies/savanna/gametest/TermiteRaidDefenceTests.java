@@ -198,6 +198,7 @@ public class TermiteRaidDefenceTests {
             TermiteWorkerEntity[] lying = {null};
             MatabeleEntity[] hunter = {null};
             long[] goneAt = {-1};
+            int[] counted = {0};
             each[0] = () -> {
                 long tick = helper.getTick();
                 if (tick == 80) {
@@ -222,12 +223,16 @@ public class TermiteRaidDefenceTests {
                         helper.assertTrue(lying[0].isAlive(), "the paralysed nestmate was fetched with a Matabele beside it");
                         if (tick - outAt[0] >= 200) {
                             hunter[0].discard(); // the hunter goes: now it may be fetched
+                            counted[0] = colony.getCount(com.antcolonies.savanna.entity.TermiteWorkerEntity.CASTE); // (it has joined by now)
                             colony.part(SavannaParts.ALARM).ifPresent(Alarm::calmForTests);
                         }
                     } else if (!lying[0].isAlive() && goneAt[0] < 0) {
                         goneAt[0] = tick;
                         helper.assertTrue(level.getEntitiesOfClass(AntCorpseEntity.class, lying[0].getBoundingBox().inflate(2.0),
                                 body -> body.isAlive() && body != old && body != stranger).isEmpty(), "the paralysed nestmate died where it lay");
+                        // (review R3-18: eaten, it leaves the headcount too; a plain discard left a ghost worker for ever)
+                        int now = colony.getCount(com.antcolonies.savanna.entity.TermiteWorkerEntity.CASTE);
+                        helper.assertTrue(now <= Math.max(0, counted[0] - 1), "the eaten nestmate is still counted: " + counted[0] + " workers before, " + now + " after");
                         SavannaMod.LOGGER.info("[raid-dead-test] bodies out at {}, paralysed nestmate carried in at {}", outAt[0], tick);
                         helper.succeed();
                     }

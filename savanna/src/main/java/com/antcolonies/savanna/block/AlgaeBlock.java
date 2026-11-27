@@ -198,7 +198,7 @@ public class AlgaeBlock extends BushBlock implements LiquidBlockContainer, Bonem
      * while the bed round the spot is still patchy, as new land lays it.
      */
     static boolean roomToSpread(ServerLevel level, BlockPos to) {
-        if (!level.getBiome(to).is(com.antcolonies.savanna.worldgen.RiverBankFeature.WATERS)) {
+        if (!spreadsInAnyBiome && !level.getBiome(to).is(com.antcolonies.savanna.worldgen.RiverBankFeature.WATERS)) {
             return false;
         }
         int mats = 0;
@@ -211,6 +211,9 @@ public class AlgaeBlock extends BushBlock implements LiquidBlockContainer, Bonem
     }
 
     /** Seeds a bare mat on the bed beside {@code pos} (one cell, the bed up to a block higher or lower), if there is room. */
+    /** The game tests (their world is no savanna): the biome is not asked. */
+    public static boolean spreadsInAnyBiome;
+
     static void spread(ServerLevel level, BlockPos pos, RandomSource random) {
         Direction side = Direction.Plane.HORIZONTAL.getRandomDirection(random);
         BlockPos to = pos.relative(side).above(random.nextInt(3) - 1);

@@ -115,6 +115,9 @@ public class AntWanderGoal extends Goal {
     private static final double CHECKS_A_MINUTE = 600.0;
     /** A stroll start or a settle walk this many checks apart at most, on average, when away from its place (about 5 s). */
     private static final int SETTLE_EVERY = 50;
+    /** After six settle walks with no way, it waits this long (ticks) before it tries again (as {@code GoInsideGoal}). */
+    private static final int SETTLE_RETRY = 200;
+    private int settleAgainAt;
 
     /**
      * Rest first: a walk to its place to settle when away from it (or from where it may be), else now and then a
@@ -130,7 +133,7 @@ public class AntWanderGoal extends Goal {
         double settle = idle.settleWithin();
         boolean away = place != null && here.distSqr(place) > settle * settle;
         if (away || !ant.mayBeAt(here)) {
-            if (ant.getRandom().nextInt(SETTLE_EVERY) != 0) {
+            if (ant.tickCount < settleAgainAt || ant.getRandom().nextInt(SETTLE_EVERY) != 0) {
                 return false;
             }
             map = new LevelCellMap(ant.level(), ant);
@@ -143,6 +146,7 @@ public class AntWanderGoal extends Goal {
                     return true;
                 }
             }
+            settleAgainAt = ant.tickCount + SETTLE_RETRY; // no way to its place: it waits before the next six tries (review R3-11)
             return false;
         }
         // A calm one a quarter of the species' strolls, the most restless 1.75 times (its personality, for life).
@@ -158,6 +162,13 @@ public class AntWanderGoal extends Goal {
             if (spot == null || spot.equals(here) || !ant.mayBeAt(spot) || !inRooms(spot)
                     || place != null && spot.distSqr(place) > settle * settle) {
                 continue;
+            }
+            // (under a roof, some strolls go up onto the ceiling: the rule of the stroll above, lost for every insect
+            // that rests first since M8 step 3Q, so termite workers no longer hung from the ceilings; review R3-13)
+            if (ceilingChance > 0.0F && ant.getRandom().nextFloat() < ceilingChance && !ant.level().canSeeSky(spot)
+                    && Foothold.ceiling(spot).isValid(map)
+                    && ant.getNavigator().moveTo(Foothold.ceiling(spot), speed)) {
+                return true;
             }
             if (ant.getNavigator().moveTo(spot, speed)) {
                 return true;

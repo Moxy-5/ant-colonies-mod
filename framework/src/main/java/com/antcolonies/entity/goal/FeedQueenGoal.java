@@ -162,7 +162,7 @@ public class FeedQueenGoal extends Goal {
     private void walkToQueen(ServerLevel level) {
         AbstractAntEntity queen = colony.getQueen(level);
         if (queen == null) {
-            done = true;
+            giveBack(level);
             return;
         }
         if (ant.isFoodInCrop()) {
@@ -174,7 +174,7 @@ public class FeedQueenGoal extends Goal {
             } else if (at == Errand.At.STEPPING) {
                 // the last little step to her mouth
             } else if (!errand.walkOn(MouthToMouth.cellAtMouth(queen), 1.0) && !errand.walkOn(queen.blockPosition(), 1.0)) { // her mouth first
-                done = true;
+                giveBack(level);
             }
             return;
         }
@@ -182,7 +182,7 @@ public class FeedQueenGoal extends Goal {
         if (errand.within(queen, REACH)) {
             handOver(level);
         } else if (!errand.walkOn(queen.blockPosition(), 1.0)) {
-            done = true;
+            giveBack(level);
         }
     }
 
@@ -190,7 +190,7 @@ public class FeedQueenGoal extends Goal {
     private void passToQueen(ServerLevel level) {
         AbstractAntEntity queen = colony.getQueen(level);
         if (queen == null) {
-            done = true;
+            giveBack(level);
             return;
         }
         MouthToMouth.faceEachOther(ant, queen);
@@ -208,7 +208,14 @@ public class FeedQueenGoal extends Goal {
             done = true;
             return;
         }
-        // She wants no more right now: the bread goes back on a heap.
+        giveBack(level); // she wants no more right now
+    }
+
+    /**
+     * The food goes back on a heap (she wants no more; review R3-31: also with no queen, or no way to her: the goal ended
+     * with the food kept, began again two ticks later because of the food, and the worker stood there for ever).
+     */
+    private void giveBack(ServerLevel level) {
         pile = colony.nurseFood().pickReturnSpot(level, ant.getRandom());
         if (!errand.setOff(pile, 1.0)) {
             colony.nurseFood().putDownWhereItStands(level, ant); // nowhere to put it

@@ -1667,11 +1667,11 @@ public class MatabeleRaidTests {
                     }
                 })
                 .thenIdle(40)
-                // Raid rework R7, dusk: a raid set out at 18:45, in the evening raid hours, keeps them; at 19:30 on the
+                // Raid rework R7, dusk: a raid set out at 17:45, in the evening raid hours (they end at 18:00, review R11-17), keeps them; at 19:30 on the
                 // march it turns home where it is, attacks nothing, and the spot is no empty check (never reached).
                 .thenExecute(() -> {
-                    clock.skipTo(18.75);
-                    helper.assertTrue(raids.isRaidTime(level) && !raids.isDusk(level), "18:45 is not in the raid hours");
+                    clock.skipTo(17.75);
+                    helper.assertTrue(raids.isRaidTime(level) && !raids.isDusk(level), "17:45 is not in the raid hours");
                     BlockPos entrance = colony.getCenter();
                     BlockPos there = helper.absolutePos(new BlockPos(52, SURFACE, 52));
                     List<BlockPos> trail = new ArrayList<>();

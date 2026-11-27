@@ -282,7 +282,7 @@ public class AwayLife {
         long now = level.getGameTime();
         Frozen what = null;
         // (A paralysed insect is never folded in: it lies where it was stung and dies there in time, M8 step 2b.)
-        if (entity instanceof AbstractAntEntity mob && mob.nestCaste() != null && mob.isAlive() && !mob.isDowned()) {
+        if (entity instanceof AbstractAntEntity mob && mob.nestCaste() != null && mob.isAlive() && !mob.staysABody()) { // (review R3-38)
             long grownUpAt = mob.getGrownUpAt() == AbstractAntEntity.AGE_NOT_SET ? now : mob.getGrownUpAt();
             what = Frozen.adult(mob, grownUpAt, now);
         } else if (entity instanceof AntEggEntity egg && egg.isAlive()) {

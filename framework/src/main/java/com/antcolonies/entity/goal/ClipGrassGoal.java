@@ -93,7 +93,9 @@ public class ClipGrassGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return colony != null && grass != null && colony.food().isFoodPlant(ant.level().getBlockState(grass))
+        // (a plant on land not loaded is not read: the read would load it, review R3-22)
+        return colony != null && grass != null && com.antcolonies.colony.LandReady.at(ant.level(), grass)
+                && colony.food().isFoodPlant(ant.level().getBlockState(grass))
                 && !ant.hasFullMandibles() && ticks < GIVE_UP_TICKS
                 && (fromInside ? colony.food().isFeedableFromInside(ant.level(), grass) : colony.isForagingTime(ant.level()));
     }

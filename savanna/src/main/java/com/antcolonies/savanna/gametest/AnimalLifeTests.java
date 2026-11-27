@@ -621,7 +621,8 @@ public class AnimalLifeTests {
     }
 
     /**
-     * Eaten eggs: a hungry tilapia goes for catfish eggs on a mat before the plain algae round it and bites some off, and
+     * Eaten eggs: a hungry tilapia grazing a mat with catfish eggs on it bites some off (a find where it grazes, never
+     * sought before plain algae: the user's call, review R10-4, so the mat here is the only one), and
      * a hungry crab picks at a snail clutch on the bed; a clutch eaten to nothing is gone (the mat left as algae).
      */
     @GameTest(template = "arena", timeoutTicks = 900, batch = "breeding")
@@ -630,9 +631,7 @@ public class AnimalLifeTests {
         ServerLevel level = helper.getLevel();
         com.antcolonies.savanna.block.AlgaeBlock algae = SavannaBlocks.ALGAE.get();
         BlockPos mat = helper.absolutePos(new BlockPos(P1 - 2, BED + 1, P1 - 2));
-        for (BlockPos rel : List.of(new BlockPos(P1 - 4, BED + 1, P1 - 2), new BlockPos(P1 - 2, BED + 1, P1 - 4), new BlockPos(P1 - 2, BED + 1, P1 - 2))) {
-            helper.setBlock(rel, algae.whole(com.antcolonies.savanna.block.AlgaeBlock.LUSH));
-        }
+        helper.setBlock(new BlockPos(P1 - 2, BED + 1, P1 - 2), algae.whole(com.antcolonies.savanna.block.AlgaeBlock.LUSH));
         com.antcolonies.savanna.block.CatfishEggsBlock.lay(level, mat, SavannaEntities.CATFISH.get(), 3);
         BlockPos clutch = helper.absolutePos(new BlockPos(P0 + 3, BED + 1, P0 + 3));
         com.antcolonies.savanna.block.SnailEggsBlock.lay(level, clutch, net.minecraft.core.Direction.UP, SavannaEntities.SNAIL.get(), 4);

@@ -315,6 +315,8 @@ other.
   so 30 raiders do not walk the same 40 cells 30 times; a major that found no breach waits a second before it looks
   again (as `noWayTo` already does for a breach with no way). Then measure again.
 
+**Status (2026-11-26, `claude/review-fix-b6`): half fixed: a fighter looks round for a foe once a second, with a foe or without (`FightGoal.pickAt`; a foe it may no longer attack is still replaced at once), and a major that found no breach looks again a second later (`MatabeleEntity.noBreachUntil`): the searches are a tenth of what they were. Not done: each termite's shut-in answer is not shared between the raiders, and nothing was measured.**
+
 ### R3-11 (B, likely; to measure): a walk that found no route is searched again on every goal tick
 
 - **Where:** `RescueGoal.java:127-133` (walk to the caller) and `177-180` (carry home); `ClampCareGoal.java:101-108`;
@@ -337,6 +339,8 @@ other.
   while, with an `Errand` and `leaveAlone`); the settle walk waits `RETRY` ticks after 6 failures, as `GoInsideGoal`
   does (line 66-67).
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: the legs already answer "no way" without a new search for half a second after a failed one (R2-37's fix, after this was read), and now the job ends too: a rescuer, a clamp carer, a wound carer or a groomer whose walk finds no way gives up and leaves that nestmate alone for 10 seconds (`goal/LeftAlone`), a rescuer with no way to the room sets its nestmate down where it is, and the settle walk waits 10 seconds after six tries with no way (`AntWanderGoal.SETTLE_RETRY`).**
+
 ### R3-12 (B, proven): termite nurses at the queen never clean themselves or groom anyone
 
 - **Where:** `StandByQueenGoal.java:57-68` (`canContinueToUse`); `TermiteWorkerEntity.java:121-124` (StandByQueen,
@@ -351,6 +355,8 @@ other.
   workers, so a nurse cleans or grooms a nestmate (the queen too, if she counts as resting) and then walks back to her
   place. Check the court test after.
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: for termite workers the cleaning goals come before standing by the queen (rank 5, then `StandByQueenGoal` 6, the wander 7), so a nurse at the queen cleans herself or a nestmate and walks back to her place.**
+
 ### R3-13 (B, proven): termite workers no longer hang from the ceilings
 
 - **Where:** `AntWanderGoal.java:76-80` (rest first takes over), `102-105` (the ceiling choice, only in the old stroll),
@@ -363,6 +369,8 @@ other.
 - **What the player sees:** a behaviour that was built and shown is gone.
 - **Fix proposed:** give `rest()`'s stroll the same one-in-four ceiling choice underground (one rule moved, not
   added), or, if the user prefers resting termites on the floor, delete `hangsFromCeilings` and its comment.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: the rest-first stroll has the ceiling choice again (`AntWanderGoal.rest`, the same rule as the old stroll), so termite workers hang from the ceilings on about 1 stroll in 4.**
 
 ### R3-14 (C, proven): the fleeing termite's "startled moment" is only a delay
 
@@ -470,6 +478,8 @@ only every other game tick unless it asks for every tick).
   `CarryCorpseGoal:219`. `findParalysed` skips insects with no `nestCaste()` (queen, king). Add the headcount check
   to the test above.
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: the eaten nestmate leaves by `carriedOff`, the same way out as one a hunter takes (off the headcount by the colony's stands-for rule), and `Refuse.findParalysed` never picks a queen or king; the test `TermiteRaidDefenceTests` checks the headcount.**
+
 ### R3-19 (B, proven): `DigGoal` can start with a body in the jaws, and its first bite throws the body away
 
 - **Where:** `DigGoal.java:67` and `93` (`ant.isCarrying()`, which is soil only, `AbstractAntEntity.java:392-394`),
@@ -486,6 +496,8 @@ only every other game tick unless it asks for every tick).
   comb misses its layer); a `[load]` warning in the log that the code calls "never seen".
 - **Fix proposed:** `hasFullMandibles()` in place of `isCarrying()` at lines 67 and 93 (a soil pellet is a full jaw
   too).
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: `DigGoal` asks for empty jaws (`hasFullMandibles`), not only "no soil pellet", to start and to go on.**
 
 ### R3-20 (B, proven): the work goals run at half the speed their numbers say, and the numbers copied from them do not
 
@@ -507,6 +519,8 @@ only every other game tick unless it asks for every tick).
   (they are cheap per tick; the costly part is `canUse`, which this does not change), so their numbers mean what
   their comments say and match `BuildLife` and `FieldLife`. Then re-read any timing a test pins.
 
+**Your call (2026-11-26):** The pace of work near you and away. Today a real digger bites once a second and a real forager cuts 5 seconds at a plant (their goals count every other game tick), but the colony's numbers (builders and foragers while you are away or out of sight) bite and cut twice as fast. Make the numbers work at the pace you see (away digging and cutting at half today's speed, so mounds and stores grow a little slower while you are away), or speed the real workers up to the numbers (twice as fast as what you have watched)? My pick: the numbers slow down to what you see, then I run the away tests and tell you what moved.
+
 ### R3-21 (B, a call for the user): the insects never ask the `mobGriefing` game rule
 
 - **Where:** `DigGoal.java:191-206` (`destroyBlock`, `setBlock`), `SealEntranceGoal.java:128`, `SealGoal.java:129`
@@ -517,6 +531,8 @@ only every other game tick unless it asks for every tick).
 - **Fix proposed (my recommendation, the user decides):** keep the colonies digging and sealing their own nest with
   the rule off (the nest is the colony's body; without it the mod does not work), and write that down in
   `docs/DESIGN.md`. Eating a player's hay bale is the one place worth asking the rule.
+
+**Your call (2026-11-26):** The mobGriefing game rule. Today termites and Matabele ants dig, plug and eat blocks whatever that rule says (the animals obey it). Keep the colonies digging and sealing their own nests with the rule off (without it the mod does not work), and let the rule only stop termites eating hay bales a player put down? My pick: yes, and I write it in the design notes.
 
 ### R3-22 (B, likely): two goals read their target block every tick without asking whether its land is loaded
 
@@ -529,6 +545,8 @@ only every other game tick unless it asks for every tick).
   chunks from the insect, near the edge of a player's range, would do it; I did not measure foraging reaches.
 - **Fix proposed:** `LandReady.at(level, grass) &&` in front at `ClipGrassGoal:96`, and in `Nest.canDig`.
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: `ClipGrassGoal.canContinueToUse` and `Nest.canDig` ask `LandReady` before they read the block.**
+
 ### R3-23 (B, to measure): an idle nurse's search for a hungry young one costs three mob searches and never waits
 
 - **Where:** `FeedLarvaGoal.java:82-93`, `109-133`; `Brood.getLarvae` (`Brood.java:151-153`), the castes'
@@ -539,6 +557,8 @@ only every other game tick unless it asks for every tick).
 - **Fix proposed:** set `nextTry` when no hungry one is found too; or keep "who is hungry" on the colony once a
   second for all nurses.
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: a nurse that found nobody hungry looks again a second later (`FeedLarvaGoal.nextTry`), not on its next ask. Not measured.**
+
 ### R3-24 (B, to measure): sealing a hole searches for a route at least twice, and once per unreachable nearer spot
 
 - **Where:** `SealGoal.java:138-153` (`walkToAPlugSpot`).
@@ -547,6 +567,8 @@ only every other game tick unless it asks for every tick).
   unreachable spot costs a failed whole search, the spike the fix was for.
 - **Fix proposed:** after the group search succeeds take `ant.getNavigator().getGoal()` as `stand`, as
   `Errand.setOffToNearest` does (`Errand.java:284-286`), and drop the loop.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: one search for all the plug spots, and the worker goes to the spot that search found (`SealGoal.walkToAPlugSpot`); the second loop is gone. It now takes the nearest spot it can reach, not the first of the list.**
 
 ### R3-25 (C, proven): `DigGoal`'s "soil waits" check is a harvester leftover, and half of it never runs
 
@@ -686,6 +708,8 @@ pace (see R3-33).
   `savanna/.../RetreatGoal.java:63-67` already does). A goal that must know there is a way before it starts keeps
   what it found and sets off again in `start()`. Add a test that a worker carrying forage reaches flee speed.
 
+**Status (2026-11-26, `claude/review-fix-b6`): half fixed: `FleeGoal` decides in `canUse` and plans its walk in `start`, so the goal it pushes out can no longer wipe the route: a worker flees on its first try, with food in its jaws too. Left: the milder goals of the same shape (`GoInsideGoal`, `WaitAtNestGoal`, `QueenToRoomGoal`, `StayWithQueenGoal`, and the feeders' two searches a start), which only lose one try.**
+
 ### R3-31 (A, proven; checked again): in a colony without a queen, a worker holding food for her starts and stops `FeedQueenGoal` for ever and stands like a statue
 
 - **Checked again (the main session):** `FeedQueenGoal.canUse` (`:62-67`) returns true at once for an ant holding nurse food; `walkToQueen` (`:162-167`) sets `done` when `colony.getQueen` is null and keeps the food; `stop` (`:100-107`) keeps it too. `StoreFoodGoal` asks `isCarryingSeed`, false for nurse food (`AbstractAntEntity.java:415-417`), and `FeedLarvaGoal.canUse` has no take-over for food already held. The work-goals reader found the same loop on its own, and adds: with a living queen it has no way to, each restart also runs failed route searches (the BUGS 42 pattern; likely, `:176`, `:184`).
@@ -713,6 +737,8 @@ pace (see R3-33).
   already has for "she wants no more" (`:211-219`: `pickReturnSpot`, else `putDownWhereItStands`). Do it in
   `canUse` too, so a worker that loads with food and no queen lets go of it.
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: with no queen, or no way to her, the food goes back on a heap by the path `handOver` already had (`FeedQueenGoal.giveBack`), so the worker is free again.**
+
 ### R3-32 (B, proven): `closeIn`'s one-second "no nearer" clock never runs for the goals that use it
 
 - **Where:** `AbstractAntEntity.java:1602` (`closingAt < tickCount - 1` starts the clock afresh), `:1590-1591` (its
@@ -732,6 +758,8 @@ pace (see R3-33).
 - **Fix proposed:** count a gap as more than 2 ticks, or better count game time. Then `ClipGrassGoal`'s own clock
   can go. A test: a carrier blocked 0.1 short of its spot acts within about a second.
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: a gap is more than two game ticks and the clock counts game ticks (`AbstractAntEntity.closeIn`), so a goal that ticks every other tick gets "no nearer" after a second. `ClipGrassGoal`'s own clock is left in (harmless). No test of its own yet.**
+
 ### R3-33 (B, proven): goals count their own ticks at half pace, so most written times are double (the list BUGS 35 and 357 did not name)
 
 - **Where:** `FightGoal.java` (`idleTicks` against the species' `give_up_ticks`, `look_over_ticks`, `CHASE_TICKS`
@@ -750,6 +778,8 @@ pace (see R3-33).
 - **Fix proposed:** needs the user's word, as 357 did, because looks confirmed in play would change. Either count
   game time everywhere with one small helper and halve the numbers so nothing changes in play, or write "goal
   ticks (10 a second)" on each number. Do it with 357, as one change.
+
+**Your call (2026-11-26):** Times written in the insects' goals. Most goals count their own ticks, which come 10 a second, so every written time is really double (a give-up of "a minute" is two, a chase of "10 seconds" is 20). Nothing looks wrong in play: these were tuned by eye. Leave the pace as it is and write the real times on the numbers (no change in play), or halve the waits so they mean what they say (insects give up twice as fast)? My pick: leave the pace, fix the notes; it goes with R3-20.
 
 ### R3-34 (B, to measure): what "may I start" costs per idle worker
 
@@ -777,6 +807,8 @@ pace (see R3-33).
   shows, the colony can keep one "work on offer" answer per role per second that all idle workers read, instead of
   each worker searching for itself. Cache the room cell set in `Nest`.
 
+**Status (2026-11-26, `claude/review-fix-b6`): open: to measure. Nobody has counted the calls and the time of each goal's `canUse` in a full day-time nest; R3-23's wait takes the dearest of them (the nurse's three searches) down to once a second.**
+
 ### R3-35 (B, likely): `RescueGoal` has no claim on the caller, every free nestmate sets off for the same hurt ant
 
 - **Where:** `RescueGoal.java:60-70, 73-86` (`canUse` and `start`), `:142` (the hurt ant only learns of its helper
@@ -786,6 +818,8 @@ pace (see R3-33).
 - **What the player sees:** after a fight, a clump of ants running to one caller while a second caller waits.
 - **Unchecked link:** how many are free in play: raiders and ants going home do not answer, so it may be few.
 - **Fix proposed:** a third care job (rescue) claimed in `canUse` through the claim BUGS 349 added.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: a third care job, rescue (`CareJob.RESCUE`): the helper claims the caller as it picks it, renews the claim while it walks and works, and lets go when it stops, so one nestmate sets off for one caller and the next free one hears the next caller.**
 
 ### R3-36 (C, proven): small things
 
@@ -883,6 +917,8 @@ and both species files. Not read line by line: the rest of `AbstractAntEntity`, 
   at `hitAt` if it is in reach at that moment, or the blow on it lands at once as a clip-less blow does. Spend
   `nextPlayerSting` only when the sting lands.
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: a blow on anything that is not an insect (a player, an animal) lands as its clip begins (`AbstractAntEntity.strike`); only an insect is gripped and stung at the clip's hit moment. The wait between stings is still taken when the blow begins (it now lands whenever it begins in reach). Not seen in the game.**
+
 ### R3-38 (A, proven for leaving; likely for the swap near a player; checked again): a hurt ant that goes into the numbers comes back whole
 
 - **Checked again (the main session):** `mayGoIntoNest` (`AbstractAntEntity.java:560-562`) asks only alive, empty jaws, no target, not riding, no clamp; `Population.goingIn` (`:543-568`) asks only that, sight and distance; `AwayLife.frozenOf` (`:274`) keeps out only the downed, and what it writes down (`Frozen`: caste, age, load, last meal) has no place for legs, wounds or venom. Four readers met this hole from four sides (the insect slice, the fighting slice, both threads); this is the fullest write-up. The open link is the same for all: how often a caste has more real mobs than wanted while hurt ones are about.
@@ -907,6 +943,8 @@ and both species files. Not read line by line: the rest of `AbstractAntEntity`, 
   paralysed one already does in `frozenOf`. Folding the state into the numbers is a bigger job and not needed
   for the few hurt there are.
 
+**Status (2026-11-26, `claude/review-fix-b6`): half fixed: an insect with venom at work, a foe's jaws on it or an open wound stays a real mob (`AbstractAntEntity.staysABody`, asked by `mayGoIntoNest` and `AwayLife.frozenOf`), so wound care and a sting are no longer undone by walking away or by a swap. Left on purpose: lost legs still go into the numbers and come back whole; they are for life, so keeping those ants as mobs would fill the real-mob cap, and holding legs in the numbers is a job of its own.**
+
 ### R3-39 (B, proven): held cells are never cleared away, so "any held?" stays yes and the old world is kept
 
 - **Where:** `fight/HeldCells.java:30` (the static map), `36-45` (`hold`), `60-63` (`any`), `69-93` (`barred`, the
@@ -922,6 +960,8 @@ and both species files. Not read line by line: the rest of `AbstractAntEntity`, 
 - **Fix proposed:** sweep expired holds on a slow clock (once a second per world), and drop the world's map on
   level unload. No new rule needed.
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: once a second the first question (`HeldCells.any`) sweeps away the holds that ran out, so it answers no again and the insects are let go; the server's stop already empties the map (R2-22).**
+
 ### R3-40 (B, proven mechanism, effect to measure): only one bite in half a second lands on one body
 
 - **Where:** `fight/Fights.java:147-151` (`strike`: clamp and leg cut only `if (hit ...)`), `172-176` (`squeeze`).
@@ -934,6 +974,8 @@ and both species files. Not read line by line: the rest of `AbstractAntEntity`, 
 - **Unchecked link:** how often two bites fall within 10 ticks in a real raid; one soldier alone bites every 2 s.
 - **Fix proposed:** say which is wanted. If mobbing should count, insect bites use a damage type that skips the
   cooldown (`bypasses_cooldown` tag), which is one data file, no new rule.
+
+**Your call (2026-11-26):** Many soldiers on one ant. Today only one bite in half a second counts on one body (Minecraft's rule for any mob just hurt), so ten termite soldiers on one ant bite like two, while ten ants on one termite all count. Should every soldier's bite count (a mobbed ant dies about as fast as the numbers say; raids near you cost more ants)? My pick: yes, it is what real soldiers do, but it makes watched raids costlier, so it is your call.
 
 ### R3-41 (B, a reading, not a measurement): a living clamp nearly always costs the leg before care can save it
 
@@ -951,6 +993,8 @@ and both species files. Not read line by line: the rest of `AbstractAntEntity`, 
   to fight it, and its own colony cannot fold it in (it is outside `realMembers`' area). Likely, not run.
 - **Fix proposed:** fewer rules, not more: drop the leg roll from the squeeze (damage only), so `clean` is the one
   place that decides the leg, as the papers say. A holder whose leg comes off dies with it.
+
+**Your call (2026-11-26):** A termite soldier clamped on a leg. Today each squeeze (every 20 seconds) may cut the leg, so an ant that walks home clamped keeps its leg only about 1 time in 3 (minor soldier) or 1 in 8 (major), against the 9 in 10 the papers give when nestmates take the head off in the nest. Take the leg roll out of the squeeze (it only hurts), so the nest's care is the one place that decides the leg? My pick: yes.
 
 ### R3-42 (B, a reading, to measure): the cost of a raid near and as numbers is not the same kind of thing
 
@@ -970,6 +1014,8 @@ and both species files. Not read line by line: the rest of `AbstractAntEntity`, 
   the hurt near (many, with a real death risk after) against the hurt away (few, with none).
 - **Fix proposed:** measure first: one soak line per real raid, "raiders, bitten, clamped, legs lost, dead", next to
   the away dice. Then make the away dice copy what was measured. No code change proposed before that.
+
+**Status (2026-11-26, `claude/review-fix-b6`): open: to measure. A soak line per real raid (raiders, bitten, clamped, legs lost, dead) beside the away dice; no code change before that, as the finding says.**
 
 ### R3-43 (C, proven): small things lost over a reload in the middle of a fight
 
@@ -996,6 +1042,8 @@ and both species files. Not read line by line: the rest of `AbstractAntEntity`, 
   This is how bees behave too, so it may be wanted. It is nowhere written down.
 - **Fix proposed:** the user's call. Either leave it and note it in `docs/DESIGN.md`, or have `fair` say no in
   Peaceful so the ants only come out to look.
+
+**Your call (2026-11-26):** The ants in Peaceful. Today the nest's defenders still pour out, chase and squeak at you in Peaceful, but their sting does nothing (Minecraft switches mob damage off). Leave it (bees do the same) and note it, or have them only come out and look in Peaceful? My pick: leave it, note it in the design notes.
 
 ### Solid on this thread (do not "fix")
 

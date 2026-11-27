@@ -89,6 +89,7 @@ public class FeedLarvaGoal extends Goal {
         }
         larva = claimHungry(level);
         if (larva == null) {
+            nextTry = level.getGameTime() + 20; // nobody hungry: it looks again in a second, not on its next ask (review R3-23)
             return false;
         }
         pile = colony.nurseFood().findFood(level, ant.getRandom());

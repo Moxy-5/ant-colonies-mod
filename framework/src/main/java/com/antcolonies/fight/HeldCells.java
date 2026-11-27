@@ -34,6 +34,7 @@ public final class HeldCells {
 
     /** Forgets every world's held cells (the server stopped: the holders would keep their closed world in memory, review R2-22). */
     public static void clear() {
+        SWEPT.clear();
         HELD.clear();
     }
 
@@ -61,10 +62,29 @@ public final class HeldCells {
         return until != null && until >= insect.level().getGameTime() && insect.isAlive() && !insect.isDowned();
     }
 
-    /** Whether any cell of this world may be held now (a cheap first question). */
+    /** Per world: the game time its held cells were last swept for holds run out. */
+    private static final Map<Level, Long> SWEPT = new WeakHashMap<>();
+
+    /**
+     * Whether any cell of this world may be held now (a cheap first question). Once a second the holds that ran out are
+     * swept away first (review R3-39: a hold was only taken out when somebody asked about that very cell again, so
+     * after one soldier had held one cell this stayed yes for the rest of the sitting, and the insects kept were never let go).
+     */
     public static boolean any(Level level) {
         Map<BlockPos, Map<AbstractAntEntity, Long>> held = HELD.get(level);
-        return held != null && !held.isEmpty();
+        if (held == null || held.isEmpty()) {
+            return false;
+        }
+        long now = level.getGameTime();
+        Long swept = SWEPT.get(level);
+        if (swept == null || now - swept >= 20 || now < swept) {
+            SWEPT.put(level, now);
+            held.entrySet().removeIf(cell -> {
+                cell.getValue().entrySet().removeIf(hold -> gone(hold.getKey(), hold.getValue(), cell.getKey(), now));
+                return cell.getValue().isEmpty();
+            });
+        }
+        return !held.isEmpty();
     }
 
     /**

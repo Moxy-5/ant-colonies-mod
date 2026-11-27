@@ -703,6 +703,9 @@ public class Nest {
      * where it must be hollow. A foraging hole only at foraging time (soil or its plug).
      */
     public boolean canDig(Level level, BlockPos pos) {
+        if (!LandReady.at(level, pos)) {
+            return false; // (never read land that is not loaded: the read would load it, review R3-22)
+        }
         if (colony.foragingHoles().isHole(level, pos)) {
             return colony.foragingHoles().mayOpen(level, pos);
         }

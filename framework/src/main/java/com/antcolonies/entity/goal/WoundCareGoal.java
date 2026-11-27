@@ -37,6 +37,8 @@ public class WoundCareGoal extends Goal {
     private int working;
     private int replan;
 
+    private final LeftAlone noWayTo = new LeftAlone();
+
     public WoundCareGoal(AbstractAntEntity ant) {
         this.ant = ant;
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
@@ -54,7 +56,7 @@ public class WoundCareGoal extends Goal {
         }
         // The infected first (they smell of it), then the nearest.
         patient = level.getEntitiesOfClass(AbstractAntEntity.class, ant.getBoundingBox().inflate(LOOK_REACH),
-                        other -> other != ant && other.isAlive() && colony.getId().equals(other.getColonyId())
+                        other -> other != ant && other.isAlive() && !noWayTo.is(other) && colony.getId().equals(other.getColonyId())
                                 && other.wounds().wantsCare() && other.tender() == null && other.careTaker(AbstractAntEntity.CareJob.WOUND) == null
                                 && other.restsForCare(level, colony))
                 .stream().min(Comparator.<AbstractAntEntity>comparingInt(other -> other.wounds().wantsDab() ? 0 : 1)
@@ -100,9 +102,11 @@ public class WoundCareGoal extends Goal {
             walking++;
             working = 0;
             ant.setActivity(AbstractAntEntity.ACTIVITY_NONE);
-            if (--replan <= 0 || ant.getNavigator().isDone()) {
+            if ((--replan <= 0 || ant.getNavigator().isDone()) && !ant.getNavigator().moveTo(patient.blockPosition(), 1.0)) {
+                noWayTo.leave(patient); // no way to it: the job ends and it is left alone a while (review R3-11)
+                walking = WALK_TICKS;
+            } else if (replan <= 0) {
                 replan = 20;
-                ant.getNavigator().moveTo(patient.blockPosition(), 1.0);
             }
             return;
         }

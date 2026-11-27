@@ -40,6 +40,8 @@ public class ClampCareGoal extends Goal {
     private int working;
     private int replan;
 
+    private final LeftAlone noWayTo = new LeftAlone();
+
     public ClampCareGoal(AbstractAntEntity ant) {
         this.ant = ant;
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
@@ -56,7 +58,7 @@ public class ClampCareGoal extends Goal {
             return false;
         }
         patient = level.getEntitiesOfClass(AbstractAntEntity.class, ant.getBoundingBox().inflate(LOOK_REACH),
-                        other -> other != ant && other.isAlive() && colony.getId().equals(other.getColonyId())
+                        other -> other != ant && other.isAlive() && !noWayTo.is(other) && colony.getId().equals(other.getColonyId())
                                 && other.clamp().isOn() && other.careTaker(AbstractAntEntity.CareJob.CLAMP) == null && other.restsForCare(level, colony))
                 .stream().min(Comparator.comparingDouble(other -> other.distanceToSqr(ant))).orElse(null);
         return patient != null && patient.claimCare(AbstractAntEntity.CareJob.CLAMP, ant.getUUID(), level.getGameTime() + AbstractAntEntity.CARE_CLAIM_TICKS);
@@ -101,9 +103,11 @@ public class ClampCareGoal extends Goal {
         if (ant.distanceToSqr(patient) > reach * reach) {
             walking++;
             working = 0;
-            if (--replan <= 0 || ant.getNavigator().isDone()) {
+            if ((--replan <= 0 || ant.getNavigator().isDone()) && !ant.getNavigator().moveTo(patient.blockPosition(), 1.0)) {
+                noWayTo.leave(patient); // no way to it: the job ends and it is left alone a while (review R3-11)
+                walking = WALK_TICKS;
+            } else if (replan <= 0) {
                 replan = 20;
-                ant.getNavigator().moveTo(patient.blockPosition(), 1.0);
             }
             return;
         }

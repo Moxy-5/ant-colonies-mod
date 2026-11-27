@@ -7,19 +7,19 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**307 findings: 169 left (3 of them wait for your call), 138 done.**
+**352 findings: 201 left (9 of them wait for your call), 151 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
-| A: a player can meet it | 67 | 17 | 1 | 0 | 48 | 1 |
-| B: it will cost us when building on this | 143 | 36 | 14 | 12 | 79 | 2 |
-| C: a tidy-up | 97 | 87 | 0 | 2 | 7 | 1 |
+| A: a player can meet it | 73 | 17 | 1 | 3 | 51 | 1 |
+| B: it will cost us when building on this | 160 | 41 | 16 | 12 | 89 | 2 |
+| C: a tidy-up | 119 | 109 | 0 | 2 | 7 | 1 |
 
 | Round | System | Found | Left | Done |
 |---|---|---|---|---|
 | 1 | the colony brain | 50 | 16 | 34 |
 | 2 | the legs | 43 | 18 | 25 |
-| 3 | the insect body | not read yet | | |
+| 3 | the insect body | 45 | 32 | 13 |
 | 4 | how bodies are drawn | not read yet | | |
 | 5 | the termites | not read yet | | |
 | 6 | the Matabele ants (not raids) | not read yet | | |
@@ -30,11 +30,23 @@ review stay in `docs/BUGS.md`.
 | 11 | the new raid code | 22 | 6 | 16 |
 | 12 | the animation engine | 73 | 73 | 0 |
 
-## Waiting for your call (3)
+## Waiting for your call (9)
 
 These change how the game looks or plays, or a balance number, so nothing is built until you say. Each has
 what happens today and my pick. Answer whenever you like: tell Claude the number and what you want.
 
+- **R3-20** (grade B, the insect body) the work goals run at half the speed their numbers say, and the numbers copied from them do not
+  - *Your call:* The pace of work near you and away. Today a real digger bites once a second and a real forager cuts 5 seconds at a plant (their goals count every other game tick), but the colony's numbers (builders and foragers while you are away or out of sight) bite and cut twice as fast. Make the numbers work at the pace you see (away digging and cutting at half today's speed, so mounds and stores grow a little slower while you are away), or speed the real workers up to the numbers (twice as fast as what you have watched)? My pick: the numbers slow down to what you see, then I run the away tests and tell you what moved.
+- **R3-21** (grade B, the insect body) the insects never ask the `mobGriefing` game rule
+  - *Your call:* The mobGriefing game rule. Today termites and Matabele ants dig, plug and eat blocks whatever that rule says (the animals obey it). Keep the colonies digging and sealing their own nests with the rule off (without it the mod does not work), and let the rule only stop termites eating hay bales a player put down? My pick: yes, and I write it in the design notes.
+- **R3-33** (grade B, the insect body) goals count their own ticks at half pace, so most written times are double (the list BUGS 35 and 357 did not name)
+  - *Your call:* Times written in the insects' goals. Most goals count their own ticks, which come 10 a second, so every written time is really double (a give-up of "a minute" is two, a chase of "10 seconds" is 20). Nothing looks wrong in play: these were tuned by eye. Leave the pace as it is and write the real times on the numbers (no change in play), or halve the waits so they mean what they say (insects give up twice as fast)? My pick: leave the pace, fix the notes; it goes with R3-20.
+- **R3-40** (grade B, the insect body) only one bite in half a second lands on one body
+  - *Your call:* Many soldiers on one ant. Today only one bite in half a second counts on one body (Minecraft's rule for any mob just hurt), so ten termite soldiers on one ant bite like two, while ten ants on one termite all count. Should every soldier's bite count (a mobbed ant dies about as fast as the numbers say; raids near you cost more ants)? My pick: yes, it is what real soldiers do, but it makes watched raids costlier, so it is your call.
+- **R3-41** (grade B, the insect body) a living clamp nearly always costs the leg before care can save it
+  - *Your call:* A termite soldier clamped on a leg. Today each squeeze (every 20 seconds) may cut the leg, so an ant that walks home clamped keeps its leg only about 1 time in 3 (minor soldier) or 1 in 8 (major), against the 9 in 10 the papers give when nestmates take the head off in the nest. Take the leg roll out of the squeeze (it only hurts), so the nest's care is the one place that decides the leg? My pick: yes.
+- **R3-45** (grade C, the insect body) in Peaceful the nest defence runs but can do nothing; the sting is not "2 hearts" off Normal
+  - *Your call:* The ants in Peaceful. Today the nest's defenders still pour out, chase and squeak at you in Peaceful, but their sting does nothing (Minecraft switches mob damage off). Leave it (bees do the same) and note it, or have them only come out and look in Peaceful? My pick: leave it, note it in the design notes.
 - **R9-19** (grade C, the river hunters) several small things, listed in the review file
   - *Your call:* Hippo paths. Today the ground a pod walks wears to path blocks and never heals, a player's lawn by a pool too (only with mobGriefing on). Let worn paths grow back to grass when no hippo has walked them for some days? My pick: yes, slowly. (The other small things in this finding need no call.)
 - **R9-44** (grade C, the river hunters) small things in the monitor
@@ -47,7 +59,16 @@ what happens today and my pick. Answer whenever you like: tell Claude the number
 Grade A first. *Open* means looked at and left for a reason (the reason is given); *half fixed* says what
 is left; no word means nobody has started it. The findings that wait for your call are in the part above.
 
-### A: a player can meet it (18 left)
+### A: a player can meet it (21 left)
+
+**Round 3, the insect body** (`docs/reviews/full/round-03-insect-body.md`)
+
+- **R3-10** a fighter with no foe in reach runs costly searches every other tick, for minutes
+  - *Half fixed:* a fighter looks round for a foe once a second, with a foe or without (`FightGoal.pickAt`; a foe it may no longer attack is still replaced at once), and a major that found no breach looks again a second later ...
+- **R3-30** a walk planned in `canUse` is thrown away by the goal it pushes out, so a fleeing worker's first try always fails, and a worker carrying food never flees at all
+  - *Half fixed:* `FleeGoal` decides in `canUse` and plans its walk in `start`, so the goal it pushes out can no longer wipe the route: a worker flees on its first try, with food in its jaws too. Left: the milder goals of the same shape ...
+- **R3-38** a hurt ant that goes into the numbers comes back whole
+  - *Half fixed:* an insect with venom at work, a foe's jaws on it or an open wound stays a real mob (`AbstractAntEntity.staysABody`, asked by `mayGoIntoNest` and `AwayLife.frozenOf`), so wound care and a sting are no longer undone by walking away ...
 
 **Round 7, the giant trees** (`docs/reviews/full/round-07-trees.md`)
 
@@ -74,7 +95,7 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R12-70** the monitor's drawn leg fold turns its right hind foot the wrong way (a Java copy of the swim pose, "kept in step by hand", is out of step)
 - **R12-71** the spot tables and the pair check never see what the game draws on top of the clips, so a throat hold bites the air with every check green
 
-### B: it will cost us when building on this (62 left)
+### B: it will cost us when building on this (64 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -93,6 +114,13 @@ is left; no word means nobody has started it. The findings that wait for your ca
   - *Open:* left on purpose. Checked now: only the termite worker fits the tunnels (the tag `fits_termite_tunnels`), so only it takes a mouth's tube; the king, queen and nymph pass only the old chimney crown block, which no mound builds any ...
 - **R2-39** a mind pays for the same "no way" again a tick later, and a builder can ask 24 times in one tick
   - *Half fixed:* `Errand.walkOn` now treats a walk the legs gave up as "no way" (R2-2's fix): no second ask a tick later. Open: `BuildMoundGoal`'s many asks in one tick (round 5).
+
+**Round 3, the insect body** (`docs/reviews/full/round-03-insect-body.md`)
+
+- **R3-34** what "may I start" costs per idle worker
+  - *Open:* to measure. Nobody has counted the calls and the time of each goal's `canUse` in a full day-time nest; R3-23's wait takes the dearest of them (the nurse's three searches) down to once a second.
+- **R3-42** the cost of a raid near and as numbers is not the same kind of thing
+  - *Open:* to measure. A soak line per real raid (raiders, bitten, clamped, legs lost, dead) beside the away dice; no code change before that, as the finding says.
 
 **Round 7, the giant trees** (`docs/reviews/full/round-07-trees.md`)
 
@@ -188,7 +216,7 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R12-65** `MoveRider`, the planned one home for block moves, lacks two lessons of the monitor's copy, and the drawing half is copied three times
 - **R12-72** the move files have no staleness check (the spot tables do), and their unit test reads only the monitor's
 
-### C: a tidy-up (86 left)
+### C: a tidy-up (107 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -225,6 +253,30 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R2-34** on the server "is it climbing" reads the value sent to the drawing, a tick late
 - **R2-35** comments in the wrong place or saying the wrong thing
 - **R2-36** gaps in `DoorwayMotionTest`
+
+**Round 3, the insect body** (`docs/reviews/full/round-03-insect-body.md`)
+
+- **R3-1** a stung insect saved while staggering walks at full speed after the reload
+- **R3-2** the camera's "film:" name hook is reachable in play
+- **R3-3** `WoundOddsTest` is a weak copy of a savanna test
+- **R3-4** comments that still describe the harvester
+- **R3-5** a felled insect's load is deleted, while the comment says it drops it
+- **R3-6** the lookers' small reach at the entrance lasts one second
+- **R3-7** a felled striker still finishes its grip
+- **R3-8** a new name string for every insect every tick, for the stopwatch
+- **R3-9** stings add up for life
+- **R3-14** the fleeing termite's "startled moment" is only a delay
+- **R3-15** five goals turn the body themselves, five copies of one method
+- **R3-16** leftovers of the harvester ant
+- **R3-17** small loose ends
+- **R3-25** `DigGoal`'s "soil waits" check is a harvester leftover, and half of it never runs
+- **R3-26** wrong or stale comments
+- **R3-27** `FeedLarvaGoal` and `FeedQueenGoal` carry the same three legs twice
+- **R3-28** mouth to mouth turns the nurse's body from the mind
+- **R3-29** `TidySearchTest` checks the rule, not the search
+- **R3-36** small things
+- **R3-43** small things lost over a reload in the middle of a fight
+- **R3-44** the headcount's "one died" is written three times in species code
 
 **Round 7, the giant trees** (`docs/reviews/full/round-07-trees.md`)
 
@@ -370,6 +422,22 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R2-41** (B) saving an insect that is walking a wall reads the world and loses its hold
 - **R2-42** (B) four tests of "is this a doorway for this insect"
 - **R2-43** (B) knocked into a cell near its route, an insect finds out only after 6 seconds (BUGS 413)
+
+**Round 3, the insect body**
+
+- **R3-11** (B) a walk that found no route is searched again on every goal tick
+- **R3-12** (B) termite nurses at the queen never clean themselves or groom anyone
+- **R3-13** (B) termite workers no longer hang from the ceilings
+- **R3-18** (A) a paralysed nestmate eaten on the comb stays in the colony's headcount for ever
+- **R3-19** (B) `DigGoal` can start with a body in the jaws, and its first bite throws the body away
+- **R3-22** (B) two goals read their target block every tick without asking whether its land is loaded
+- **R3-23** (B) an idle nurse's search for a hungry young one costs three mob searches and never waits
+- **R3-24** (B) sealing a hole searches for a route at least twice, and once per unreachable nearer spot
+- **R3-31** (A) in a colony without a queen, a worker holding food for her starts and stops `FeedQueenGoal` for ever and stands like a statue
+- **R3-32** (B) `closeIn`'s one-second "no nearer" clock never runs for the goals that use it
+- **R3-35** (B) `RescueGoal` has no claim on the caller, every free nestmate sets off for the same hurt ant
+- **R3-37** (A) a player who keeps walking is almost never stung
+- **R3-39** (B) held cells are never cleared away, so "any held?" stays yes and the old world is kept
 
 **Round 7, the giant trees**
 

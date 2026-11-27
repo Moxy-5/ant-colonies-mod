@@ -558,7 +558,19 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     /** Whether it may go back into its colony's numbers now: not while it holds anything or is after an enemy. */
     public boolean mayGoIntoNest() {
-        return isAlive() && !hasFullMandibles() && getTarget() == null && !isPassenger() && !clamp.isOn() && clampingOn == null;
+        return isAlive() && !hasFullMandibles() && getTarget() == null && !isPassenger() && !clamp.isOn() && clampingOn == null
+                && !staysABody();
+    }
+
+    /**
+     * Review R3-38: whether its body carries a state the colony's numbers cannot hold, one that passes: venom at work, a
+     * foe's jaws on it, an open wound (it closes or kills). Such an insect stays a real mob: going into the numbers, near
+     * a player or when the colony goes away, it came out again whole, so wound care and a sting were undone by walking
+     * off. (Lost legs are for life and still go into the numbers and are lost there: keeping every such ant a mob for
+     * ever would fill the real-mob cap; holding legs in the numbers is its own job.)
+     */
+    public boolean staysABody() {
+        return isDowned() || pinnedBy != null || wounds.isOpen();
     }
 
     /** The kind of body this insect leaves: its species' dead ({@link com.antcolonies.species.SpeciesBodies}). */
@@ -1088,7 +1100,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     @Nullable
     private UUID tendedBy;
     /** BUGS 349: the kinds of care a nestmate gives it, each with its own carer, so the two go on side by side. */
-    public enum CareJob { CLAMP, WOUND }
+    public enum CareJob { CLAMP, WOUND, RESCUE }
 
     /**
      * BUGS 349: for each kind of care ({@link CareJob}), the nestmate that has picked it (on its way or at work) and until
@@ -1587,8 +1599,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      * 0.3 of a cell's middle, which reached a foe or a body when insects were big; at real sizes the jaws reach a third
      * of a body length, so the mind asks for this step and acts once {@link #touches} (or {@link #reachesInFight}) says
      * so. It tells how it went: {@link CloseIn#NO_NEARER} lets the mind fall back to the reach it had before real sizes,
-     * so nothing is ever stuck for want of a few hundredths of a block. Asked every tick while it is wanted (a gap of a
-     * tick starts it afresh).
+     * so nothing is ever stuck for want of a few hundredths of a block. Asked on every tick of the goal that wants it (a gap
+     * of more than two game ticks starts it afresh).
      */
     public CloseIn closeIn(Vec3 point, double near) {
         double dx = point.x - getX();
@@ -1599,14 +1611,16 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             closingOn = null;
             return CloseIn.FAR;
         }
-        if (closingOn == null || closingAt < tickCount - 1 || closingOn.distanceToSqr(point) > 0.5 * 0.5) {
+        // (a goal asks on each of its ticks, every other game tick for most: a gap is more than that, and the clock
+        // counts game ticks; review R3-32: with "a gap of a tick" the clock started afresh on every ask and never ran)
+        if (closingOn == null || closingAt < tickCount - 2 || closingOn.distanceToSqr(point) > 0.5 * 0.5) {
             closingBest = flat;
             closingTicks = 0;
         } else if (flat < closingBest - 0.01) {
             closingBest = flat;
             closingTicks = 0;
         } else {
-            closingTicks++;
+            closingTicks += tickCount - closingAt;
         }
         closingOn = point;
         closingAt = tickCount;
@@ -1636,7 +1650,10 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         }
         Attack how = attackFor(foe);
         swing(net.minecraft.world.InteractionHand.MAIN_HAND);
-        if (how == null || how.hitAt() <= 0) {
+        // Review R3-37: the grip holds an insect still till the blow lands; nothing else can be held (a player, an
+        // animal), so a blow on it lands as the clip begins: a player who kept walking was out of reach long before the
+        // clip's hit moment and was almost never stung.
+        if (how == null || how.hitAt() <= 0 || !(foe instanceof AbstractAntEntity)) {
             if (how != null) {
                 playAttack(how);
             }

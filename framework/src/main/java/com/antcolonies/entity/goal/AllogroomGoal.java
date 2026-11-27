@@ -36,6 +36,8 @@ public class AllogroomGoal extends Goal {
     /** Not again before this tick: a few seconds between two cleanings (my pick). */
     private int restUntil;
 
+    private final LeftAlone noWayTo = new LeftAlone();
+
     public AllogroomGoal(AbstractAntEntity insect) {
         this.insect = insect;
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
@@ -57,7 +59,7 @@ public class AllogroomGoal extends Goal {
         }
         double reach = numbers.reach();
         mate = level.getEntitiesOfClass(AbstractAntEntity.class, insect.getBoundingBox().inflate(reach),
-                        other -> other != insect && other.isAlive() && colony.getId().equals(other.getColonyId())
+                        other -> other != insect && other.isAlive() && !noWayTo.is(other) && colony.getId().equals(other.getColonyId())
                                 && (other.isIdle() || other.isAsleep()) && other.getActivity() != AbstractAntEntity.ACTIVITY_ALLOGROOM
                                 && !other.isBeingGroomed(null) && mayHere(other) && other.distanceToSqr(insect) <= reach * reach
                                 && colony.nest().isInside(level, other.blockPosition()))
@@ -121,9 +123,11 @@ public class AllogroomGoal extends Goal {
         if (insect.distanceToSqr(mate) > reach * reach) {
             walking++;
             insect.setActivity(AbstractAntEntity.ACTIVITY_NONE);
-            if (--replan <= 0 || insect.getNavigator().isDone()) {
+            if ((--replan <= 0 || insect.getNavigator().isDone()) && !insect.getNavigator().moveTo(mate.blockPosition(), 1.0)) {
+                noWayTo.leave(mate); // no way to it: it gives up and leaves that nestmate alone a while (review R3-11)
+                walking = WALK_TICKS;
+            } else if (replan <= 0) {
                 replan = 20;
-                insect.getNavigator().moveTo(mate.blockPosition(), 1.0);
             }
             return;
         }

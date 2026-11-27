@@ -138,17 +138,14 @@ public class SealGoal extends Goal {
     private boolean walkToAPlugSpot(ServerLevel level, BlockPos hole) {
         AntPathFinder.StepCosts notThroughTheHole = AntPathFinder.StepCosts.forbid(java.util.List.of(hole));
         java.util.List<BlockPos> spots = colony.walls().plugSpots(level, hole);
-        // One search for them all first (tick spikes, 2026-11-10; the same pick): a worker cut off from the hole searched
-        // the whole nest once for every spot round it, up to 100 ms in one tick. With a way to any, the best is picked as before.
-        if (spots.size() > 1 && !errand.setOff(spots, 1.0, notThroughTheHole)) {
+        // One search for them all (tick spikes, 2026-11-10): a worker cut off from the hole searched the whole nest once
+        // for every spot round it, up to 100 ms in one tick. It goes to the spot that search found, the nearest it can
+        // reach (review R3-24: a second loop searched again spot by spot, a whole failed search for each nearer spot
+        // out of reach).
+        if (spots.isEmpty() || !errand.setOff(spots, 1.0, notThroughTheHole)) {
             return false;
         }
-        for (BlockPos spot : spots) {
-            if (errand.setOff(spot, 1.0, notThroughTheHole)) {
-                stand = spot;
-                return true;
-            }
-        }
-        return false;
+        stand = ant.getNavigator().getGoal();
+        return stand != null;
     }
 }

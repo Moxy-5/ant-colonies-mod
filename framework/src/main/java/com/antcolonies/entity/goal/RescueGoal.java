@@ -43,6 +43,7 @@ public class RescueGoal extends Goal {
     private int replan;
     @Nullable
     private BlockPos room;
+    private final LeftAlone noWayTo = new LeftAlone();
 
     public RescueGoal(AbstractAntEntity ant) {
         this.ant = ant;
@@ -65,7 +66,7 @@ public class RescueGoal extends Goal {
         }
         return level.getEntitiesOfClass(AbstractAntEntity.class, ant.getBoundingBox().inflate(n.helpReach()),
                         other -> other != ant && colony.getId().equals(other.getColonyId()) && other.isCallingForHelp()
-                                && other.tender() == null)
+                                && other.tender() == null && other.careTaker(AbstractAntEntity.CareJob.RESCUE) == null)
                 .stream().sorted(Comparator.comparingDouble(other -> other.distanceToSqr(ant))).toList();
     }
 
@@ -80,9 +81,10 @@ public class RescueGoal extends Goal {
         if ((ant.tickCount + ant.getId()) % 20 != 0 || !mayHelp(ant)) {
             return false;
         }
-        List<AbstractAntEntity> calling = callers(level, ant);
-        patient = calling.isEmpty() ? null : calling.get(0);
-        return patient != null;
+        // The nearest caller nobody is on the way to yet, claimed as it is picked (review R3-35: every free nestmate in
+        // reach set off for the same hurt ant); never one it just found no way to (review R3-11).
+        patient = callers(level, ant).stream().filter(other -> !noWayTo.is(other)).findFirst().orElse(null);
+        return patient != null && patient.claimCare(AbstractAntEntity.CareJob.RESCUE, ant.getUUID(), level.getGameTime() + AbstractAntEntity.CARE_CLAIM_TICKS);
     }
 
     @Override
@@ -108,6 +110,9 @@ public class RescueGoal extends Goal {
         if (ant.isCarrying(FrameworkLoads.HURT) && walking >= CARRY_TICKS && ant.level() instanceof ServerLevel level) {
             setDown(level); // it could not get it to the room: it sets it down where it is
         }
+        if (patient != null) {
+            patient.releaseCare(AbstractAntEntity.CareJob.RESCUE, ant.getUUID());
+        }
         patient = null;
     }
 
@@ -123,13 +128,16 @@ public class RescueGoal extends Goal {
         if (patient == null) {
             return;
         }
+        patient.claimCare(AbstractAntEntity.CareJob.RESCUE, ant.getUUID(), level.getGameTime() + AbstractAntEntity.CARE_CLAIM_TICKS);
         double reach = (ant.getBbWidth() + patient.getBbWidth()) * 0.5 + 0.3;
         if (ant.distanceToSqr(patient) > reach * reach) {
             walking++;
             working = 0;
-            if (--replan <= 0 || ant.getNavigator().isDone()) {
+            if ((--replan <= 0 || ant.getNavigator().isDone()) && !ant.getNavigator().moveTo(patient.blockPosition(), 1.2)) { // it hurries to the call
+                noWayTo.leave(patient); // no way to it: the job ends, and another caller is heard (review R3-11)
+                walking = WALK_TICKS;
+            } else if (replan <= 0) {
                 replan = 20;
-                ant.getNavigator().moveTo(patient.blockPosition(), 1.2); // it hurries to the call
             }
             return;
         }
@@ -174,9 +182,10 @@ public class RescueGoal extends Goal {
             setDown(level);
             return;
         }
-        if (--replan <= 0 || ant.getNavigator().isDone()) {
+        if ((--replan <= 0 || ant.getNavigator().isDone()) && !ant.getNavigator().moveTo(room, 1.0)) {
+            walking = CARRY_TICKS; // no way to the room: it sets its nestmate down here (review R3-11; before, it searched again and again for 4 minutes)
+        } else if (replan <= 0) {
             replan = 40;
-            ant.getNavigator().moveTo(room, 1.0);
         }
     }
 

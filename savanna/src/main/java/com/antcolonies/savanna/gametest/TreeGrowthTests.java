@@ -194,10 +194,12 @@ public class TreeGrowthTests {
             }
         }
         forest.update(level, t, base + days + 1);
-        helper.assertTrue(forest.at(foot) == null, "a tree cut through at its foot is still in the book");
-        // (review R7-31: what was left of the little tree went with it, nothing hangs)
-        int hanging = countAround(level, foot, 2, 30, b -> b.is(TreeBlocks.TREE_WOOD) || b.is(TreeBlocks.TREE_LEAVES));
-        helper.assertTrue(hanging == 0, hanging + " blocks of the cut young tree hang in the air");
+        // (review R7-31: a little tree goes with what was left of it; one past young falls and lies as a log. Nothing hangs.)
+        Forest.Tree cut = forest.at(foot);
+        helper.assertTrue(cut == null || cut.fell || cut.toppling, "a tree cut through at its foot still stands in the book");
+        // (the fall itself is aGrownTreeCutThroughAtTheFootFalls' to check)
+        int hanging = cut != null ? 0 : countAround(level, foot, 2, 30, b -> b.is(TreeBlocks.TREE_WOOD) || b.is(TreeBlocks.TREE_LEAVES));
+        helper.assertTrue(hanging == 0, hanging + " blocks of the cut little tree hang in the air");
         forest.forgetInside(helper.getBounds());
         helper.succeed();
     }

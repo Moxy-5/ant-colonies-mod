@@ -637,6 +637,9 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
      * (or a mud cast itself), with open air over it to stand in; never wood, never the mound, never one another major
      * is at. It walks there and bites it open, then the next, up to {@link #OPENS_PER_SPOT} at the spot.
      */
+    /** Game time until which it looks for no breach: it found none to open (review R3-10). */
+    private long noBreachUntil;
+
     @Override
     public boolean breakIn(ServerLevel level, BlockPos spot, double reach) {
         if (!hasMajorBody()) {
@@ -656,9 +659,13 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
             if (opened >= OPENS_PER_SPOT) {
                 return false;
             }
+            if (now < noBreachUntil) {
+                return false; // (review R3-10: it found none a moment ago; the look is two entity searches and every gallery cell)
+            }
             breach = pickBreach(level, spot, reach);
             walkingToBreach = null;
             if (breach == null) {
+                noBreachUntil = now + 20;
                 return false;
             }
             com.antcolonies.fight.FightDiary.note(this, "picks a breach at " + breach.toShortString() + " (" + opened + " opened so far)");

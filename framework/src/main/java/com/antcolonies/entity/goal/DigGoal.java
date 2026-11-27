@@ -64,7 +64,8 @@ public class DigGoal extends Goal {
     public boolean canUse() {
         // Only look for work now and then, so ants don't all think on the same tick (every time just before it would count as idle).
         // An ant with a pellet in its mouth must carry it out before biting again.
-        if (ant.getColonyId() == null || ant.isCarrying() || !ant.looksForWork(20) || !allowed.getAsBoolean()
+        // (any full jaw, not only a soil pellet: a builder still holding a body bit soil and the body was gone, review R3-19)
+        if (ant.getColonyId() == null || ant.hasFullMandibles() || !ant.looksForWork(20) || !allowed.getAsBoolean()
                 || !mayStart.getAsBoolean()) {
             return false;
         }
@@ -90,7 +91,7 @@ public class DigGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return target != null && !ant.isCarrying() && stuckTicks < GIVE_UP_TICKS && allowed.getAsBoolean()
+        return target != null && !ant.hasFullMandibles() && stuckTicks < GIVE_UP_TICKS && allowed.getAsBoolean()
                 && colony != null && colony.nest().canDig(ant.level(), target)
                 // now and then: has the night soil piled up (rest), or is there a pile to carry up first?
                 && (ant.tickCount % 20 != 0 || target.equals(colony.nest().getEntrance())

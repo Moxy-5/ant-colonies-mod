@@ -118,12 +118,14 @@ public class TermiteWorkerEntity extends AbstractAntEntity implements ColonyBorn
         this.goalSelector.addGoal(4, new GoInsideGoal(this));
         // With nothing to do, a player's steps or a jump shaking the ground near: it freezes, antennae up (it is blind).
         this.goalSelector.addGoal(4, new NoticeGoal(this));
-        this.goalSelector.addGoal(5, new StandByQueenGoal(this));
         // M8 3Q: at rest, cleaning its antennae and its nestmates (often: termites groom each other constantly); no naps
         this.goalSelector.addGoal(5, new GroomGoal(this));
         this.goalSelector.addGoal(5, new AllogroomGoal(this));
-        this.goalSelector.addGoal(6, new AntWanderGoal(this, 1.0, 160, 5, () -> true).hangsFromCeilings(0.25F).restsFirst(1.0F)); // M8 3Q: rest first
-        this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
+        // (after the cleaning, review R3-12: at the same rank a nurse standing by the queen, which she does for good,
+        // never cleaned herself or a nestmate, so the queen's court stood still; real court workers groom all the time)
+        this.goalSelector.addGoal(6, new StandByQueenGoal(this));
+        this.goalSelector.addGoal(7, new AntWanderGoal(this, 1.0, 160, 5, () -> true).hangsFromCeilings(0.25F).restsFirst(1.0F)); // M8 3Q: rest first
+        this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
     }
 
     @Override

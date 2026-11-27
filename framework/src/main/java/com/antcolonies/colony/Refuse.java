@@ -273,7 +273,8 @@ public class Refuse {
         AbstractAntEntity best = null;
         double bestDistance = Double.MAX_VALUE;
         for (AbstractAntEntity body : level.getEntitiesOfClass(AbstractAntEntity.class, groundBox(8.0),
-                insect -> insect.isAlive() && id.equals(insect.getColonyId()) && insect.isParalysed() && !insect.isPinned())) {
+                insect -> insect.isAlive() && id.equals(insect.getColonyId()) && insect.isParalysed() && !insect.isPinned()
+                        && insect.nestCaste() != null)) { // (review R3-18: never the queen or the king, who are no number)
             if (claimedCorpses.contains(body.getUUID()) || avoid.contains(body.getUUID()) || !canGo.test(body.blockPosition())
                     || foeNear(level, body.blockPosition())) {
                 continue;
