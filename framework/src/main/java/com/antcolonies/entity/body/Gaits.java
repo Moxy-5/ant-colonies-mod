@@ -14,7 +14,7 @@ import software.bernie.geckolib.animation.RawAnimation;
 
 /**
  * An animal's gaits from its body plan, the one place they are written (the Motion Studio, phase 2, step 2, 2026-11-25;
- * {@code docs/plans/motion-studio-phase2.md}): each gait clip's own speed (the plan's {@code checks.walks}, which the
+ * the first phase 2, its record in {@code docs/HISTORY.md}): each gait clip's own speed (the plan's {@code checks.walks}, which the
  * offline checker reads too), the speed it starts at and its play-speed limits (the plan's {@code gaits}). The game picks
  * the gait and plays its clip at the speed its stride needs, within the limits; before, the game kept copies of the
  * clips' speeds and the switch points in Java, and two had drifted from the plans.

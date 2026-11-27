@@ -430,6 +430,21 @@ def _jaw(rig, pose):
     return rig.world_pt(mats, origs, "carry", rig.piv["carry"])
 
 
+_MADE_AGAINST = {}          # (holder, hold clip): the print of the buffalo's spots it is made from (tools/spots.py)
+
+
+def _mark_made_against(made, holder):
+    """Each clip made against the buffalo's spots says so (a "made_against buffalo <print>" note, its first timeline
+    key): tools/spots.py --check (the build) then fails when the buffalo's table moves on and the clip is not made again
+    (the new phase 2, idea 56, 2026-11-27)."""
+    for name, clip in made.items():
+        sign = _MADE_AGAINST.get((holder, name))
+        if sign is not None:
+            notes = clip.setdefault("timeline", {})
+            notes["0.0"] = f"made_against buffalo {sign}" + (f"; {notes['0.0']}" if "0.0" in notes else "")
+    return made
+
+
 def _prey_heights(holder, hold_clip):
     """For the buffalo pair this hold is made for: the sizes, the prey's clips and the height of the spots it holds at
     every tick of each (the mean of those spots, in the holder's model px) and their spread (px)."""
@@ -440,6 +455,8 @@ def _prey_heights(holder, hold_clip):
     plan = _json.load(open(_os.path.join(base, "body_plans", "buffalo.json"), encoding="utf-8"))
     pair = next(p for p in plan["spots"]["pairs"] if p["holder"] == holder and p["hold"] == hold_clip)
     table = _json.load(open(_os.path.join(base, "spots", "buffalo.json"), encoding="utf-8"))["spots"]
+    import spots as _spots                              # what the clip is made from, for the build's check
+    _MADE_AGAINST[(holder, hold_clip)] = _spots.partner_print("buffalo", holder, hold_clip)
     names = table["names"]
     held = [names.index(n) for n in pair.get("spots", names)]
     scale = pair["size"] / pair["holder_size"]
@@ -543,7 +560,7 @@ def make_feeds(rig, holder, rest_frame):
         npitch, dz = state["at"]
         print(f"  {holder} {name}: jaw {y:.2f} px high at reach {state['reach']:.2f} (a carcass of size {pair['size']}), "
               f"neck about {npitch:.0f} deg, its height missed by {state['miss']:.3f} px")
-    return made
+    return _mark_made_against(made, holder)
 
 
 def make_holds(rig, bite, rest_targets):
@@ -640,7 +657,7 @@ def make_holds(rig, bite, rest_targets):
     report.append(f"hold_sink: jaw {track_s[0]:.2f} down to {track_s[-1]:.2f} px over {n} ticks, spots spread {spread_s:.2f}")
     for line in report:
         print("  lioness " + line)
-    return made
+    return _mark_made_against(made, "lioness")
 
 
 # ====================================================================================================

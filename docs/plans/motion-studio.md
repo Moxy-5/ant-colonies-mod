@@ -170,18 +170,43 @@ plan"). The clips were the easy part of step 5; nearly every fault came from put
     a clip that depends on another animal's clip (the lioness's holds on the buffalo's death) says so when that clip
     changes. S.
 
+*Neon's small additions to G (2026-11-27, written on `neon/studio` after reading phases 0 to 3, folded in here):*
+57. **One shared feet rule in `tools/recording.py`** (fixes BUGS 456, 457): the replay page's foot contact and slide
+    rule, so `replay.py`, `replay_strips.py`, `pair_report.py` and `body_course.py` report the same planted and sliding
+    feet. S, Claude.
+58. **Every maker keeps the plan's other sections** (extends 56): `keep_gaits` grown into one helper every maker goes
+    through, keeping `gaits`, `spots`, `holds`, `strikes`, `checks.controller`, `checks.drawn_ahead`, `course`,
+    `verify` and added `switches`. S, Claude.
+59. **The young's gaits** (BUGS 378): `clip_check.py` at a young size, young gait slots in `Gaits` and the pace report,
+    so stride-matched calf and cub gaits can be made and checked against the young's real speeds. S, Claude.
+
+**H. Video review (Neon's phase 3c, part 1; added 2026-11-27).** Neon can watch an `.mp4` itself and judge timing and
+weight that fall between contact-sheet frames.
+60. **A recording to video** (`tools/replay_video.py` or `replay_strips.py --video`): several cameras in one frame,
+    1x and slow motion, a bar with tick, clip, play speed and a red mark for a sliding foot. M, Claude.
+61. **An offline clip to video:** the same from the clip files alone (a clip on a moving floor at its stride, a blend
+    of `--switches`, a `--pair` scene), in seconds, no game. M, Claude or Neon.
+62. **Real footage beside the clip** (`--ref <video>`, grows idea 47), cycle-matched. S-M, Claude.
+
+**I. Living motion (Neon's phase 3c, part 2; promotes 27 and 28).**
+63. **The spine bending into turns** from the body plan's chain, eased on `DrawClock`. M, Claude.
+64. **Start, stop and banked-turn weight** (`stop_pitch`, `turn_lean`, `accel_stride` in the plan, eased on
+    `DrawClock`), for runners and fliers. M, Claude.
+
 ## The order (my recommendation)
 - **Phase 0, eyes on the real hunt (a day or two, Claude):** 1, 2, 11, 12, 16, 14, plus the quick fixes 29 and 30.
   Then look at the films and the recording before changing anything ("find the cause before fixing jank").
 - **Phase 1, the lab shows the game (Neon's viewer):** 3, 5, 6, 7 on the phase 0 recordings. After this the user can
   study any real motion from any angle.
-- **Phase 2, one source of truth for motion:** 20, 21, 22, 23, 24, 25, 26. Each removes a copy or a hidden difference.
+  **Built 2026-11-27 by Claude (Neon out of quota), `claude/motion-phase1`: "Phase 1, built" below.**
+- **Phase 2 (new, 2026-11-27, the user: "its a new phase delete the old one that was already completed"): the glue,**
+  51 to 56 with Neon's 57 to 59: `docs/plans/motion-studio-phase2.md`. (The first phase 2, ideas 20 to 26, one source
+  of truth for motion, was built 2026-11-25; its record is in `docs/HISTORY.md`.)
 - **Phase 3, partner moves (the lion and buffalo first):** 31, 32, then 36 and 37 offline, then 33 with 34 or 35 in
   the game (pick after seeing the phase 0 films), then 38, 40, 41. The hunt's oval and fixed ticks go.
   **Started 2026-11-26: its own plan and steps in `docs/plans/motion-studio-phase3.md` (step 1, the hold on the prey's body, built).**
-- **Phase 3b, the glue (my recommendation, 2026-11-26; not started):** 51, 52, 53 first, before the animations are
-  redone (the user plans to change them all later; each new clip goes through this glue), then 54 to 56. Check first
-  what the round 12 review's fixes already cover and do not work in the lion and engine code beside that chat.
+- **Phase 3b, the glue:** became the new phase 2 (above).
+- **Phase 3c (Neon's, 2026-11-27): video review and living motion,** 60 to 62, then 63 and 64. After phase 2.
 - **Phase 4, the replay key (9)** and the tests (43 to 46). **On hold (the user, 2026-11-26).** Its hold and strike
   tests would be written against the placement code that 51 replaces; the replay key loses nothing by waiting.
 
@@ -222,6 +247,63 @@ plan"). The clips were the easy part of step 5; nearly every fault came from put
 
 **What phase 0 did not do:** the replay page (phase 1, Neon's viewer); no fix to the hunt itself (373 to 377 are the
 evidence for phase 3's partner moves; 372 is a plain bug for its own session).
+
+## Phase 1, built (2026-11-27, branch `claude/motion-phase1`, Claude covering Neon's lane; the user's go-ahead)
+**What was built (ideas 3, 5, 6, 7; foot paths in the replay in place of idea 8's dots in the game), in three stages,
+each reviewed by three subagents and their findings fixed:**
+- **The replay page (3):** `python tools/replay.py run-film/screenshots/<scene>` writes `references/replay/<scene>.html`,
+  one file that works offline: every animal of a film's recording on the recorded blocks and water, each part where the
+  game drew it (the recorded matrices, nothing re-imagined), any angle, play at 1/10 to 2 times, a moment at a time,
+  the scrub bar, cameras round a picked animal, follow, labels, the pieces, hide an animal. Each camera turns with the
+  animal and stands at one distance for its whole recording: fitted to the space the animal takes up in its own frame
+  over the recording (a fit to one moment's pose made the zoom jump from moment to moment and a turn crop it, the
+  stage 3 review; a strip is fitted to its own moments). Follow keeps a lit camera on the animal, turning with it.
+  Click an animal to read its clips, play speed, how far in, standing, and its mind's facts. The page's address holds
+  the moment, the animal, the camera and the traces: a link brings back the same view. Game ticks run but not drawn show
+  as gaps ("after 61 game ticks not recorded").
+- **One clock:** the recorder now writes the client's own tick count (`ct`, counted only while the game runs: not while
+  frozen or paused) beside the game time (`ft`); animals are lined up on `ct` plus the partial tick. Older recordings
+  fall back to `ft` (the page says so).
+- **One reader:** `tools/recording.py` reads every recording (the page, `tools/pair_report.py`, `tools/body_course.py`;
+  their outputs checked unchanged).
+- **The footfall chart (6):** under the scene, the picked animal's clip and each foot moment by moment (dark on the
+  ground, red sliding, light lifted, a dashed blue line for ticks not recorded), three seconds each side of now or the
+  whole recording; press or drag on it to go to a moment.
+- **Ghosts (7)** (4 or 8, a tenth of a second apart, never across ticks not recorded) and **foot paths** (each foot's
+  middle over the last 1.5 s, coloured the same way).
+- **Picture strips (5):** `python tools/replay_strips.py <scene> --pick <animal> --from <tick> --to <tick> --every N
+  [--cams side,front,above] [--fixed] [--list]` lays the animal at every N-th of its own moments from each camera on
+  sheets of ten rows with its clip, play speed and feet (heights in model pixels, a sliding row framed red), its foot
+  paths in the pictures, the chart under the last sheet, and a text file: a summary (clip changes, ticks not recorded,
+  slide stretches, the body's biggest step) and every moment with clips, feet, the body's drawn step and turn a tick
+  and the mind's facts (`references/replay/strips/`). `--fixed` keeps each camera where its first picture was taken (the
+  animal's own travel shows); `--list` writes only the text, to find the ticks worth a picture. The page is built afresh
+  for each run. For checking a motion before the user sees it.
+- **The feet rule (my picks, set from the lion hunt's numbers):** a foot is the last bone of each leg in the body plan
+  with the bones below it (as the offline checker); every corner is measured against the recorded ground under it, in
+  the animal's own model pixels: on the ground within 1 pixel, touching within 0.25, sliding when its touching corners
+  move more than 0.15 a tick (still feet drift under 0.04); not judged in the 3 ticks after ticks not recorded (the game
+  eases an animal to its new place over 3 ticks).
+
+**What the page shows in the lion hunt film (to look into, nothing fixed here):**
+- Still clips are quiet: graze, rest and feed slide on fewer than 1 standing moment in 100.
+- The walk slides on a fifth to a half of its standing moments, the stalk on about 1 in 10; the buffalo's charge and
+  trot skate.
+- Each switch from `stalk` to `ambush_freeze` slides all four feet 0.2 to 2.7 pixels a tick for about 6 ticks, and early
+  in the freeze all four slide the same 0.19 pixels a tick: the body still gliding while the clip stands still.
+- `rest_down` and `rest_up` slide on about half their standing moments (paws dragged as she lies down or gets up).
+- In `jump_smack` and `stalk_leap_bite` a lioness's front claw reaches 1.5 to 1.7 blocks to either side of her (98 in
+  100 of her moments stay within 0.8): a paw flung wide, or something to look at in the clip.
+- The cow's `mood_alert`: about 1 foot moment in 8 slides (likely turning on the spot on planted hooves).
+- The film itself misses the hold (BUGS 449). Two measuring tools have their own feet rules with faults (BUGS 456,
+  457); later, one Python feet rule in `tools/recording.py` matching the page's.
+
+**Other animals in the strips (the user's call, 2026-11-27, "Yes, see-through"):** two tries at judging which animal
+stands in the way failed (the prey faded; then crowding pride-mates kept solid), so in a strip every animal but the
+picked one is drawn as one even layer of glass (40 in 100, only its nearest surface, no shadow): none hides the animal
+checked, and the shape of its prey or holder still shows. The page itself draws them solid.
+
+**What phase 1 did not do:** idea 4 (the clip as made beside the clip as drawn); idea 8 in the game.
 
 ## Watch out for
 - **Never copy the game's rules into Python.** A lab that re-imagines the game drifts from it; the recording is the

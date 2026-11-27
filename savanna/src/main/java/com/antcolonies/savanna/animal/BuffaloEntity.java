@@ -86,8 +86,13 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
     /** Each doing's clip, by its number. */
     private static final String[] DOING_CLIPS = {"idle", "graze", "drink", "rest_down", "rest", "rest_up", "ear_flutter", "shake_off",
             "snort", "bellow", "paw_ground", "mood_alert", "mood_angry", "headbutt", "gore", "charge_headbutt", "held_sink", "held_down"};
-    /** Each one-shot doing's clip length (ticks, read from the clip file); 0 for the loops. */
-    private static final int[] DOING_TICKS = {0, 80, 72, 48, 0, 48, 30, 30, 28, 36, 36, 0, 0, 25, 22, 36, 40, 0};
+    /**
+     * Its clips as its clip file says them: each one's length and whether it loops (the Motion Studio, the new phase 2,
+     * step 3: before, a table of lengths typed here from the file by hand). Calves play the grown model's.
+     */
+    static com.antcolonies.entity.body.Clips clips() {
+        return com.antcolonies.entity.body.Clips.of(BuffaloEntity.class, com.antcolonies.savanna.SavannaMod.MODID, "buffalo");
+    }
 
     private static final EntityDataAccessor<Byte> DATA_DOING = SynchedEntityData.defineId(BuffaloEntity.class, EntityDataSerializers.BYTE);
     /** Counted up at every doing started, so the same clip started again plays from its start (as the bull shark's actions). */
@@ -116,8 +121,6 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
      * {@code tools/clip_check.py} from the controller below.
      */
     public static final int BLEND = 5;
-    /** The death clip (1.4 s) is played to its end before the body goes. */
-    static final int DEATH_TICKS = 28 + BLEND;
     /**
      * Its gaits (walk, trot, charge), from its body plan (the Motion Studio, phase 2, step 2): each clip's own speed (0.61,
      * 1.39 and 2.45 blocks a second at size 1), where it is drawn trotting, then charging (faster than 1.25 and 2.6 blocks
@@ -516,7 +519,7 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
      */
     public void setDoing(byte doing) {
         byte now = doing();
-        if (doing == now && !(oneShot(now) && doingFor() >= DOING_TICKS[now] + BLEND)) {
+        if (doing == now && !(oneShot(now) && doingFor() >= doingTicks(now))) {
             return;
         }
         doingSince = tickCount;
@@ -539,14 +542,14 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
         return doingFor() - BLEND;
     }
 
-    /** A doing whose clip plays once (all but calm, the rest and the moods). */
+    /** A doing whose clip plays once (its clip file says so: all but calm, the rest, the moods and held down). */
     static boolean oneShot(byte doing) {
-        return doing > CALM && doing < DOING_TICKS.length && DOING_TICKS[doing] > 0;
+        return doing > CALM && doing < DOING_CLIPS.length && !clips().loops(DOING_CLIPS[doing]);
     }
 
-    /** How long a one-shot doing lasts (ticks, its blend in included); 0 for calm and the loops. */
+    /** How long a one-shot doing lasts (ticks, its clip file's length and its blend in); 0 for calm and the loops. */
     static int doingTicks(byte doing) {
-        return oneShot(doing) ? DOING_TICKS[doing] + BLEND : 0;
+        return oneShot(doing) ? clips().ticks(DOING_CLIPS[doing]) + BLEND : 0;
     }
 
     public float ownSize() {
@@ -929,11 +932,11 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
         return FLOAT_DEPTH * getScale();
     }
 
-    /** The death clip (1.4 s) is played to its end before the body goes ({@link #DEATH_TICKS}). */
+    /** The death clip (1.4 s, its file's length) is played to its end before the body goes. */
     @Override
     protected void tickDeath() {
         deathTime++;
-        if (deathTime >= DEATH_TICKS && !level().isClientSide() && !isRemoved()) {
+        if (deathTime >= clips().ticks(clipName()) + BLEND && !level().isClientSide() && !isRemoved()) {
             if (level() instanceof ServerLevel level && getFluidHeight(net.minecraft.tags.FluidTags.WATER) < getBbHeight() * 0.5) {
                 // its body stays: a carcass for the lions (and later the scavengers), in its death pose (lion step 2)
                 RemainsEntity carcass = RemainsEntity.leave(level, RemainsEntity.Kind.BUFFALO, position(), yBodyRot, getScale());
@@ -1097,14 +1100,6 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
     private static final RawAnimation IDLE = RawAnimation.begin().thenLoop("idle");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
     private static final RawAnimation DEATH_DOWN = RawAnimation.begin().thenPlayAndHold("death_down");
-    /** Each doing's clip: the one-shots played once and held, the loops looped. */
-    private static final RawAnimation[] DOING_ANIMS = new RawAnimation[DOING_CLIPS.length];
-
-    static {
-        for (byte d = 1; d < DOING_CLIPS.length; d++) {
-            DOING_ANIMS[d] = oneShot(d) ? RawAnimation.begin().thenPlayAndHold(DOING_CLIPS[d]) : RawAnimation.begin().thenLoop(DOING_CLIPS[d]);
-        }
-    }
 
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
@@ -1143,11 +1138,11 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
                 player.forceAnimationReset();   // a new doing: its clip from the start, even the same clip again
             }
         }
-        if (d > CALM && d < DOING_ANIMS.length) {
+        if (d > CALM && d < DOING_CLIPS.length) {
             if (!oneShot(d)) {
                 player.setAnimationSpeed(loopRate());
             }
-            return state.setAndContinue(DOING_ANIMS[d]);
+            return state.setAndContinue(clips().anim(DOING_CLIPS[d]));   // (looped, or once and held, as its clip file says)
         }
         if (walking()) {
             // its gait by how fast it goes, each clip's pace following its stride so its hooves never slide (in the water

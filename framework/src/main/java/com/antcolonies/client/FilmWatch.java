@@ -298,6 +298,9 @@ final class FilmWatch {
             // assets/<mod name>/animations/... or assets/<mod name>/geo/...
             String[] parts = name.split("/");
             if (parts.length > 2 && (parts[2].equals("animations") || parts[2].equals("geo"))) {
+                if (parts[2].equals("animations")) {
+                    com.antcolonies.entity.body.Clips.reloadAll();   // (the game's clip lengths read from the files: the new phase 2)
+                }
                 gecko = true;
             } else if (parts.length > 2 && parts[2].equals("block_moves")) {
                 // an animal's move file (the Animal Maker Engine step B): read again from the copied file, both sides

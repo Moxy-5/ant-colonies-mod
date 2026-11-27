@@ -10,7 +10,9 @@ drew them, its clips, its mind's facts, the blocks round it) and builds one page
 animals on the recorded ground, turn and zoom, scrub, step a moment, slow motion, follow an animal, and each one's
 clips, play speed and facts at every moment.
 
-The game is the one truth: nothing here knows the game's rules. The page draws every box from the 8 corners the game
+The game is the one truth: nothing here knows the game's rules. The scene's line of moments and each animal's feet (on
+the ground, lifted, sliding) are worked out in tools/recording.py, the one place that rule is written (the new phase
+2, idea 57, 2026-11-27); the page only draws them. The page draws every box from the 8 corners the game
 wrote, through the matrix the game drew its bone with; nothing is blended between moments, and a moment the game did
 not draw (an animal out of the camera's view) is not shown.
 
@@ -101,6 +103,7 @@ def build(folder, start=None, end=None, only=None, out=None):
     if not paths:
         raise SystemExit(f'no body*.jsonl.gz in {folder}: film the scene with "record on 1 all" first')
     animals, blocks, water, skipped, notes = [], {}, {}, [], []
+    kept = []                                       # each shown animal's header and moments, for its feet
     blob = array('h')
     origin = None
     # each file's name (its custom name; the file's own when two share one) and whether it has the client's clock
@@ -169,6 +172,7 @@ def build(folder, start=None, end=None, only=None, out=None):
                 clip_index[key] = len(clip_table)
                 clip_table.append(m.get('clips', {}))
             clips.append(clip_index[key])
+        kept.append((header, moments, keys, plan))
         kind_count = sum(1 for a in animals if a['entity'] == header['entity'])
         animals.append({
             'name': name, 'entity': header['entity'], 'file': Path(path).name,
@@ -176,7 +180,9 @@ def build(folder, start=None, end=None, only=None, out=None):
             'width': header.get('width'), 'height': header.get('height'), 'scale': header.get('scale'),
             'bones': [{'name': b['name'], 'parent': b.get('parent'), 'pivot': b.get('pivot', [0, 0, 0]),
                        'cubes': [[r(v, 5) for v in c] for c in b['cubes']]} for b in header['bones']],
-            'legs': plan.get('legs', {}),
+            # each leg from the body outward, its role names turned into the model's own bone names (the plan's
+            # "bones" table: a bone renamed in the model changes only that table)
+            'legs': {k: [(plan.get('bones') or {}).get(r, r) for r in chain] for k, chain in (plan.get('legs') or {}).items()},
             'n': len(moments), 'B': n_bones, 'offset': offset, 'turn': s_turn, 'move': s_move,
             'key': keys, 'ft': [m.get('ft') for m in moments], 'pt': [r(m.get('pt', 0), 3) for m in moments],
             'pos': [[r(m['pos'][0] - origin[0]), r(m['pos'][1] - origin[1]), r(m['pos'][2] - origin[2])] for m in moments],
@@ -190,11 +196,26 @@ def build(folder, start=None, end=None, only=None, out=None):
         print(f'  {name:18s} {header["entity"]:26s} {len(moments):5d} moments, {n_bones} bones, clock {clock}')
     if not animals:
         raise SystemExit('nothing to show: ' + '; '.join(skipped))
+    # the scene's one line of moments and each animal's feet, worked out in tools/recording.py (the one feet rule: the
+    # page only draws them; the new phase 2, idea 57)
+    timeline, slots, tick_at, gap_before, since_gap = recording.line_up([k for _, _, k, _ in kept],
+                                                                        [[m.get('ft') for m in ms] for _, ms, _, _ in kept])
+    ground = recording.Ground([[x, y, z, *boxes] for (x, y, z), boxes in blocks.items()])
+    for a, (header, moments, keys, plan), sl in zip(animals, kept, slots):
+        feet = recording.feet(header, moments, recording.plan_legs(plan), ground, keys, [since_gap[t] for t in sl], origin)
+        a['px'] = recording.model_px(header, moments)
+        a['footData'] = [{'key': f['key'], 'name': f['name'], 'state': f['state'],
+                          'slide': [None if v is None else round(v, 4) for v in f['slide']],
+                          'height': [None if v is None else round(v, 3) for v in f['height']],
+                          'mid': [None if v is None else [round(c, 4) for c in v] for v in f['mid']]} for f in feet]
+    line = {'timeline': timeline, 'tickAt': tick_at, 'gapBefore': gap_before,
+            'rule': {'gap': recording.GAP, 'downPx': recording.DOWN_PX, 'contactPx': recording.CONTACT_PX,
+                     'slidePx': recording.SLIDE_PX, 'catchUp': recording.CATCH_UP}}
     if sys.byteorder != 'little':
         blob.byteswap()
-    ground = [[x - origin[0], y - origin[1], z - origin[2], *boxes] for (x, y, z), boxes in blocks.items()]
+    ground_list = [[x - origin[0], y - origin[1], z - origin[2], *boxes] for (x, y, z), boxes in blocks.items()]
     wet = [[x - origin[0], y - origin[1], z - origin[2], h] for (x, y, z), h in water.items()]
-    meta = {'animals': animals, 'blocks': ground, 'water': wet, 'origin': origin, 'clock': clock}
+    meta = {'animals': animals, 'blocks': ground_list, 'water': wet, 'origin': origin, 'clock': clock, 'line': line}
     meta_bytes = zlib.compress(json.dumps(meta, separators=(',', ':')).encode('utf-8'), 9)
     mat_bytes = zlib.compress(blob.tobytes(), 9)
     scene = folder.name

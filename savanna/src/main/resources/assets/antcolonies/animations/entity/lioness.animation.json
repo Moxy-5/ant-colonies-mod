@@ -286517,7 +286517,10 @@
      }
     }
    },
-   "loop": true
+   "loop": true,
+   "timeline": {
+    "0.0": "made_against buffalo 3a6243409e1d"
+   }
   },
   "hold_down": {
    "animation_length": 1.9,
@@ -313656,7 +313659,10 @@
      }
     }
    },
-   "loop": true
+   "loop": true,
+   "timeline": {
+    "0.0": "made_against buffalo 041ffdd3ea51"
+   }
   },
   "hold_sink": {
    "animation_length": 2.05,
@@ -342849,6 +342855,9 @@
       ]
      }
     }
+   },
+   "timeline": {
+    "0.0": "made_against buffalo 5f154ad0b5d8"
    }
   },
   "bluff_charge": {
@@ -503944,7 +503953,10 @@
      }
     }
    },
-   "loop": true
+   "loop": true,
+   "timeline": {
+    "0.0": "made_against buffalo 2bf61e6b540b"
+   }
   },
   "rest_stretch_up": {
    "animation_length": 3.8,

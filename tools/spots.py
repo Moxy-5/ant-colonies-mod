@@ -9,7 +9,8 @@ played by the game):
     assets/<mod>/spots/<animal>.json      written here, never by hand
 
     python tools/spots.py write [animal ...]     every plan with spots or holds (or the named): writes its table
-    python tools/spots.py --check                 fails when a table is behind its plan, model or clips (the build's
+    python tools/spots.py --check                 fails when a table is behind its plan, model or clips, or a holder's
+                                                  clip behind the prey's table it was made against (the build's
                                                   checkSpotTables runs it)
     python tools/spots.py report <holder> <prey> [--sizes 0.97:0.9,0.97:0.36]
                                                   where the holder stands for each spot at those sizes (holder:prey),
@@ -35,6 +36,11 @@ A prey's "spots" (model px, the geo file's own frame: x to its left, y up, z tow
 A holder's "holds":
   jaw     the bone whose pivot is the point that bites (the plan's role name: carry)
   clips   {clip: the tick it bites}; the game reads the tick from the table (one place)
+
+A holder's clips made against its prey (the new phase 2, idea 56, 2026-11-27): a hold or feed clip whose jaw is solved
+to the prey's spot heights (tools/lion_anims.py) carries a note "made_against <prey> <print>" (its first timeline
+key), the print of what it was made from (partner_print: the prey's pair for that clip, the rows of the prey's clips
+then, both blends). --check fails when the prey's table has moved on since, naming the clips to make again.
 
 A holder's "strikes" (step 4, 2026-11-26): the clips it strikes with, each carrying its own travel in a "path root"
 note made with it (tools/lion_anims.py), and the tick it hits:
@@ -334,6 +340,64 @@ def stale():
     return out
 
 
+def partner_print(prey, holder, hold, table=None):
+    """What a holder's clip made against its prey depends on (a short hash): the prey's pair for that clip (its sizes,
+    clips and spots), the rows of the prey's spots in those clips in the prey's written table, and both animals' blends
+    (read from the Java; hold_sink is laid on the cow's clock by them). None: the prey has no such pair. table: the
+    prey's written table (a test hands one in), else read from its file."""
+    plan = plan_data(prey)
+    pair = next((p for p in plan.get('spots', {}).get('pairs', []) if p['holder'] == holder and p['hold'] == hold), None)
+    path = table_path(prey)
+    if table is None and os.path.exists(path):
+        table = json.load(open(path, encoding='utf-8'))
+    if pair is None or table is None:
+        return None
+    table = table['spots']
+    rows = {c: table['clips'].get(c) for c in pair['clips']}
+    blends = [cc.Animal(prey).blend_ticks()[0], cc.Animal(holder).blend_ticks()[0]]
+    h = hashlib.sha1(json.dumps([pair, table['names'], rows, blends], sort_keys=True).encode())
+    return h.hexdigest()[:12]
+
+
+def made_against(clip):
+    """A clip's "made_against <prey> <print>" note as (prey, print), or None."""
+    for note in (clip.get('timeline') or {}).values():
+        if isinstance(note, str) and note.startswith('made_against '):
+            _, prey, sign = note.split()[:3]
+            return prey, sign
+    return None
+
+
+def partners_stale(prey_tables=None):
+    """Each holder's clips made against a prey whose table has moved on since (or no longer has their pair).
+    prey_tables: {prey: its table} in place of the files (a test)."""
+    out = []
+    for animal in sorted(with_spots()):
+        if 'holds' not in plan_data(animal):
+            continue
+        a = cc.Animal(animal)
+        path = cc.lab.model_file(a.anim_stem, 'animations', 'entity', f'{a.anim_stem}.animation.json')
+        clips = json.load(open(path, encoding='utf-8')).get('animations', {})
+        behind = {}
+        for name, clip in clips.items():
+            made = made_against(clip)
+            if made and partner_print(made[0], animal, name, (prey_tables or {}).get(made[0])) != made[1]:
+                behind.setdefault(made[0], []).append(name)
+        for prey, names in behind.items():
+            out.append(f'{animal}: {", ".join(sorted(names))} were made against {prey}\'s spots as they were; they have '
+                       f'changed since (make the clips again: python tools/{maker_of(animal)} clips; then python '
+                       f'tools/spots.py write {animal})')
+    return out
+
+
+def maker_of(animal):
+    """The maker that makes an animal's clips (its tool's name), for the message."""
+    for name in (f'{animal}_models.py', f'{animal.split("_")[0]}_models.py'):
+        if os.path.exists(os.path.join(HERE, name)):
+            return name
+    return '<its maker>'
+
+
 # --- the report -------------------------------------------------------------------------------------------------------
 def placement(prey_table, spot, row, prey_size, hold, holder_size, draw_ahead_prey, draw_ahead_holder):
     """Where the holder stands (flat, in the prey's frame, blocks: forward, left) and faces (degrees, + left of the
@@ -412,11 +476,12 @@ def segment_gap(p1, p2, q1, q2):
 
 def main(argv):
     if argv and argv[0] == '--check':
-        found = stale()
+        found = stale() + partners_stale()
         for line in found:
             print(line)
         if found:
-            print('The spot tables are behind (tools/spots.py): run the commands above and commit the tables.')
+            print('The spot tables or the clips made against them are behind (tools/spots.py): run the commands above '
+                  'and commit what they write.')
             return 1
         return 0
     if argv and argv[0] == 'write':

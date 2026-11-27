@@ -1,0 +1,15 @@
+{
+ "note": "Stage 3 Shape Detail (v7): locked Bold Heavy reusable bird_beak() + bird_eye() on reshaped tapered skull (348/400)",
+ "date": "2026-11-25",
+ "boxes": 242,
+ "numbers": {
+  "BODY_PITCH": 48.0,
+  "CHEST_HW": 6.5,
+  "WING_SPAN_SCALE": 1.0,
+  "CREST_RAISE": 0.38,
+  "TAIL_SPREAD": 0.15,
+  "BEAK_LEN": 4.4,
+  "TALON_SCALE": 1.0,
+  "JAW_OPEN": 0.0
+ }
+}

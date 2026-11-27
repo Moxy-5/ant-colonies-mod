@@ -34,6 +34,8 @@
   #chartRow { margin: 0 16px 8px; }
   canvas#chart { display: block; width: 100%; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; touch-action: none; }
   .chartFoot { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; justify-content: space-between; padding-top: 4px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 2px 14px; padding-top: 4px; font-size: 12px; color: var(--muted); }
+  .legend i { display: inline-block; width: 16px; height: 10px; margin-right: 5px; vertical-align: -1px; border-radius: 2px; }
   .pair { display: inline-flex; margin: 0 6px 4px 0; }
   .pair button:first-child { border-radius: 8px 0 0 8px; }
   .pair button.hide { border-radius: 0 8px 8px 0; border-left: none; font-size: 12px; padding: 5px 8px; color: var(--muted); }
@@ -71,7 +73,8 @@
 <div id="chartRow">
   <canvas id="chart" aria-label="Footfall chart: the picked animal's clip and each foot, moment by moment"></canvas>
   <div class="chartFoot"><span id="chartNote" class="readout"></span>
-    <button id="chartSpan" title="The chart over the whole recording, or a few seconds round now">Whole recording</button></div>
+    <button id="chartSpan" title="The chart over the whole recording (off: three seconds each side of now)">Whole recording</button></div>
+  <div class="legend" id="chartLegend"></div>
 </div>
 <div class="controls"><b>Animals</b><span id="animalBtns"></span></div>
 <div class="controls"><b>Camera</b><span id="camBtns"></span><button id="followBtn" title="Keep the camera on the picked animal (F)">Follow</button>
@@ -83,6 +86,19 @@
 <!--VIEWER-->
 <script>
 const DATA = /*DATA*/null;
+// a name in the page's address as written (the shared reader turns a value starting with a digit into a number, so
+// an animal named "2nd-cow" read back as 2); its pieces still encoded, for a list split on commas
+function rawHash(key) {
+  const kv = location.hash.slice(1).split('&').map(x => x.split('=')).find(([k]) => k === key);
+  return kv ? kv.slice(1).join('=') : '';
+}
+const rawPick = (() => { try { return decodeURIComponent(rawHash('pick')); } catch (e) { return ''; } })();
+if (!DATA) {                                    // the template itself, opened by mistake: it holds no recording
+  document.getElementById('loading').textContent = 'This is the template, with no recording in it. Build a scene\'s page with ' +
+    '"python tools/replay.py run-film/screenshots/<scene>" and open references/replay/<scene>.html.';
+  window.Replay = {error: 'the template holds no recording'};
+  throw new Error('the replay template holds no recording');
+}
 document.getElementById('title').textContent = 'Replay: ' + DATA.title;
 document.title = DATA.title + ' Replay';
 const $ = id => document.getElementById(id);
@@ -122,9 +138,6 @@ function buildGround(blocks, water) {
   const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial(), boxes.length);
   const m = new THREE.Matrix4(), c = new THREE.Color();
   boxes.forEach(([x, y, z, b], i) => {
-    const col = x + ',' + z;                    // each column's block tops, for the feet
-    if (!groundTops.has(col)) groundTops.set(col, []);
-    groundTops.get(col).push(y + b[4]);
     const w = Math.max(b[3] - b[0], 0.01), h = Math.max(b[4] - b[1], 0.01), d = Math.max(b[5] - b[2], 0.01);
     m.makeScale(w, h, d).setPosition(x + (b[0] + b[3]) / 2, y + (b[1] + b[4]) / 2, z + (b[2] + b[5]) / 2);
     mesh.setMatrixAt(i, m);
@@ -170,10 +183,10 @@ function unpack(a, all) {
 
 let animals = [], timeline = [], now = 0, playing = false, clock = 0, speed = 1, picked = null, follow = false, ready = false;
 // each moment's game tick, and the game ticks that ran unrecorded just before it (a film's "wait" and "until" steps
-// run the game on while the client draws nothing, or draws none of these animals); more than GAP is called a gap (a
-// tick or two is the noise of reading the server's tick live while the client draws)
+// run the game on while the client draws nothing, or draws none of these animals); more than GAP is called a gap
+// (all three from tools/recording.py's line_up, packed by tools/replay.py)
 let tickAt = [], gapBefore = [];
-const GAP = 3;
+let GAP = 3;
 
 function buildAnimal(a, i, all) {
   a.index = i;
@@ -243,7 +256,8 @@ function show(t) {
   $('when').classList.toggle('gap', gapBefore[now] > GAP);
   $('stamp').textContent = DATA.title + ' · ' + text;
   // follow: the camera moves with the picked animal's own place (not its drawn box, which bobs with the legs)
-  if (follow && was && picked.now >= 0) {
+  // (with a camera button lit, that camera stays put on the animal, turning with it; turned by hand, it slides along)
+  if (follow && was && picked.now >= 0 && !(settings.cam && aim(settings.cam))) {
     const p = picked.pos[picked.now], d = new THREE.Vector3(p[0] - was[0], p[1] - was[1], p[2] - was[2]);
     st.camera.position.add(d); st.controls.target.add(d);
   }
@@ -306,6 +320,9 @@ function info() {
   const v = a.v[j], sp = Math.hypot(v[0], v[2]) * 20;
   rows.push(['moving', `${sp.toFixed(2)} blocks a second` + (Math.abs(v[1]) > 0.09 ? `, ${(v[1] * 20).toFixed(1)} up` : '') +
     `, facing ${(((a.yaw[j] % 360) + 360) % 360).toFixed(0)}°`]);
+  const step = stepAt(a, j);                    // (where the game drew it: after ticks not recorded the game eases an
+                                                // animal on to where it is, much faster than it moves)
+  if (step) rows.push(['drawn', `${step.move.toFixed(3)} blocks and ${step.turn.toFixed(1)}° a tick since its moment before`]);
   rows.push(['standing', a.held[j] ? 'held, drawn by its holder' : a.water[j] ? `in water (${a.fluid[j]} deep)` : a.ground[j] ? 'on the ground' : '<span class="warn">in the air</span>']);
   const facts = a.facts[j] || {};
   Object.keys(facts).forEach(k => rows.push([esc(k), esc(JSON.stringify(facts[k]).replace(/^"|"$/g, ''))]));
@@ -338,28 +355,80 @@ function sceneView() {
   st.camera.position.set(c.x + s * 0.6, c.y + s * 0.55, c.z + s * 0.8);
   st.controls.target.copy(c); st.controls.update();
 }
-// the picked animal from one side: its own left (Minecraft: facing (-sin yaw, cos yaw), left (cos yaw, sin yaw));
-// with nothing picked, or the pick not drawn now, the whole scene
+// the space the animal takes up in its own frame (forward, left and up from its place) over its whole recording: each
+// camera is fitted to it, so it stands at one distance from the animal however it turns, lies down or stretches, and
+// pictures of a strip, a turn or a follow keep one size (fitted to one moment's pose, the zoom jumped from moment to
+// moment and a turn cropped it: the stage 3 review, 2026-11-27). Over the frames j0..j1 when a tool asks (a strip is
+// fitted to its own moments: one lioness's leap throws a claw 1.7 blocks to her side, and fitted to the whole
+// recording every picture of her walk was small)
+function envelopeOf(a, j0 = 0, j1 = a.n - 1) {
+  const key = j0 + '-' + j1;
+  a.envelopes = a.envelopes || {};
+  if (a.envelopes[key]) return a.envelopes[key];
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity], M = a.M;
+  for (let j = j0; j <= j1; j++) {              // (every moment: a leap between two samples was cropped)
+    const yaw = a.yaw[j] * Math.PI / 180, fx = -Math.sin(yaw), fz = Math.cos(yaw), lx = Math.cos(yaw), lz = Math.sin(yaw);
+    for (let b = 0; b < a.B; b++) {
+      const o = (j * a.B + b) * 12, s = a.turn[b], v = a.move[b];
+      if (hidden(M, o)) continue;
+      for (const c of a.bones[b].cubes) for (let k = 0; k < 24; k += 3) {
+        const x = c[k], y = c[k + 1], z = c[k + 2];
+        const wx = (M[o] * x + M[o + 1] * y + M[o + 2] * z) * s + M[o + 3] * v;
+        const wy = (M[o + 4] * x + M[o + 5] * y + M[o + 6] * z) * s + M[o + 7] * v;
+        const wz = (M[o + 8] * x + M[o + 9] * y + M[o + 10] * z) * s + M[o + 11] * v;
+        const q = [wx * fx + wz * fz, wx * lx + wz * lz, wy];
+        for (let i = 0; i < 3; i++) { if (q[i] < lo[i]) lo[i] = q[i]; if (q[i] > hi[i]) hi[i] = q[i]; }
+      }
+    }
+  }
+  if (!(lo[0] <= hi[0])) { lo.fill(-0.5); hi.fill(0.5); }
+  return (a.envelopes[key] = {lo, hi});
+}
+// how far back a camera looking along -dir at target must stand for these points to fit in the picture with a margin
+// round them
+function fitDistance(points, target, dir) {
+  const z = dir.clone().normalize(), x = new THREE.Vector3(0, 1, 0).cross(z).normalize(), y = z.clone().cross(x);
+  const tanV = Math.tan(st.camera.fov * Math.PI / 360), tanH = tanV * st.camera.aspect, MARGIN = 1.15;
+  const span = points.length ? points[0].distanceTo(points[points.length - 1]) : 1;
+  const p = new THREE.Vector3();
+  let dist = 0;
+  points.forEach(q => {
+    p.copy(q).sub(target);
+    const toward = p.dot(z);
+    dist = Math.max(dist, toward + MARGIN * Math.abs(p.dot(x)) / tanH, toward + MARGIN * Math.abs(p.dot(y)) / tanV,
+                    toward + 0.1 * span);      // (never nearer to a point than a tenth of the animal: a termite too)
+  });
+  return dist;
+}
+// the picked animal from one side: its own left (Minecraft: facing (-sin yaw, cos yaw), left (cos yaw, sin yaw)),
+// near enough for its envelope to fill the picture; above looks down with its head to the left, as the side view
 const CAMS = [['three-quarter', 'Three quarters'], ['side', 'Side'], ['front', 'Front'], ['behind', 'Behind'], ['above', 'Above'], ['wide', 'Wide']];
+function aim(name) {
+  const a = picked;
+  if (!a || a.now < 0) return false;
+  const j = a.now, p = a.pos[j], yaw = a.yaw[j] * Math.PI / 180, {lo, hi} = envelopeOf(a, ...(a.fitRange || []));
+  const fwd = new THREE.Vector3(-Math.sin(yaw), 0, Math.cos(yaw)), left = new THREE.Vector3(Math.cos(yaw), 0, Math.sin(yaw));
+  const at = (f, l, y) => new THREE.Vector3(p[0] + fwd.x * f + left.x * l, p[1] + y, p[2] + fwd.z * f + left.z * l);
+  const corners = [];
+  for (let k = 0; k < 8; k++) corners.push(at(k & 1 ? hi[0] : lo[0], k & 2 ? hi[1] : lo[1], k & 4 ? hi[2] : lo[2]));
+  const centre = at((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2);
+  const low = new THREE.Vector3(0, 0.15, 0);   // (a little over the ground: the feet and the ground under them show)
+  const dir = {side: left.clone().add(low), front: fwd.clone().add(low), behind: fwd.clone().negate().add(low),
+               above: new THREE.Vector3(0, 1, 0).addScaledVector(left, 0.02),
+               'three-quarter': fwd.clone().add(left).normalize().add(new THREE.Vector3(0, 0.45, 0)),
+               wide: fwd.clone().add(left).normalize().add(new THREE.Vector3(0, 0.8, 0))}[name].normalize();
+  const dist = fitDistance(corners, centre, dir) * (name === 'wide' ? 3 : 1);
+  st.camera.position.copy(centre).addScaledVector(dir, dist);
+  st.controls.target.copy(centre);
+  st.controls.update();
+  return true;
+}
 function camera(name) {
   name = String(name || '').toLowerCase();
   if (!CAMS.some(([k]) => k === name)) name = 'three-quarter';
-  const a = picked, at = a && a.now >= 0 ? centreOf(a) : null;
-  if (!at) { settings.cam = ''; camBtns(null); sceneView(); writeState(); writeAddress(); return; }
+  if (!aim(name)) { settings.cam = ''; camBtns(null); sceneView(); writeState(); writeAddress(); return; }
   settings.cam = name;
   camBtns(name);
-  const yaw = a.yaw[a.now] * Math.PI / 180;
-  const fwd = new THREE.Vector3(-Math.sin(yaw), 0, Math.cos(yaw)), left = new THREE.Vector3(Math.cos(yaw), 0, Math.sin(yaw));
-  const d = Math.max(2.5, at.size * 1.5);
-  const dir = {side: left.clone(), front: fwd.clone(), behind: fwd.clone().negate(),
-               above: new THREE.Vector3(0.02, 1, 0.02), 'three-quarter': fwd.clone().add(left).normalize().add(new THREE.Vector3(0, 0.45, 0)),
-               wide: fwd.clone().add(left).normalize().add(new THREE.Vector3(0, 0.8, 0))}[name];
-  const dist = name === 'wide' ? d * 3.5 : name === 'above' ? d * 1.2 : d;
-  dir.normalize();
-  st.camera.position.copy(at.c).addScaledVector(dir, dist);
-  if (name === 'side' || name === 'front' || name === 'behind') st.camera.position.y = at.c.y + at.size * 0.12;
-  st.controls.target.copy(at.c);
-  st.controls.update();
   writeState();
   writeAddress();
 }
@@ -369,120 +438,87 @@ function sunToView() {
   sun.position.set(t.x + 6, t.y + 18, t.z + 10); sun.target.position.copy(t); sun.target.updateMatrixWorld();
 }
 
-// --- feet: on the ground or lifted, and sliding, measured from the recording (the Motion Studio, idea 6) -----------
-// Each foot is the last bone of a leg in the animal's body plan, with the toes and claws below it (as the offline
-// checker, tools/clip_check.py, takes them). Its lowest point says whether it stands. Whether it slides is judged on
-// the very corners that touch the ground at both moments: how far those same corners moved. A paw rolling off its
-// heel or onto its toes keeps its touching corners still and does not count; its middle moves, which is why the
-// middle is not used (it read every lift and landing as a slide). Nothing of the game's rules: only where the game
-// drew the foot, against the recorded blocks.
-const TOUCH = 0.03;       // a foot (a corner of it) this near the ground under it touches it (blocks; my pick, measured
-                          // on the lion hunt: standing paws and hooves sit 0.008 to 0.010 over the block top, a lifting
-                          // paw passes 0.03 within a tick or two; tools/pair_report.py's 0.1 took a paw lifting off
-                          // its toes as standing, and its forward swing as a slide)
-const SLIDE = 0.03;       // a standing foot moving more than this a tick slides (blocks; my pick: under a sixth of a
-                          // lion's walking pace, a third of the smallest slide the phase 0 films found, 0.10)
-const groundTops = new Map();                   // each column's block tops (filled with the ground)
-function groundUnder(x, y, z) {
-  const tops = groundTops.get(Math.floor(x) + ',' + Math.floor(z));
-  let best = null;
-  if (tops) for (const t of tops) if (t <= y + 0.5 && (best === null || t > best)) best = t;
-  return best;
-}
-// l1 r1 l2 r2 ... (front to back): front and hind for four legs, front, middle and hind for six, numbers past that
-function legLabel(key, rows) {
-  const side = key[0] === 'l' ? 'left' : key[0] === 'r' ? 'right' : '';
-  const n = parseInt(key.slice(1), 10);
-  const row = rows === 2 ? ['front', 'hind'][n - 1] : rows === 3 ? ['front', 'middle', 'hind'][n - 1] : 'leg ' + n;
-  return ((row || key) + ' ' + side).trim();
-}
-// the animal's feet and, for every moment, each foot's state (0 lifted, 1 on the ground, 2 on the ground and
-// sliding, -1 no ground recorded under it, -2 not drawn), slide (blocks a tick, NaN when not judged) and middle
+// --- feet: on the ground or lifted, and sliding (the Motion Studio, idea 6) -------------------------------------------
+// Measured by tools/recording.py (the one feet rule, the new phase 2, idea 57: tools/replay.py packs what it found, so
+// the page, the strips, tools/pair_report.py and tools/body_course.py judge feet alike); the page only draws it. Each
+// foot is the last bone of a leg in the animal's body plan with the toes and claws below it; on the ground within
+// RULE.downPx of a model pixel, sliding when its touching corners move more than RULE.slidePx a tick (the limits there).
+let RULE = {};
+// one model pixel in blocks (the animal's first bone's recorded size over 16), from tools/recording.py
+function pxOf(a) { return a.px || 1 / 16; }
+// the animal's feet: for every moment each foot's state (0 lifted, 1 on the ground, 2 on the ground and sliding,
+// -1 no ground recorded under it, -2 not drawn), slide (model pixels a tick, NaN when not judged), lowest height over
+// the ground (pixels) and middle (blocks, for its path)
 function feetOf(a) {
-  if (a.feet) return a.feet;
-  const index = new Map(a.bones.map((b, i) => [b.name, i]));
-  const kids = new Map();
-  a.bones.forEach((b, i) => { if (b.parent) { if (!kids.has(b.parent)) kids.set(b.parent, []); kids.get(b.parent).push(i); } });
-  const below = i => { const out = [i]; for (let k = 0; k < out.length; k++) (kids.get(a.bones[out[k]].name) || []).forEach(c => out.push(c)); return out; };
-  const legs = Object.entries(a.legs || {}).filter(([, chain]) => chain && chain.length && index.has(chain[chain.length - 1]));
-  const rows = new Set(legs.map(([k]) => k.slice(1))).size;
-  const order = k => (parseInt(k.slice(1), 10) || 0) * 2 + (k[0] === 'r' ? 1 : 0);
-  legs.sort((x, y) => order(x[0]) - order(y[0]));
-  const n = a.n, B = a.B, M = a.M;
-  a.feet = legs.map(([key, chain]) => {
-    const bone = index.get(chain[chain.length - 1]), parts = below(bone);
-    const corners = parts.reduce((sum, bi) => sum + a.bones[bi].cubes.length * 8, 0);
-    const foot = {key, name: legLabel(key, rows), bone, parts,
-                  state: new Int8Array(n), slide: new Float32Array(n).fill(NaN), mid: new Float32Array(n * 3)};
-    // every corner of the foot at this moment and the one before (x, y, z; NaN for a part not drawn), and which of
-    // them touched the ground
-    let now3 = new Float32Array(corners * 3), was3 = new Float32Array(corners * 3);
-    let touch = new Uint8Array(corners), touched = new Uint8Array(corners);
+  if (a.feetMade) return a.feetMade;
+  const n = a.n;
+  a.feetMade = (a.footData || []).map(f => {
+    const foot = {key: f.key, name: f.name, state: Int8Array.from(f.state), slide: new Float32Array(n).fill(NaN),
+                  height: new Float32Array(n).fill(NaN), mid: new Float32Array(n * 3)};
     for (let j = 0; j < n; j++) {
-      const p = a.pos[j];
-      let lowY = Infinity, lx = 0, lz = 0, sx = 0, sz = 0, cnt = 0, q = 0;
-      for (const bi of parts) {
-        const o = (j * B + bi) * 12, s = a.turn[bi], v = a.move[bi], off = hidden(M, o);
-        for (const c of a.bones[bi].cubes) for (let k = 0; k < 24; k += 3, q++) {
-          if (off) { now3[q * 3] = NaN; continue; }
-          const x = c[k], y = c[k + 1], z = c[k + 2];
-          const wx = (M[o] * x + M[o + 1] * y + M[o + 2] * z) * s + M[o + 3] * v + p[0];
-          const wy = (M[o + 4] * x + M[o + 5] * y + M[o + 6] * z) * s + M[o + 7] * v + p[1];
-          const wz = (M[o + 8] * x + M[o + 9] * y + M[o + 10] * z) * s + M[o + 11] * v + p[2];
-          now3[q * 3] = wx; now3[q * 3 + 1] = wy; now3[q * 3 + 2] = wz;
-          if (wy < lowY) { lowY = wy; lx = wx; lz = wz; }
-          if (bi === bone) { sx += wx; sz += wz; cnt++; }
-        }
-      }
-      touch.fill(0);
-      if (lowY === Infinity) foot.state[j] = -2;
-      else {
-        foot.mid[j * 3] = cnt ? sx / cnt : lx; foot.mid[j * 3 + 1] = lowY; foot.mid[j * 3 + 2] = cnt ? sz / cnt : lz;
-        const g = groundUnder(lx, lowY, lz);
-        if (g === null) foot.state[j] = -1;
-        else {
-          foot.state[j] = lowY - g < TOUCH ? 1 : 0;
-          for (let i = 0; i < corners; i++) touch[i] = now3[i * 3 + 1] - g < TOUCH ? 1 : 0;   // NaN: not
-          // its slide since its moment before: the corners touching at both moments, how far they moved (only when
-          // that moment was at most two ticks before and no ticks went unrecorded between)
-          const dt = j > 0 ? a.key[j] - a.key[j - 1] : 0;
-          if (foot.state[j] === 1 && foot.state[j - 1] >= 1 && dt > 0 && dt <= 2 && !(gapBefore[a.slot[j]] > GAP)) {
-            let sum = 0, both = 0;
-            for (let i = 0; i < corners; i++) {
-              if (!touch[i] || !touched[i]) continue;
-              sum += Math.hypot(now3[i * 3] - was3[i * 3], now3[i * 3 + 2] - was3[i * 3 + 2]);
-              both++;
-            }
-            if (both) {                         // (none in common: it changed the part it stands on; not judged)
-              foot.slide[j] = sum / both / dt;
-              if (foot.slide[j] > SLIDE) foot.state[j] = 2;
-            }
-          }
-        }
-      }
-      [now3, was3] = [was3, now3];
-      [touch, touched] = [touched, touch];
+      if (f.slide[j] !== null) foot.slide[j] = f.slide[j];
+      if (f.height[j] !== null) foot.height[j] = f.height[j];
+      const m = f.mid[j];
+      if (m) { foot.mid[j * 3] = m[0]; foot.mid[j * 3 + 1] = m[1]; foot.mid[j * 3 + 2] = m[2]; }
     }
     return foot;
   });
-  return a.feet;
+  return a.feetMade;
 }
-function feetNow(a) {
-  const j = a ? a.now : -1;
-  return j < 0 ? [] : feetOf(a).map(f => ({name: f.name, planted: f.state[j] >= 1, sliding: f.state[j] === 2,
-    groundKnown: f.state[j] !== -1, slide: isNaN(f.slide[j]) ? null : +f.slide[j].toFixed(3)}));
+// the body's drawn step since the animal's recorded moment before: how far it moved (blocks) and turned (degrees) a
+// tick, or null (the camera follows the animal, so a jump shows here, not in a picture)
+function stepAt(a, j) {
+  const dt = j > 0 ? a.key[j] - a.key[j - 1] : 0;
+  if (!(dt > 0)) return null;
+  const p = a.pos[j], q = a.pos[j - 1];
+  return {move: Math.hypot(p[0] - q[0], p[2] - q[2]) / dt, turn: (((a.yaw[j] - a.yaw[j - 1]) % 360 + 540) % 360 - 180) / dt};
+}
+function feetNow(a) { return a ? feetAt(a, a.now) : []; }
+// each foot at the animal's frame j, in words a tool can read (heightPx: its lowest corner over the ground, in model
+// pixels, below 0 inside it; slidePx: how far its touching part moved, model pixels a tick)
+function feetAt(a, j) {
+  return j < 0 ? [] : feetOf(a).map(f => ({name: f.name, drawn: f.state[j] !== -2, planted: f.state[j] >= 1, sliding: f.state[j] === 2,
+    groundKnown: f.state[j] !== -1, heightPx: isNaN(f.height[j]) ? null : +f.height[j].toFixed(2),
+    slidePx: isNaN(f.slide[j]) ? null : +f.slide[j].toFixed(3), slide: isNaN(f.slide[j]) ? null : +(f.slide[j] * pxOf(a)).toFixed(4)}));
 }
 
 // --- the footfall chart: the picked animal's clip and each foot, moment by moment (idea 6) -----------------------
-const CLOSE = 60;                               // the close view: this many moments each side of now (6 s)
+const CLOSE = 60;                               // the close view: this many ticks each side of now (3 s each side)
 let chartWhole = false, chartHover = -1, chartCache = null;
 const LANE = 18, LEFT = 104, TOP = 4, AXIS = 18;
+// the lanes' colours are fixed, not the page's theme, and sit on a light strip of their own: the key under the chart
+// means the same in light and dark
+const FOOT = {strip: '#f4f1e8', down: '#2b2a24', slide: '#d23c22', up: '#cfc9b8', noGround: '#c9a45a', hidden: '#8f8a7c',
+              gap: '#3f63d6', clipInk: '#2a2a22'};
+let chartHold = null;                           // the moments shown while a press on the chart is held (so the same
+                                                // place on it stays the same moment while the moment shown moves)
+let chartDrag = false, chartPointer = null;       // a press held on the chart; the pointer's place over it (or null)
+function chartLegend() {
+  $('chartLegend').innerHTML = [
+  [`background:${FOOT.down}`, 'on the ground'],
+  [`background:${FOOT.slide}`, `sliding (on the ground, its touching part moving more than ${RULE.slidePx} of a model pixel a tick)`],
+  [`background:${FOOT.up};outline:1px solid ${FOOT.strip}`, 'lifted'],
+  [`background:${FOOT.noGround}`, 'no ground recorded under it'],
+  [`background:repeating-linear-gradient(90deg,${FOOT.hidden} 0 2px,${FOOT.strip} 2px 4px)`, 'not drawn'],
+  [`width:0;border-left:2px dashed ${FOOT.gap};border-radius:0`, 'game ticks not recorded'],
+].map(([style, words]) => `<span><i style="${style}"></i>${words}</span>`).join('');
+}
 function cssVar(name, fallback) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback; }
 function clipColour(name) { let h = 7; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return `hsl(${h % 360}, 42%, 64%)`; }
+// the last moment whose clock value is at most c (0 if none): the clock is the client's ticks, so a film recording
+// several moments a tick has several a tick
+function momentAt(c) {
+  let lo = 0, hi = timeline.length - 1;
+  if (timeline[0] > c) return 0;
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (timeline[mid] <= c) lo = mid; else hi = mid - 1; }
+  return lo;
+}
 function chartSpan() {
+  if (chartHold) return chartHold;
   if (chartWhole) return [0, timeline.length - 1];
-  const t1 = Math.min(timeline.length - 1, Math.max(now + CLOSE, 2 * CLOSE));
-  return [Math.max(0, t1 - 2 * CLOSE), t1];
+  const first = timeline[0], last = timeline[timeline.length - 1];
+  const c1 = Math.min(last, Math.max(timeline[now] + CLOSE, first + 2 * CLOSE));
+  return [momentAt(Math.max(first, c1 - 2 * CLOSE)), momentAt(c1)];
 }
 // draws the chart of moments t0..t1 into a canvas this many css pixels wide; the picked animal's lanes, the gaps and
 // the game ticks along the bottom (no cursor: drawChartNow adds it)
@@ -492,19 +528,19 @@ function drawChart(canvas, t0, t1, width, dpr) {
   canvas.width = Math.round(width * dpr); canvas.height = Math.round(H * dpr);
   const ctx = canvas.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const ink = cssVar('--ink', '#2a2a22'), muted = cssVar('--muted', '#6a675a'), line = cssVar('--line', '#d9d4c4'),
-        warn = cssVar('--warn', '#b5402a'), panel = cssVar('--panel', '#fdfcf8');
+  const muted = cssVar('--muted', '#6a675a'), panel = cssVar('--panel', '#fdfcf8');
   ctx.fillStyle = panel; ctx.fillRect(0, 0, width, H);
+  ctx.fillStyle = FOOT.strip; ctx.fillRect(LEFT, TOP, width - LEFT, lanes * LANE);
   const cw = (width - LEFT - 4) / (t1 - t0 + 1), x = t => LEFT + (t - t0) * cw, w = Math.max(cw + 0.6, 1);   // (a little over a column: no seams between them)
   ctx.font = '12px system-ui, sans-serif'; ctx.textBaseline = 'middle';
   ctx.fillStyle = muted;
   ctx.fillText(a ? 'clip' : 'pick an animal', 6, TOP + LANE / 2);
   feet.forEach((f, i) => ctx.fillText(f.name, 6, TOP + (i + 1.5) * LANE));
-  const hatch = (px, y) => { ctx.fillStyle = line; for (let k = 0; k < w; k += 4) ctx.fillRect(px + k, y + 3, Math.min(1.5, w), LANE - 6); };
+  const hatch = (px, y) => { ctx.fillStyle = FOOT.hidden; for (let k = 0; k < w; k += 4) ctx.fillRect(px + k, y + 3, Math.min(1.5, w), LANE - 6); };
   if (a) {
     let runStart = t0, runClip;
     const label = (from, to, name) => {          // a clip's name over its run, when it fits
-      if (name && ctx.measureText(name).width + 6 < x(to + 1) - x(from)) { ctx.fillStyle = ink; ctx.fillText(name, x(from) + 3, TOP + LANE / 2); }
+      if (name && ctx.measureText(name).width + 6 < x(to + 1) - x(from)) { ctx.fillStyle = FOOT.clipInk; ctx.fillText(name, x(from) + 3, TOP + LANE / 2); }
     };
     for (let t = t0; t <= t1; t++) {
       const j = a.frameAt[t], px = x(t);
@@ -513,17 +549,23 @@ function drawChart(canvas, t0, t1, width, dpr) {
       if (clip !== runClip) { label(runStart, t - 1, runClip); runStart = t; runClip = clip; }
       if (j < 0) { for (let i = 0; i < lanes; i++) hatch(px, TOP + i * LANE); continue; }
       ctx.fillStyle = clipColour(clip); ctx.fillRect(px, TOP + 2, w, LANE - 4);
-      feet.forEach((f, i) => {
-        const s = f.state[j], y = TOP + (i + 1) * LANE;
-        if (s === -2) { hatch(px, y); return; }
-        ctx.fillStyle = s === 2 ? warn : s === 1 ? ink : s === -1 ? '#c9b07a' : line;
-        ctx.fillRect(px, y + 4, w, LANE - 8);
-      });
     }
     label(runStart, t1, runClip);
+    // the feet, the worst last: in the whole recording a pixel holds several moments, and one sliding among them
+    // must still show (red over on the ground over lifted)
+    const colour = {0: FOOT.up, '-1': FOOT.noGround, 1: FOOT.down, 2: FOOT.slide};
+    feet.forEach((f, i) => {
+      const y = TOP + (i + 1) * LANE;
+      for (const want of [-2, 0, -1, 1, 2]) for (let t = t0; t <= t1; t++) {
+        const j = a.frameAt[t];
+        if (j < 0 || f.state[j] !== want) continue;
+        if (want === -2) hatch(x(t), y);
+        else { ctx.fillStyle = colour[want]; ctx.fillRect(x(t), y + 4, w, LANE - 8); }
+      }
+    });
   }
-  ctx.fillStyle = warn;                         // the game ticks not recorded
-  for (let t = t0 + 1; t <= t1; t++) if (gapBefore[t] > GAP) ctx.fillRect(x(t) - 1, TOP, 2, lanes * LANE);
+  ctx.fillStyle = FOOT.gap;                     // the game ticks not recorded: a dashed line
+  for (let t = t0 + 1; t <= t1; t++) if (gapBefore[t] > GAP) for (let y = TOP; y < TOP + lanes * LANE; y += 6) ctx.fillRect(x(t) - 1, y, 2, 3.5);
   ctx.fillStyle = muted; ctx.textBaseline = 'top';
   let lastX = -1e9;
   for (let t = t0; t <= t1; t++) {              // the game ticks along the bottom
@@ -539,11 +581,14 @@ function drawChartNow() {
   const [t0, t1] = chartSpan();
   const key = [picked ? picked.index : -1, t0, t1, width, dpr, cssVar('--panel', '')].join('|');
   if (!chartCache || chartCache.key !== key) {
-    const base = document.createElement('canvas');
+    const base = chartCache ? chartCache.base : document.createElement('canvas');
     chartCache = {key, base, ...drawChart(base, t0, t1, width, dpr)};
   }
   const c = chartCache;
-  canvas.width = c.base.width; canvas.height = c.base.height; canvas.style.height = c.H + 'px';
+  // (its css height holds the drawing and the 1-pixel border round it: the drawing is never squeezed)
+  canvas.width = c.base.width; canvas.height = c.base.height; canvas.style.height = (c.H + 2) + 'px';
+  if (chartPointer !== null && !chartDrag) chartHover = chartAt({clientX: chartPointer});   // (the pointer resting
+                                                                                            // on it while it moves on)
   const ctx = canvas.getContext('2d');
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(c.base, 0, 0);
@@ -556,24 +601,23 @@ function drawChartNow() {
 // the chart's line of words: a moment's clip and feet (the one under the pointer, else now), or the key to it
 function chartText(t) {
   const a = picked;
-  if (!a) { $('chartNote').textContent = 'Pick an animal to see its footfall. Red lines: game ticks not recorded.'; return; }
+  if (!a) { $('chartNote').textContent = 'Pick an animal to see its footfall.'; return; }
   const j = a.frameAt[t];
   if (j < 0) { $('chartNote').textContent = `moment ${t + 1}: ${a.name} not drawn`; return; }
   const feet = feetOf(a), clip = (a.clipTable[a.clips[j]].body || '-').split(' ')[0];
-  const words = feet.map(f => f.name + ' ' + (f.state[j] === 2 ? `slides ${f.slide[j].toFixed(2)}` : f.state[j] === 1 ? 'down' :
+  const words = feet.map(f => f.name + ' ' + (f.state[j] === 2 ? `slides ${f.slide[j].toFixed(2)} px` : f.state[j] === 1 ? 'down' :
     f.state[j] === 0 ? 'up' : f.state[j] === -1 ? '(no ground recorded)' : '-'));
-  $('chartNote').textContent = `moment ${t + 1}, tick ${tickAt[t]}: ${clip}` + (words.length ? ' · ' + words.join(', ') : '') +
-    (feet.length ? '  (dark: on the ground; red: on the ground and sliding over ' + SLIDE + ' blocks a tick; light: lifted)' : '');
+  $('chartNote').textContent = `moment ${t + 1}, tick ${tickAt[t]}: ${clip}` + (words.length ? ' · ' + words.join(', ') : '');
 }
 function chartAt(e) {
   if (!chartCache) return -1;
-  const r = $('chart').getBoundingClientRect(), px = e.clientX - r.left;
+  const canvas = $('chart'), px = e.clientX - canvas.getBoundingClientRect().left - canvas.clientLeft;   // (inside its border)
   if (px < LEFT) return -1;
   return Math.max(chartCache.t0, Math.min(chartCache.t1, chartCache.t0 + Math.floor((px - LEFT) / chartCache.cw)));
 }
 
 // --- ghosts: see-through copies of the picked animal a few moments back, to see arcs and jerks (idea 7) -----------
-const GHOST_STEP = 2;                           // moments between ghosts (a tenth of a second at one a tick)
+const GHOST_STEP = 2;                           // ticks between ghosts (a tenth of a second)
 let ghosts = 0;
 function ghostSet(a, k) {
   a.ghostSets = a.ghostSets || [];
@@ -612,9 +656,12 @@ function placeGhosts() {
   animals.forEach(a => (a.ghostSets || []).forEach(g => g && (g.group.visible = false)));
   const a = picked;
   if (!ghosts || !a || !a.on || a.now < 0) return;
+  let back = now;                               // how far back the recording runs on without ticks not recorded
+  while (back > 0 && !(gapBefore[back] > GAP)) back--;
   for (let k = 0; k < ghosts; k++) {
-    const t = now - (k + 1) * GHOST_STEP;
-    if (t < 0) break;
+    const want = timeline[now] - (k + 1) * GHOST_STEP;
+    if (want < timeline[back]) break;            // (a ghost across ticks not recorded would look like a jerk)
+    const t = momentAt(want);
     const j = a.frameAt[t];
     if (j < 0 || j === a.now) continue;
     const g = ghostSet(a, k);
@@ -625,42 +672,49 @@ function placeGhosts() {
   }
 }
 
-// --- foot paths: each foot's middle over the last 1.5 seconds (30 moments), coloured by its state ----------------
+// --- foot paths: each foot's middle over the last 1.5 seconds (30 ticks), coloured by its state -------------------
 const PATH = 30;
+const PATH_MAX = 200;                           // points a line holds (30 ticks at up to 6 moments a tick)
 const pathGroup = new THREE.Group();
 st.scene.add(pathGroup);
 let paths = false;
+const pathSets = [];
 function placePaths() {
   pathGroup.visible = false;
   const a = picked;
-  if (!paths || !a || a.now < 0) return;
+  if (!paths || !a || !a.on || a.now < 0) return;
   const feet = feetOf(a);
   const ink = new THREE.Color('#1d1d18'), red = new THREE.Color('#e0442a'), up = new THREE.Color('#9a9a90');
+  const drawn = f => t => a.frameAt[t] >= 0 && f.state[a.frameAt[t]] !== -2;
   feet.forEach((f, i) => {
-    let line = pathGroup.children[i];
-    if (!line) {
+    let set = pathSets[i];
+    if (!set) {                                 // a line and a dot at each moment (a line alone is one pixel wide)
       const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array((PATH + 1) * 3), 3));
-      g.setAttribute('color', new THREE.BufferAttribute(new Float32Array((PATH + 1) * 3), 3));
-      line = new THREE.Line(g, new THREE.LineBasicMaterial({vertexColors: true, depthTest: false}));
-      line.renderOrder = 20; line.frustumCulled = false;
-      pathGroup.add(line);
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(PATH_MAX * 3), 3));
+      g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(PATH_MAX * 3), 3));
+      const line = new THREE.Line(g, new THREE.LineBasicMaterial({vertexColors: true, depthTest: false}));
+      const dots = new THREE.Points(g, new THREE.PointsMaterial({vertexColors: true, size: 4, sizeAttenuation: false, depthTest: false}));
+      line.renderOrder = dots.renderOrder = 20; line.frustumCulled = dots.frustumCulled = false;
+      pathGroup.add(line, dots);
+      set = pathSets[i] = {g, line, dots};
     }
-    const pos = line.geometry.attributes.position, col = line.geometry.attributes.color;
-    let n = 0;
-    for (let t = Math.max(0, now - PATH); t <= now; t++) {
+    const pos = set.g.attributes.position, col = set.g.attributes.color, isDrawn = drawn(f);
+    let n = 0, from = now;                      // back 30 ticks, never across ticks not recorded or a moment not drawn
+    while (from > 0 && now - from + 1 < PATH_MAX && timeline[now] - timeline[from - 1] <= PATH && !(gapBefore[from] > GAP)
+           && isDrawn(from - 1)) from--;
+    for (let t = from; t <= now; t++) {
       const j = a.frameAt[t];
-      if (j < 0 || f.state[j] === -2) continue;
+      if (!isDrawn(t)) continue;
       pos.setXYZ(n, f.mid[j * 3], f.mid[j * 3 + 1] + 0.02, f.mid[j * 3 + 2]);
       const c = f.state[j] === 2 ? red : f.state[j] === 1 ? ink : up;
       col.setXYZ(n, c.r, c.g, c.b);
       n++;
     }
-    line.geometry.setDrawRange(0, n);
+    set.g.setDrawRange(0, n);
     pos.needsUpdate = true; col.needsUpdate = true;
-    line.visible = n > 1;
+    set.line.visible = set.dots.visible = n > 1;
   });
-  pathGroup.children.forEach((l, i) => { if (i >= feet.length) l.visible = false; });
+  pathSets.forEach((set, i) => { if (i >= feet.length) set.line.visible = set.dots.visible = false; });
   pathGroup.visible = true;
 }
 
@@ -693,6 +747,7 @@ $('pieces').onclick = () => {
   settings.pieces = settings.pieces ? 0 : 1;
   $('pieces').classList.toggle('on', !!settings.pieces);
   animals.forEach(a => a.meshes.forEach(m => m && (m.material = settings.pieces ? m.userData.tint : m.userData.mat)));
+  if (ready) placeGhosts();                     // (their colour follows the pieces)
 };
 document.addEventListener('keydown', e => {
   if (!ready || e.ctrlKey || e.altKey || e.metaKey) return;     // the browser's own keys (Ctrl+F finds, Alt+Left goes back)
@@ -710,26 +765,36 @@ const ghostBtns = Viewer.buttons($('ghostBtns'), [[0, 'No ghosts'], [4, '4 ghost
 $('pathsBtn').onclick = () => { paths = !paths; $('pathsBtn').classList.toggle('on', paths); if (ready) show(now); };
 $('chartSpan').onclick = () => {
   chartWhole = !chartWhole;
-  $('chartSpan').textContent = chartWhole ? 'A few seconds round now' : 'Whole recording';
+  $('chartSpan').classList.toggle('on', chartWhole);
   if (ready) { drawChartNow(); writeAddress(); }
 };
-// the chart: press or drag to go to a moment; the pointer over it says that moment's clip and feet
-let chartDrag = false;
+// the chart: press or drag to go to a moment (the moments shown stay put while pressed); the pointer over it says that
+// moment's clip and feet
 $('chart').addEventListener('pointerdown', e => {
+  if (!ready || e.button !== 0) return;
   const t = chartAt(e);
-  if (!ready || t < 0) return;
-  chartDrag = true; $('chart').setPointerCapture(e.pointerId);
+  if (t < 0) return;
+  chartDrag = true; chartHold = [chartCache.t0, chartCache.t1]; chartHover = -1;
+  $('chart').setPointerCapture(e.pointerId);
   setPlaying(false); show(t);
 });
 $('chart').addEventListener('pointermove', e => {
   if (!ready) return;
+  chartPointer = e.clientX;
   const t = chartAt(e);
-  if (chartDrag && t >= 0 && t !== now) { show(t); return; }
+  if (chartDrag) { if (t >= 0 && t !== now) show(t); return; }
   if (t !== chartHover) { chartHover = t; drawChartNow(); }
 });
-$('chart').addEventListener('pointerup', () => { chartDrag = false; });
-$('chart').addEventListener('pointerleave', () => { if (chartHover >= 0) { chartHover = -1; if (ready) drawChartNow(); } });
-st.onResize.push(() => { if (ready) drawChartNow(); });
+function endChartDrag() { if (!chartDrag) return; chartDrag = false; chartHold = null; if (ready) drawChartNow(); }
+['pointerup', 'pointercancel', 'lostpointercapture'].forEach(n => $('chart').addEventListener(n, endChartDrag));
+$('chart').addEventListener('pointerleave', () => { chartPointer = null; if (chartHover >= 0) { chartHover = -1; if (ready) drawChartNow(); } });
+// drawn again when the theme or the screen's pixel ratio changes (no resize comes with either)
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (ready) drawChartNow(); });
+(function watchRatio() {
+  matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener('change', () => { if (ready) drawChartNow(); watchRatio(); }, {once: true});
+})();
+st.onResize.push(() => { if (ready) { drawChartNow(); if (settings.cam) aim(settings.cam); } });   // (a lit camera fitted
+                                                                                                 // to the new shape)
 // a left click (not a drag) on an animal picks it; on the ground, lets the pick go
 const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
 let down = null;
@@ -771,24 +836,17 @@ st.onFrame.push(() => {
   animals = meta.animals;
   animals.forEach((a, i) => buildAnimal(a, i, all));
   buildGround(meta.blocks, meta.water);
-  const keys = new Set();
-  animals.forEach(a => a.key.forEach(k => keys.add(k)));
-  timeline = [...keys].sort((x, y) => x - y);
+  // the scene's line of moments, each moment's game tick and the ticks not recorded before it: worked out by
+  // tools/recording.py (line_up), the same line the feet are judged on
+  timeline = meta.line.timeline;
+  RULE = meta.line.rule;
+  GAP = RULE.gap;
+  chartLegend();
   $('scrub').max = timeline.length - 1;
   const slotOf = new Map(timeline.map((k, t) => [k, t]));
   animals.forEach(a => lineUp(a, slotOf));
-  // a moment's game tick: the earliest its animals read (the server's tick is read live while the client draws, so a
-  // server sprinting through an "until" can be a few ticks on between the first animal drawn and the last), then no
-  // later than the next moment's less the client ticks between (a frozen step of k ticks runs on the server before
-  // the client draws its first tick: all k moments read the step's end)
-  const whole = k => Math.floor(k + 1e-6);
-  tickAt = new Array(timeline.length).fill(Infinity);
-  animals.forEach(a => a.key.forEach((k, j) => { const t = a.slot[j]; if (a.ft[j] !== null && a.ft[j] < tickAt[t]) tickAt[t] = a.ft[j]; }));
-  for (let t = timeline.length - 2; t >= 0; t--) tickAt[t] = Math.min(tickAt[t], tickAt[t + 1] - (whole(timeline[t + 1]) - whole(timeline[t])));
-  tickAt = tickAt.map((v, t) => isFinite(v) ? v : (t ? tickAt[t - 1] : 0));
-  // the ticks not recorded before a moment: the game's ticks since the moment before, or the client's (a tick none of
-  // these animals was drawn in), whichever is more, less the one tick between two moments in a row
-  gapBefore = tickAt.map((v, t) => t ? Math.max(0, Math.max(v - tickAt[t - 1], whole(timeline[t]) - whole(timeline[t - 1])) - 1) : 0);
+  tickAt = meta.line.tickAt;
+  gapBefore = meta.line.gapBefore;
   // the animal buttons: the name picks it (and looks at it), Hide hides or shows it
   animals.forEach(a => {
     const b = document.createElement('button');
@@ -803,7 +861,7 @@ st.onFrame.push(() => {
     $('animalBtns').appendChild(pair);
     a.btn = b; a.hideBtn = h;
   });
-  (settings.hide ? String(settings.hide).split(',') : []).forEach(n => {
+  (rawHash('hide') ? rawHash('hide').split(',').map(n => { try { return decodeURIComponent(n); } catch (e) { return n; } }) : []).forEach(n => {
     const a = animals.find(x => x.name === n);
     if (a) { a.on = false; a.btn.classList.add('off'); a.hideBtn.textContent = 'Show'; }
   });
@@ -819,13 +877,13 @@ st.onFrame.push(() => {
     const t = tickAt.findIndex(v => v >= settings.at);
     start = t >= 0 ? t : timeline.length - 1;
   }
-  picked = animals.find(a => a.name === settings.pick) || null;
+  picked = animals.find(a => a.name === rawPick) || null;
   if (picked) picked.btn.classList.add('on');
   speed = SPEEDS.some(([v]) => v === settings.speed) ? settings.speed : 1; speedBtns(speed);
   follow = !!settings.follow; $('followBtn').classList.toggle('on', follow);
   ghosts = [0, 4, 8].includes(settings.ghosts) ? settings.ghosts : 0; ghostBtns(ghosts);
   paths = !!settings.paths; $('pathsBtn').classList.toggle('on', paths);
-  chartWhole = !!settings.whole; $('chartSpan').textContent = chartWhole ? 'A few seconds round now' : 'Whole recording';
+  chartWhole = !!settings.whole; $('chartSpan').classList.toggle('on', chartWhole);
   $('labelsBtn').classList.toggle('on', !!settings.labels);
   if (settings.pieces) { settings.pieces = 0; $('pieces').onclick(); }
   st.start();
@@ -839,9 +897,99 @@ st.onFrame.push(() => {
   if (settings.play) setPlaying(true);
   writeAddress();
   $('loading').style.display = 'none';
-  // what tools may call (moments are indexes from 0 here; the page and #m count from 1)
-  window.Replay = {show: t => { setPlaying(false); show(t); }, pick: n => pick(animals.find(a => a.name === n) || null),
-                   camera, follow: setFollow, play: setPlaying, moments: () => timeline.length, ready: true};
+  // what tools may call (moments are indexes from 0 here; the page and #m count from 1). tools/replay_strips.py takes
+  // its pictures through these: one page open, the moment and the camera set, the scene drawn, the picture read back.
+  const byName = n => animals.find(a => a.name === n) || null;
+  // one animal at moment t, read from its recording (nothing shown): its own tick, whether this is its own recorded
+  // moment (not its last one held while another animal's moment is shown), every clip player (speed and how far in
+  // null when not recorded), feet, drawn step, mind and place
+  function aboutAt(a, t) {
+    const j = a.frameAt[t];
+    if (j < 0) return {moment: t + 1, index: t, drawn: false, sceneTick: tickAt[t]};
+    const table = a.clipTable[a.clips[j]], play = a.play[j] || {}, clips = {};
+    Object.keys(table).forEach(k => {
+      const [name, state] = table[k].split(' '), p = play[k] || [];
+      clips[k] = {name, state: state || '', speed: p[0] == null ? null : +p[0], ticks: p[1] == null ? null : +p[1]};
+    });
+    const o = DATA.origin || [0, 0, 0];
+    return {moment: t + 1, index: t, drawn: true, own: a.slot[j] === t, tick: a.ft[j], sceneTick: tickAt[t],
+            ticksSince: j > 0 ? a.ft[j] - a.ft[j - 1] : null, clips, feet: feetAt(a, j), step: stepAt(a, j),
+            facts: a.facts[j] || {}, place: a.pos[j].map((x, i) => +(x + o[i]).toFixed(3)), yaw: a.yaw[j]};
+  }
+  const fixedViews = {};                        // a camera's place kept from its first picture (--fixed)
+  window.Replay = {
+    show: t => { setPlaying(false); show(t); }, pick: n => pick(byName(n)), camera, follow: setFollow, play: setPlaying,
+    moments: () => timeline.length, ready: true,
+    names: () => animals.map(a => a.name),
+    cams: () => CAMS.map(([k]) => k),
+    has: n => !!byName(n),
+    // the first and last moments (indexes) of this animal's own recorded moments whose own game tick lies between from
+    // and to (-1 for from: its first; -1 for to: 40 of its moments on), or why there are none
+    span: (n, from, to) => {
+      const a = byName(n);
+      if (!a) return {why: `no animal named ${n}`};
+      const own = [];
+      for (let j = 0; j < a.n; j++) if (a.slot[j] >= 0 && a.frameAt[a.slot[j]] === j) own.push(j);
+      if (!own.length) return {why: `${n} has no moment drawn in this recording`};
+      const k0 = from >= 0 ? own.findIndex(j => a.ft[j] >= from) : 0;
+      if (k0 < 0) return {why: `${n}'s last recorded tick is ${a.ft[own[own.length - 1]]}`};
+      let k1 = own.length - 1;
+      if (to >= 0) { while (k1 >= 0 && a.ft[own[k1]] > to) k1--; } else k1 = Math.min(own.length - 1, k0 + 40);
+      if (k1 < k0) return {why: `${n} has no recorded moment between game ticks ${from} and ${to} (its next is tick ${a.ft[own[k0]]})`};
+      return {first: a.slot[own[k0]], last: a.slot[own[k1]]};
+    },
+    // the cameras fitted to the space this animal takes up over moments t0 to t1 (indexes) only, not its whole recording
+    fit: (n, t0, t1) => { const a = byName(n); a.fitRange = [Math.max(0, a.frameAt[t0]), a.frameAt[t1] < 0 ? a.n - 1 : a.frameAt[t1]]; },
+    // aboutAt for every moment from t0 to t1 (indexes)
+    rows: (n, t0, t1) => { const a = byName(n), out = []; for (let t = t0; t <= t1; t++) out.push(aboutAt(a, t)); return out; },
+    // the foot paths and ghosts of the picked animal in the pictures (paths: true/false; ghosts: 0, 4 or 8)
+    traces: (p, g) => { paths = !!p; $('pathsBtn').classList.toggle('on', paths); ghosts = [0, 4, 8].includes(g) ? g : 0; ghostBtns(ghosts); show(now); },
+    // every animal but the picked one drawn see-through and casting no shadow (the user's call, 2026-11-27: a neighbour
+    // never hides the animal checked, and the shape of what it touches, its prey or its holder, still shows)
+    // (one even layer of glass: a depth-only twin of each part is drawn after the solid scene, then only the nearest
+    // surface of the animal is tinted, so its many overlapping boxes do not stack up to solid)
+    fadeOthers: on => {
+      const depthOnly = new THREE.MeshBasicMaterial({colorWrite: false, side: THREE.DoubleSide});
+      animals.forEach(a => {
+        const fade = on && a !== picked;
+        if (fade && !a.faded) a.faded = new THREE.MeshLambertMaterial({color: a.colour, transparent: true, opacity: 0.4,
+          depthWrite: false, depthFunc: THREE.LessEqualDepth, side: THREE.DoubleSide});
+        a.meshes.forEach(m => {
+          if (!m) return;
+          m.material = fade ? a.faded : settings.pieces ? m.userData.tint : m.userData.mat;
+          m.castShadow = !fade;
+          m.renderOrder = fade ? 2 : 0;
+          if (fade && !m.userData.twin) {
+            const t = new THREE.Mesh(m.geometry, depthOnly);
+            t.renderOrder = 1;                   // (after the solid scene, before the glass)
+            m.add(t);
+            m.userData.twin = t;
+          }
+          if (m.userData.twin) m.userData.twin.visible = fade;
+        });
+      });
+    },
+    // the scene from one of the picked animal's cameras, drawn now and read back as a PNG (no labels: they are not
+    // drawn on the canvas); fixed: the camera stays where it stood for this camera's first picture, so the animal's
+    // own travel and turns show
+    snap: (cam, fixed) => {
+      if (fixed && fixedViews[cam]) {
+        st.camera.position.copy(fixedViews[cam].at); st.controls.target.copy(fixedViews[cam].look); st.controls.update();
+      } else {
+        camera(cam);
+        if (fixed) fixedViews[cam] = {at: st.camera.position.clone(), look: st.controls.target.clone()};
+      }
+      sunToView();
+      st.renderer.render(st.scene, st.camera);
+      return st.renderer.domElement.toDataURL('image/png');
+    },
+    // the footfall chart of moments t0..t1 as a PNG, 1200 pixels wide
+    chart: (t0, t1) => {
+      const c = document.createElement('canvas');
+      const d = drawChart(c, Math.max(0, t0), Math.min(timeline.length - 1, t1), 1200, 1);
+      return d ? c.toDataURL('image/png') : null;
+    },
+  };
 })().catch(e => { $('loading').textContent = 'Could not unpack the recording: ' + e; window.Replay = {error: String(e)}; console.error(e); });
 </script>
 </body>

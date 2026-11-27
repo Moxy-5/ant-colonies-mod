@@ -6,7 +6,7 @@ import software.bernie.geckolib.animation.AnimationController;
 
 /**
  * A gait changes on the matching footfall while the old gait can carry the speed, and at once when it cannot (the Motion
- * Studio, phase 2, step 3, 2026-11-25; its rule rethought for BUGS 384; {@code docs/plans/motion-studio-phase2.md}).
+ * Studio, phase 2, step 3, 2026-11-25; its rule rethought for BUGS 384; the first phase 2, its record in {@code docs/HISTORY.md}).
  * GeckoLib blends from wherever the old clip is into the new clip's first frame, so a walk left at any moment swung its
  * legs through each other into the trot (up to 140 degrees apart in 4 ticks). A real animal changes gait at a set point
  * of its stride: here a change waits until the old clip comes to the moment whose pose is nearest the new clip's first

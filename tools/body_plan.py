@@ -54,8 +54,12 @@ The files are <mod>/src/main/resources/assets/<mod name>/body_plans/<model>.json
               controller    the Java file whose body controller sets GeckoLib's blend length between clips (read from
                             it: "new SteadyController<>(this, "body", N" or a constant it names)
               animations    the animation file's name when it is not the model's
-              water, dig    clip names or patterns played in open water or digging in (others are on land); a move
-                            with its own scene in its notes (step, water) is judged against that scene
+              water, dig, air, perch  clip names or patterns played in open water, digging, open air (no ground
+                            checks) or perched on a horizontal branch bar (others are on land); a move with its own
+                            scene in its notes (step, water) is judged against that scene
+              perch         {"y": 0.0, "r": 2.0, "z": 0.0} horizontal branch bar for perch clips (top at y, radius r)
+              wing_wave     [clip, ...] flapping flight clips whose wing chains should whip/trail cleanly outward
+              wing_tuck_ok  clips whose wings fold tightly into the flanks on purpose (skips wing-body clip check)
               surface       open water's surface over the model's floor when it floats (model px)
               float_depth   how far the feet line hangs under the surface afloat (a move's end height is judged by it)
               surface_marks the points judged against the water's surface: {"label", "bone", "at": [x, y, z]} a point
@@ -173,6 +177,7 @@ class Plan:
         self.to_bone = dict(data['bones'])               # role -> bone
         self.to_role = {b: r for r, b in self.to_bone.items()}
         self.legs = {k: list(v) for k, v in data.get('legs', {}).items()}
+        self.wings = {k: list(v) for k, v in data.get('wings', {}).items()}
         self.root = data.get('root', 'body')
         self.forebody = data.get('forebody', 'forebody')
         head = data.get('head', {})
@@ -325,9 +330,18 @@ def problems(plan, bones):
         out.append(f'the model\'s bone "{name}" is not in the plan\'s bones table')
     used = [plan.root, plan.forebody, plan.head] + plan.jaws + sorted(plan.antenna_bones()) + list(plan.sockets.values())
     used += plan.head_player + [j for p in plan.spine for j, _ in p['joints']] + [b for chain in plan.legs.values() for b in chain]
+    used += [b for chain in plan.wings.values() for b in chain]
     for role in used:
         if role not in plan.to_bone:
             out.append(f'role "{role}" is used in the plan but missing from its bones table')
+    for key, chain in plan.wings.items():
+        if not re.match(r'[lr]\d*$', key):
+            out.append(f'wing key "{key}" should be l or r (or l1/r1)')
+        if len(chain) < 2:
+            out.append(f'wing {key} has {len(chain)} bone(s); expected at least 2 (inner to outer)')
+        other = ('r' if key[0] == 'l' else 'l') + key[1:]
+        if other not in plan.wings:
+            out.append(f'wing {key} has no partner {other} on the other side')
     for key, chain in plan.legs.items():
         if not re.match(r'[lr]\d+$', key):
             out.append(f'leg key "{key}" should be l or r and a pair number (l1 is the front left leg)')
@@ -549,39 +563,68 @@ def plan_text(data):
     return text + '\n'
 
 
-def keep_gaits(path, data):
-    """The plan to write over the file at path, with that file's gait table kept (2026-11-25, the Motion Studio phase 2).
-    The game reads each walker's gaits from its plan (framework/.../entity/body/Gaits.java) and will not make the animal
-    without them, but the model makers (buffalo_models.py, lion_models.py) write plans without that section: rerunning
-    one dropped it. Kept where it stood among the file's sections. After a gait clip is remade, find its gait change
-    moments again: python tools/clip_check.py <animal> --gait-changes --write."""
-    if 'gaits' in data or not os.path.exists(path):
+# Sections a model maker writes only part of: what the maker leaves out of them is kept too (one level down).
+MIXED = ('checks', 'verify')
+# Lists inside those that others add entries to: the maker's entries first, then every other entry the file had.
+JOINED = ('switches',)
+
+
+def keep_sections(path, data, say=True):
+    """The plan to write over the file at path, keeping everything of that file the maker's plan lacks (the Motion
+    Studio, the new phase 2, ideas 56 and 58, 2026-11-27; it grew from keep_gaits, 2026-11-25).
+
+    A model maker writes what it knows of an animal (its bones, legs, chain, its own checks and clip changes). Other
+    tools and Claude add the rest to the same file: the gait table (clip_check.py --gait-changes --write), the spots,
+    holds and strikes (tools/spots.py reads them), checks.controller and checks.drawn_ahead (read from the Java), the
+    course, the verify films, clip changes the game makes. The game cannot do without some of them, and rerunning a
+    maker wiped them (lion_models.py game, buffalo_models.py game). The rule, for every maker alike: the maker's sections
+    and values win; a section of the file the maker does not write is kept where it stood; inside "checks" and
+    "verify" a key the maker does not write is kept; the file's "switches" entries the maker lacks are kept after the
+    maker's own. With say, prints what was kept (a key the maker dropped on purpose shows there: delete it by hand)."""
+    if not os.path.exists(path):
         return data
     try:
         with open(path, encoding='utf-8') as f:
             old = json.load(f)
     except ValueError:
         return data
-    if 'gaits' not in old:
+    if not isinstance(old, dict) or not isinstance(data, dict):
         return data
-    keys = list(old)
-    i = keys.index('gaits')
-    after = keys[i - 1] if i > 0 else None
-    if after is None:
-        return {'gaits': old['gaits'], **data}
-    if after not in data:
-        return {**data, 'gaits': old['gaits']}
-    kept = {}
-    for k, v in data.items():
-        kept[k] = v
-        if k == after:
-            kept['gaits'] = old['gaits']
-    return kept
+    kept = []
+
+    def merge(was, new, where, depth):
+        out = []
+        for k, v in new.items():
+            if k in was and depth == 0 and k in MIXED and isinstance(v, dict) and isinstance(was[k], dict):
+                v = merge(was[k], v, where + [k], depth + 1)
+            elif k in was and k in JOINED and isinstance(v, list) and isinstance(was[k], list):
+                extra = [e for e in was[k] if e not in v]
+                if extra:
+                    kept.append(f"{'.'.join(where + [k])} (+{len(extra)})")
+                    v = v + extra
+            out.append((k, v))
+        names = list(was)
+        for i, k in enumerate(names):
+            if k in new:
+                continue
+            kept.append('.'.join(where + [k]))
+            before = next((names[j] for j in range(i - 1, -1, -1) if any(n == names[j] for n, _ in out)), None)
+            at = 0 if before is None else next(j for j, (n, _) in enumerate(out) if n == before) + 1
+            out.insert(at, (k, was[k]))
+        return dict(out)
+
+    merged = merge(old, data, [], 0)
+    if say and kept:
+        print(f'  {os.path.basename(path)}: kept from the plan on disk: ' + ', '.join(kept))
+    return merged
+
+
+keep_gaits = keep_sections        # (its old name, for a maker on another branch that still calls it)
 
 
 def write_plan(model, data):
     os.makedirs(os.path.dirname(plan_path(model)), exist_ok=True)
-    data = keep_gaits(plan_path(model), data)
+    data = keep_sections(plan_path(model), data)
     with open(plan_path(model), 'w', encoding='utf-8', newline='\n') as f:
         f.write(plan_text(data))
 
@@ -647,7 +690,7 @@ BOX_KIND = [('worker_ant', 'colony insect'), ('termite_', 'colony insect'), ('ma
             ('crocodile', 'large animal'), ('monitor', 'large animal'), ('hippo', 'large animal'),
             ('otter', 'medium animal'), ('bull_shark', 'large animal'),
             ('lion', 'large animal'), ('lioness', 'large animal'), ('lion_cub', 'medium animal'),
-            ('buffalo', 'large animal')]
+            ('buffalo', 'large animal'), ('martial_eagle', 'large animal')]
 
 
 def box_kind(model):

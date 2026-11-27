@@ -511524,7 +511524,10 @@
      }
     }
    },
-   "loop": true
+   "loop": true,
+   "timeline": {
+    "0.0": "made_against buffalo 870a42beece0"
+   }
   },
   "rest_stretch_up": {
    "animation_length": 3.8,

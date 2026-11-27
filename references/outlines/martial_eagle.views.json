@@ -1,0 +1,32 @@
+{
+  "length_blocks": 2.31875,
+  "views": {
+    "side": {
+      "box": [
+        20,
+        20,
+        431,
+        458
+      ],
+      "head": "right"
+    },
+    "top": {
+      "box": [
+        20,
+        458,
+        431,
+        690
+      ],
+      "head": "right"
+    },
+    "front": {
+      "box": [
+        431,
+        20,
+        663,
+        458
+      ]
+    }
+  },
+  "made_by": "python tools/workshop.py outline martial_eagle (from references/outlines/martial_eagle.json)"
+}

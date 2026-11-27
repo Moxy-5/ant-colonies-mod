@@ -27,7 +27,7 @@ const Viewer = (() => {
   function settingsFromHash(defaults) {
     const s = Object.assign({}, defaults);
     location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
-      const [k, v] = kv.split('=').map(decodeURIComponent);
+      const [k, v] = kv.split('=').map(x => { try { return decodeURIComponent(x); } catch (e) { return x; } });   // (a stray % kept as it is)
       s[k] = isNaN(parseFloat(v)) ? v : parseFloat(v);
     });
     return s;
@@ -60,7 +60,8 @@ const Viewer = (() => {
   // bone (userData.bone). opts.centre ([x, z] in blocks, another model's userData.centre) centres it there instead,
   // so two versions of one model line up piece for piece.
   function buildModel(look, scene, opts = {}) {
-    const mat = new THREE.MeshLambertMaterial({map: loadTexture(look.texture), alphaTest: 0.5});
+    const side = (opts.doubleSide || look.doubleSide) ? THREE.DoubleSide : THREE.FrontSide;
+    const mat = new THREE.MeshLambertMaterial({map: loadTexture(look.texture), alphaTest: 0.5, side});
     const root = new THREE.Group(), groups = {}, byName = {}, meshes = [];
     look.bones.forEach(b => byName[b.name] = b);
     look.bones.forEach((b, bi) => {
@@ -229,6 +230,17 @@ const Viewer = (() => {
     return {player, block};
   }
 
+  // a horizontal acacia branch perch bar (top at y, along x) for birds
+  function perchProp(st, y = 0, length = 3.2, radius = 0.14) {
+    const branch = new THREE.Mesh(
+      new THREE.BoxGeometry(length, radius * 2, radius * 2),
+      new THREE.MeshLambertMaterial({color: '#6b533b'})
+    );
+    branch.position.set(0, y - radius, 0);
+    branch.castShadow = true; branch.receiveShadow = true;
+    return st.prop(branch);
+  }
+
   // a flat textured ground (a block texture repeated once per block)
   function ground(st, texture, w, d, x = 0, z = 0, y = 0) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshLambertMaterial({map: loadTexture(texture, w, d)}));
@@ -266,7 +278,7 @@ const Viewer = (() => {
     const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 400);
     const maskCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 400);
     maskCam.layers.set(1);
-    const white = new THREE.MeshBasicMaterial({color: '#ffffff'});
+    const white = new THREE.MeshBasicMaterial({color: '#ffffff', side: THREE.DoubleSide});
     const BACK = new THREE.Color('#f4f2ec');
     const saved = {background: st.scene.background, fog: st.scene.fog};
 
@@ -465,5 +477,5 @@ const Viewer = (() => {
   }
 
   return {deg, setRot, loadTexture, settingsFromHash, boxGeometry, buildModel, showPieces, readClips, sample, pose,
-          stage, scaleProps, ground, buttons, compare, VIEWS};
+          stage, scaleProps, perchProp, ground, buttons, compare, VIEWS};
 })();

@@ -371,7 +371,7 @@ public final class LionGoals {
                 return true;
             }
             if (d != LionEntity.CALM && d != LionEntity.MOOD_FLEHMEN) {
-                return LionEntity.oneShot(d) && (d == LionEntity.REST_UP || d == LionEntity.SIT_UP);
+                return l.oneShot(d) && (d == LionEntity.REST_UP || d == LionEntity.SIT_UP);
             }
             l.getNavigation().stop();
             trip.drop();

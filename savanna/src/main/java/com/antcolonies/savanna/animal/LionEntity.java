@@ -99,11 +99,6 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
             "groom", "drink", "roar", "pride_greet", "mama_nuzzle", "cub_groom", "play_pounce", "play_wrestle", "mood_alert", "mood_angry",
             "mood_flehmen", "mood_curious", "bluff_charge", "swipe", "swipe_quick", "swipe_heavy", "swipe_combo", "bite", "pounce", "gallop_swat",
             "stalk", "ambush_freeze", "stalk_leap_bite", "jump_smack", "takedown_pin", "throat_hold", "hold_sink", "hold_down", "feed"};
-    /** Each one-shot doing's clip length (ticks, from the clip files); 0 for the loops. The roar's is the male's (see {@link #oneShotTicks}). */
-    private static final int[] DOING_TICKS = {0, 15, 0, 15, 19, 0, 19, 76, 88, 60, 68, 36, 37, 64, 33, 44, 0, 0, 0, 0, 27, 20, 18, 21, 29,
-            15, 25, 19, 0, 0, 29, 20, 26, 0, 41, 0, 0};
-    /** The lioness's roar (her sharper contact call) and the cub's call (ticks). */
-    static final int LIONESS_ROAR_TICKS = 50, CUB_CALL_TICKS = 32;
     /** The moods, by number: the face clips {@code face_<mood>}. */
     public static final String[] MOODS = {"content", "alert", "curious", "angry", "fearful", "sleepy", "flehmen"};
     public static final byte CONTENT = 0, ALERT = 1, CURIOUS = 2, ANGRY = 3, FEARFUL = 4, SLEEPY = 5, FLEHMEN = 6;
@@ -122,8 +117,6 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
 
     /** The clips' blend (ticks; Neon's card: all 120 switches checked at 4). */
     public static final int BLEND = 4;
-    /** The death clip (1.2 s) is played to its end before the body goes. */
-    static final int DEATH_TICKS = 24 + BLEND;
     /** Its paces (the move control's share of its speed; Minecraft's push goes about with its square, 1.73 x pace squared blocks a second): a shift of a few steps, a walk about 1.2, a trot about 2.8, a gallop about 7.5. Measured in game tests (BUGS 246). */
     public static final double STEP = 0.6, WALK = 0.83, TROT = 1.27, GALLOP = 2.08;
     /**
@@ -346,16 +339,27 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
         return doingFor() - BLEND;
     }
 
-    static boolean oneShot(byte doing) {
-        return doing > CALM && doing < DOING_TICKS.length && DOING_TICKS[doing] > 0;
+    /**
+     * Its form's clips as their files say them: each clip's length and whether it loops (the Motion Studio, the new
+     * phase 2, step 3: before, a table here typed from the files by hand, the lioness's roar and the cub's call apart).
+     */
+    public com.antcolonies.entity.body.Clips clips() {
+        return com.antcolonies.entity.body.Clips.of(LionEntity.class, com.antcolonies.savanna.SavannaMod.MODID, form.clips);
     }
 
-    /** A one-shot's clip length for its form (ticks). */
+    /** A doing's clip for its form (a cub's roar is its {@code cub_call}). */
+    String clipOf(byte doing) {
+        return doing == ROAR && isCub() ? "cub_call" : DOING_CLIPS[doing];
+    }
+
+    /** Whether a doing is a one-shot (its clip file plays it once; a clip its form lacks ends at once, never a loop). */
+    boolean oneShot(byte doing) {
+        return doing > CALM && doing < DOING_CLIPS.length && !clips().loops(clipOf(doing));
+    }
+
+    /** A one-shot's clip length for its form (ticks, from its clip file). */
     int oneShotTicks(byte doing) {
-        if (doing == ROAR) {
-            return form == Form.MALE ? DOING_TICKS[ROAR] : form == Form.LIONESS ? LIONESS_ROAR_TICKS : CUB_CALL_TICKS;
-        }
-        return DOING_TICKS[doing];
+        return clips().ticks(clipOf(doing));
     }
 
     /** How long a one-shot doing lasts (ticks, its blend in); 0 for calm and the loops. */
@@ -889,7 +893,7 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
     @Override
     protected void tickDeath() {
         deathTime++;
-        if (deathTime >= DEATH_TICKS && !level().isClientSide() && !isRemoved()) {
+        if (deathTime >= clips().ticks("death") + BLEND && !level().isClientSide() && !isRemoved()) {   // (its death played to its end)
             level().broadcastEntityEvent(this, (byte) 60);
             remove(Entity.RemovalReason.KILLED);
         }
@@ -1050,14 +1054,9 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
     private static final java.util.Map<String, RawAnimation> FILM_CLIPS = new java.util.concurrent.ConcurrentHashMap<>();
     private static final RawAnimation IDLE = RawAnimation.begin().thenLoop("idle");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
-    private static final RawAnimation CUB_CALL = RawAnimation.begin().thenPlayAndHold("cub_call");
-    private static final RawAnimation[] DOING_ANIMS = new RawAnimation[DOING_CLIPS.length];
     private static final RawAnimation[] FACES = new RawAnimation[MOODS.length];
 
     static {
-        for (byte d = 1; d < DOING_CLIPS.length; d++) {
-            DOING_ANIMS[d] = oneShot(d) ? RawAnimation.begin().thenPlayAndHold(DOING_CLIPS[d]) : RawAnimation.begin().thenLoop(DOING_CLIPS[d]);
-        }
         for (int m = 0; m < MOODS.length; m++) {
             FACES[m] = RawAnimation.begin().thenLoop("face_" + MOODS[m]);
         }
@@ -1129,13 +1128,13 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
             // creeping: the stalk at its pace; still between steps, held where it is (crouched, not frozen flat)
             double s = Gaits.perSize(stride, getScale());
             player.setAnimationSpeed(tickCount - movedTick > WALK_HOLD ? 0.0 : gaits.of("stalk").rate(s));
-            return state.setAndContinue(DOING_ANIMS[d]);
+            return state.setAndContinue(clips().anim(clipOf(d)));
         }
-        if (d > CALM && d < DOING_ANIMS.length) {
+        if (d > CALM && d < DOING_CLIPS.length) {
             if (!oneShot(d) && spots().hold(DOING_CLIPS[d]) == null) {
                 player.setAnimationSpeed(loopRate());   // (a hold's or a feed's loop at its own pace: its bite is counted in ticks)
             }
-            return state.setAndContinue(d == ROAR && isCub() ? CUB_CALL : DOING_ANIMS[d]);
+            return state.setAndContinue(clips().anim(clipOf(d)));   // (looped or held as its clip file says)
         }
         if (walking()) {
             // its gait by how fast it goes, each clip's pace following its stride (its body plan's gaits), changed on the

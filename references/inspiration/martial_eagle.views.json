@@ -1,0 +1,37 @@
+{
+ "about": "Orthographic perched turnarounds cut from the bottom strip of references/inspiration/martial_eagle.png. Working model grid is 40.0 px tall (= 2.50 viewer blocks at 16 px/b) rendered at MODEL_SCALE=0.50 in-game -> 1.25 blocks perched standing height and 3.25 blocks soaring wingspan.",
+ "height_blocks": 2.5,
+ "in_game_scale": 0.5,
+ "in_game_height_blocks": 1.25,
+ "in_game_wingspan_blocks": 3.25,
+ "background_tolerance": 38,
+ "views": {
+  "side": {
+   "box": [126, 520, 236, 628],
+   "head": "left"
+  },
+  "front": {
+   "box": [42, 524, 98, 634]
+  }
+ },
+ "extra_views": {
+  "back": {
+   "box": [258, 518, 326, 636]
+  },
+  "side_right": {
+   "box": [346, 520, 452, 636],
+   "head": "right"
+  },
+  "top_spread": {
+   "box": [470, 512, 736, 635],
+   "head": "up"
+  }
+ },
+ "marks": {
+  "snout": 132,
+  "head_back": 168,
+  "shoulders": 166,
+  "hips": 198,
+  "tail_base": 208
+ }
+}

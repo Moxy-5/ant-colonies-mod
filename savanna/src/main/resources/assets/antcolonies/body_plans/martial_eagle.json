@@ -1,0 +1,175 @@
+{
+ "_note": "Martial Eagle (Polemaetus bellicosus) \u2014 flier family + Motion Studio Phase 2 gaits, exported by tools/martial_eagle_anims.py",
+ "model": "martial_eagle",
+ "family": "flier",
+ "root": "root",
+ "forebody": "body",
+ "chain": ["head", "neck_2", "neck_1", "body", "tail_base", "tail_c"],
+ "legs": {
+  "l1": ["leg_upper_left", "leg_lower_left", "leg_tarsus_left", "leg_foot_left"],
+  "r1": ["leg_upper_right", "leg_lower_right", "leg_tarsus_right", "leg_foot_right"]
+ },
+ "wings": {
+  "l": ["wing_upper_left", "wing_fore_left", "wing_hand_left", "wing_tips_left"],
+  "r": ["wing_upper_right", "wing_fore_right", "wing_hand_right", "wing_tips_right"]
+ },
+ "head": {
+  "bone": "head",
+  "jaws": ["jaw"],
+  "eyes": ["eye_left", "eye_right"],
+  "pupils": ["pupil_left", "pupil_right"],
+  "lids": ["ulid_left", "lid_left", "ulid_right", "lid_right"],
+  "brows": ["brow_left", "brow_right"],
+  "crest": ["crest_c", "crest_left", "crest_right"]
+ },
+ "head_player": ["head", "jaw", "tongue", "crest_c", "crest_left", "crest_right", "brow_left", "brow_right", "eye_left", "eye_right", "pupil_left", "pupil_right", "ulid_left", "ulid_right", "lid_left", "lid_right"],
+ "gaits": {
+  "order": ["walk", "hop"],
+  "walk": {
+   "from": 0.0,
+   "min": 0.5,
+   "max": 1.6,
+   "change": {
+    "hop": 0.37
+   }
+  },
+  "hop": {
+   "from": 21.0,
+   "min": 0.6,
+   "max": 1.8,
+   "change": {
+    "walk": 0.06
+   }
+  }
+ },
+ "bones": {
+  "root": "root",
+  "body": "body",
+  "neck_1": "neck_1",
+  "neck_2": "neck_2",
+  "head": "head",
+  "jaw": "jaw",
+  "tongue": "tongue",
+  "crest_c": "crest_c",
+  "crest_left": "crest_left",
+  "crest_right": "crest_right",
+  "brow_left": "brow_left",
+  "eye_left": "eye_left",
+  "pupil_left": "pupil_left",
+  "ulid_left": "ulid_left",
+  "lid_left": "lid_left",
+  "brow_right": "brow_right",
+  "eye_right": "eye_right",
+  "pupil_right": "pupil_right",
+  "ulid_right": "ulid_right",
+  "lid_right": "lid_right",
+  "wing_fold_left": "wing_fold_left",
+  "wing_fold_tip_left": "wing_fold_tip_left",
+  "wing_fold_right": "wing_fold_right",
+  "wing_fold_tip_right": "wing_fold_tip_right",
+  "wing_upper_left": "wing_upper_left",
+  "wing_fore_left": "wing_fore_left",
+  "wing_hand_left": "wing_hand_left",
+  "alula_left": "alula_left",
+  "wing_tips_left": "wing_tips_left",
+  "wing_upper_right": "wing_upper_right",
+  "wing_fore_right": "wing_fore_right",
+  "wing_hand_right": "wing_hand_right",
+  "alula_right": "alula_right",
+  "wing_tips_right": "wing_tips_right",
+  "tail_base": "tail_base",
+  "tail_c": "tail_c",
+  "tail_left": "tail_left",
+  "tail_right": "tail_right",
+  "leg_upper_left": "leg_upper_left",
+  "leg_lower_left": "leg_lower_left",
+  "leg_tarsus_left": "leg_tarsus_left",
+  "leg_foot_left": "leg_foot_left",
+  "leg_toe1_left": "leg_toe1_left",
+  "leg_talon1_left": "leg_talon1_left",
+  "leg_toe2_left": "leg_toe2_left",
+  "leg_talon2_left": "leg_talon2_left",
+  "leg_toe3_left": "leg_toe3_left",
+  "leg_talon3_left": "leg_talon3_left",
+  "leg_hallux_left": "leg_hallux_left",
+  "leg_hallux_talon_left": "leg_hallux_talon_left",
+  "leg_upper_right": "leg_upper_right",
+  "leg_lower_right": "leg_lower_right",
+  "leg_tarsus_right": "leg_tarsus_right",
+  "leg_foot_right": "leg_foot_right",
+  "leg_toe1_right": "leg_toe1_right",
+  "leg_talon1_right": "leg_talon1_right",
+  "leg_toe2_right": "leg_toe2_right",
+  "leg_talon2_right": "leg_talon2_right",
+  "leg_toe3_right": "leg_toe3_right",
+  "leg_talon3_right": "leg_talon3_right",
+  "leg_hallux_right": "leg_hallux_right",
+  "leg_hallux_talon_right": "leg_hallux_talon_right"
+ },
+ "checks": {
+  "px": 0.03125,
+  "blend": 8,
+  "air": ["takeoff", "fly_flap", "soar_glide", "bank_left", "bank_right", "stoop_dive", "stoop_strike", "land_flare"],
+  "perch": ["perch_*"],
+  "perch_bar": {
+   "y": 0.0,
+   "r": 1.8,
+   "z": -1.6
+  },
+  "wing_wave": ["fly_flap"],
+  "wing_tuck_ok": ["perch_*", "idle", "walk", "hop", "eat_tear", "death", "takeoff", "land_flare"],
+  "tuck_ok": ["fly_flap", "soar_glide", "bank_left", "bank_right", "stoop_dive", "stoop_strike", "takeoff", "land_flare", "death"],
+  "feet_free": ["hop", "death"],
+  "feet_parts": ["foot", "toe", "talon", "hallux"],
+  "body_bones": ["body", "neck_1", "neck_2"],
+  "hide_in": ["head", "jaw"],
+  "hidden_at_rest": ["tongue"],
+  "jaw": {
+   "bone": "jaw",
+   "flag_below": -0.5
+  },
+  "walks": {
+   "walk": 17.188,
+   "hop": 25.385
+  },
+  "switches": [
+   ["perch_idle", "perch_alert"],
+   ["perch_alert", "perch_idle"],
+   ["perch_idle", "perch_call"],
+   ["perch_call", "perch_idle"],
+   ["perch_idle", "perch_preen"],
+   ["perch_preen", "perch_idle"],
+   ["perch_idle", "perch_rouse"],
+   ["perch_rouse", "perch_idle"],
+   ["perch_idle", "takeoff"],
+   ["perch_alert", "takeoff"],
+   ["idle", "takeoff"],
+   ["takeoff", "fly_flap"],
+   ["fly_flap", "soar_glide"],
+   ["soar_glide", "fly_flap"],
+   ["soar_glide", "bank_left"],
+   ["bank_left", "soar_glide"],
+   ["soar_glide", "bank_right"],
+   ["bank_right", "soar_glide"],
+   ["soar_glide", "stoop_dive"],
+   ["stoop_dive", "stoop_strike"],
+   ["stoop_strike", "fly_flap"],
+   ["soar_glide", "land_flare"],
+   ["fly_flap", "land_flare"],
+   ["land_flare", "perch_idle"],
+   ["land_flare", "idle"],
+   ["idle", "walk"],
+   ["walk", "idle"],
+   ["idle", "hop"],
+   ["hop", "idle"],
+   ["idle", "eat_tear"],
+   ["eat_tear", "idle"],
+   ["idle", "death"]
+  ]
+ },
+ "verify": {
+  "compare": {
+   "version": "v9"
+  }
+ }
+}

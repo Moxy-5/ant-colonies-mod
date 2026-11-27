@@ -5,7 +5,8 @@ the game drew them, its clips and its mind's facts) and reports, for each hunter
   timeline   its hunt stages and clip changes, tick by tick (a clip that restarts shows as a change to itself)
   jaws       where its jaws (its plan's "carry" bone) were against the prey's body while holding: the gap to the
              nearest box of the prey (+ in the air, - into the body), smallest, middle and largest
-  feet       its planted feet sliding over the ground while holding (blocks a tick; a planted foot should not move)
+  feet       its planted feet sliding over the ground while holding (blocks a tick; a planted foot should not move;
+             judged by tools/recording.py's feet rule, the replay page's)
   strike     its box's travel through each strike clip, tick by tick (since phase 3 step 4 the clip carries its own
              travel and the box rides it from the strike's start: still through a coil, then the flight, then still)
   prey       the prey's clips and doings meanwhile
@@ -55,6 +56,7 @@ class Animal:
         self.index = {n: i for i, n in enumerate(self.names)}
         self.pivot = [tuple(b.get('pivot', (0, 0, 0))) for b in bones]
         self.cubes = [[tuple(c[i:i + 3] for i in range(0, 24, 3)) for c in b['cubes']] for b in bones]
+        self.blocks = blocks               # (for the one feet rule: tools/recording.py)
         self.tops = {}                     # each column's block tops (the ground and anything on it)
         # (the first line's blocks, and those of each "more" line written as the animal went on: R12-48)
         for entry in blocks:
@@ -147,11 +149,6 @@ def box_gap(p, corners):
     return math.sqrt(outside) if outside > 0 else -inside
 
 
-def feet_of(animal):
-    legs = animal.plan.get('legs', {})
-    return [chain[-1] for chain in legs.values() if chain]
-
-
 def report(folder, prey_name):
     animals = [Animal(p) for p in sorted(glob.glob(os.path.join(folder, 'body_*.jsonl.gz')))]
     tops = {}                              # the ground under every animal's first place, shared (each header has its own)
@@ -160,6 +157,16 @@ def report(folder, prey_name):
             tops.setdefault(k, set()).update(v)
     for a in animals:
         a.tops = tops
+    # the scene's line of moments and its ground, for the one feet rule (tools/recording.py; the new phase 2, idea 57:
+    # BUGS 457, a foot counted planted up to 0.1 blocks over the ground read a lifting paw's swing as a slide)
+    ground = recording.Ground([e for a in animals for e in a.blocks])
+    keys = [[recording.clock(f) for f in a.frames] for a in animals]
+    _, slots, _, _, since = recording.line_up(keys, [[f.get('ft') for f in a.frames] for a in animals])
+    for a, k, sl in zip(animals, keys, slots):
+        a.feet_of = (lambda a=a, k=k, sl=sl: recording.feet(a.header, a.frames, recording.plan_legs(a.plan), ground, k,
+                                                            [since[t] for t in sl]))   # (worked out only for a holder)
+        a.px = recording.model_px(a.header, a.frames)
+        a.row = {id(f): i for i, f in enumerate(a.frames)}
     out = []
     say = out.append
     say(f'Pair report for {folder}: {len(animals)} animals recorded')
@@ -243,26 +250,18 @@ def report(folder, prey_name):
                 say(f'  tick {r[0]}: gap {r[1]:+.2f}, lion clip {r[2]}, prey clip {r[3]} (doing {r[4]})')
         else:
             say('jaws: no moments with both animals drawn')
-        # feet: planted feet sliding
+        # feet: planted feet sliding (tools/recording.py's rule: on the ground within a model pixel, its touching
+        # corners' move a tick)
         slides = []
-        prev = {}
         unknown = 0
+        a.feet = a.feet_of()
         for f in holds:
-            for foot in feet_of(a):
-                boxes = a.boxes(f, {foot})
-                if not boxes:
-                    continue
-                low = min((p for box in boxes for p in box), key=lambda p: p[1])
-                ground = a.ground_under(low)
-                unknown += ground is None
-                planted = ground is not None and low[1] - ground < 0.1
-                key = foot
-                # a tick's worth: the drawn places are in-between ones, so by the real time between the two moments
-                # (review R12-17: neighbouring ticks' moments lie anywhere from near 0 to near 2 ticks apart)
-                now = recording.clock(f)
-                if planted and key in prev and prev[key][0] is not None and 0.25 <= now - prev[key][0] <= 2.0:
-                    slides.append(math.hypot(low[0] - prev[key][1][0], low[2] - prev[key][1][2]) / (now - prev[key][0]))
-                prev[key] = (now, low) if planted else (None, None)
+            i = a.row[id(f)]
+            for foot in a.feet:
+                state = foot['state'][i]
+                unknown += state == recording.NO_GROUND
+                if state in (recording.DOWN, recording.SLIDING) and foot['slide'][i] is not None:
+                    slides.append(foot['slide'][i] * a.px)
         if slides:
             say(f'feet while holding: {len(slides)} planted-foot ticks, slide middle {statistics.median(slides):.3f}, '
                 f'9 in 10 under {sorted(slides)[int(len(slides) * 0.9)]:.3f}, most {max(slides):.3f} blocks a tick')
