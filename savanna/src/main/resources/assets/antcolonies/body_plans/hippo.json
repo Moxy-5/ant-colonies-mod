@@ -56,6 +56,8 @@
     "eye_right": "eye_right",
     "lid_left": "lid_left",
     "lid_right": "lid_right",
+    "pupil_left": "pupil_left",
+    "pupil_right": "pupil_right",
     "jaw": "jaw",
     "tongue": "tongue",
     "leg_fl_1": "leg_fl_1",

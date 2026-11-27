@@ -15,6 +15,8 @@ the game draws it, then in the game frame by frame.
                Marked on it: the ground grey (a step or a bank as a grey block), the water's surface and the bottom
                as blue lines, every part inside a block a red dot, the planted feet's trails (green, red where a planted
                foot slides), and a red frame round a picture taken within a frame of a flagged jump or joint snap.
+  --fresh      judges every clip and clip change again (without it, one judged before is read back from
+               run-film/clip_cache/clip_check/ while its keys, the model, the plan and these tools are unchanged)
   --switches   also (or, with no clip named, only) checks the clip changes the plan lists, GeckoLib's blend between
                them played as the game plays it (the blend length read from the animal's Java code), and draws each
                blend as a strip (sw_<from>_<to>.png) with --times.
@@ -139,13 +141,22 @@ class Animal:
         m = re.search(r'new SteadyController<>\(this,\s*"body",\s*([\w.]+)', text) or \
             re.search(r'new AnimationController<>\(this,\s*"body",\s*([\w.]+)', text)
         if not m:
-            return self.checks.get('blend', 4), f'{src}: no body controller found, the plan\'s'
+            raise SystemExit(f'{self.name}: no body controller found in {src} (the checks.controller of its plan)')
         word = m.group(1)
         if word.isdigit():
             return int(word), os.path.basename(src)
         const = word.split('.')[-1]
         c = re.search(rf'\b{const}\s*=\s*(\d+)', text)
-        return (int(c.group(1)), f'{os.path.basename(src)} ({word})') if c else (self.checks.get('blend', 4), 'the plan')
+        if c:
+            return int(c.group(1)), f'{os.path.basename(src)} ({word})'
+        # the block moves' lead (R12-10): "MOVES.lead()" is the move file's "lead_ticks" (BlockMoves reads 4 when the
+        # file names none); the file is the one the Java names in BlockMoves.of(..., "<file>")
+        of = re.search(r'BlockMoves\.of\([^)]*"(\w+)"\s*\)', text)
+        if const == 'lead' and of:
+            moves = json.load(open(lab.model_file(self.anim_stem, 'block_moves', of.group(1) + '.json'), encoding='utf-8'))
+            return int(moves.get('lead_ticks', 4)), f'block_moves/{of.group(1)}.json (lead_ticks)'
+        # nothing readable is a stop, never a quiet guess (the plan's "blend" is only for a plan with no controller)
+        raise SystemExit(f'{self.name}: the body controller\'s blend "{word}" in {src} cannot be read as a number')
 
 
     def drawn_ahead(self):
@@ -379,10 +390,57 @@ def body_depth(p, boxes):
     return max((box_depth(p, cs) for cs in boxes), default=-99.0)
 
 
+EDGES = [(i, j) for i in range(8) for j in range(i + 1, 8) if bin(i ^ j).count('1') == 1]    # a box's 12 edges
+
+
 def with_edges(corners):
     """A box's corners and the middles of its edges (a box lying across a block's corner shows at an edge's middle)."""
-    return list(corners) + [tuple((a + b) / 2 for a, b in zip(corners[i], corners[j]))
-                            for i in range(8) for j in range(i + 1, 8) if bin(i ^ j).count('1') == 1]
+    return list(corners) + [((corners[i][0] + corners[j][0]) / 2, (corners[i][1] + corners[j][1]) / 2,
+                             (corners[i][2] + corners[j][2]) / 2) for i, j in EDGES]
+
+
+# --- what a run has already judged (R12-15): a clip or a clip change is judged again only when what it is made of has
+# changed (its own keys, the model, the plan, the move file, the Java it names, these tools), as anim_lab.py does
+CACHE_DIR = os.path.join(PROJECT, 'run-film', 'clip_cache', 'clip_check')
+_BASE = {}
+
+
+def _digest(*parts):
+    import hashlib
+    h = hashlib.sha1()
+    for p in parts:
+        h.update(p if isinstance(p, bytes) else json.dumps(p, sort_keys=True, default=repr).encode())
+    return h.hexdigest()[:20]
+
+
+def cache_base(animal):
+    """Everything a judgement of this animal rests on but the clip itself."""
+    if animal.name not in _BASE:
+        here = os.path.dirname(os.path.abspath(__file__))
+        files = sorted(os.path.join(here, f) for f in os.listdir(here) if f.endswith('.py'))
+        files.append(lab.model_file(animal.model_name, 'geo', 'entity', f'{animal.model_name}.geo.json'))
+        files.append(lab.model_file(animal.anim_stem, 'block_moves', f'{animal.anim_stem}.json'))
+        for spec in (animal.checks.get('controller'), (animal.checks.get('drawn_ahead') or {}).get('java')):
+            if spec:
+                files.append(os.path.join(PROJECT, spec))
+        _BASE[animal.name] = _digest(animal.plan_data, animal.model_name,
+                                     *[open(f, 'rb').read() for f in files if os.path.exists(f)])
+    return _BASE[animal.name]
+
+
+def cached(animal, kind, name, key, make):
+    """make() only when its key is new; otherwise what it gave last time (plain JSON data; never committed)."""
+    path = os.path.join(CACHE_DIR, animal.name, f'{kind}_{name}.json')
+    try:
+        held = json.load(open(path, encoding='utf-8'))
+        if held.get('key') == key:
+            return held['made'], True
+    except (OSError, ValueError):
+        pass
+    made = make()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    json.dump({'key': key, 'made': made}, open(path, 'w', encoding='utf-8'))
+    return made, False
 
 
 def keys_of(chans):
@@ -827,6 +885,9 @@ def hidden_at_rest(animal):
 
 
 # --- clip changes (GeckoLib's blend) ------------------------------------------------------------------------------
+RESET_TICKS = 5      # GeckoLib's getBoneResetTime(): a bone no clip moves goes back to rest over this (no animal changes it)
+
+
 def switch_poses(animal, a, b, ticks, phase=None):
     """The poses a tick apart from the end of clip a, through GeckoLib's blend (each bone's turn, place and size eased
     straight from where clip a left it to clip b's first frame over the blend's ticks), into clip b's first ticks.
@@ -841,12 +902,26 @@ def switch_poses(animal, a, b, ticks, phase=None):
     start, goal = before[-1], cb.pose(0.0)
     names = set(start) | set(goal)
     rest = ((0, 0, 0), (0, 0, 0), (1, 1, 1))
-    blend = []
-    for k in range(1, ticks + 1):
-        f = k / ticks
-        blend.append({n: tuple(tuple(x + (y - x) * f for x, y in zip(start.get(n, rest)[c], goal.get(n, rest)[c]))
-                               for c in range(3)) for n in names})
-    after = [cb.pose(i * 0.05) for i in range(1, 4)]
+    keyed = {n: tuple(ch in cb.bones.get(n, {}) for ch in ('rotation', 'position', 'scale')) for n in names}
+
+    def eased(n, k, to):
+        """Bone n, k ticks into the change: a channel clip b keys is eased to `to` over the blend; one it does not key
+        goes home over GeckoLib's own reset (RESET_TICKS, whatever the blend's length; R12-9)."""
+        out = []
+        for c in range(3):
+            if keyed[n][c]:
+                f, goal_c = min(1.0, k / ticks), to.get(n, rest)[c]
+            else:
+                f, goal_c = min(1.0, k / RESET_TICKS), rest[c]
+            out.append(tuple(x + (y - x) * f for x, y in zip(start.get(n, rest)[c], goal_c)))
+        return tuple(out)
+
+    blend = [{n: eased(n, k, goal) for n in names} for k in range(1, ticks + 1)]
+    after = []
+    for i in range(1, 4):
+        pose = cb.pose(i * 0.05)
+        after.append({n: tuple(pose.get(n, rest)[c] if keyed[n][c] else eased(n, ticks + i, goal)[c] for c in range(3))
+                      for n in names})
     return before, blend, after, ca, cb
 
 
@@ -856,7 +931,7 @@ WORST_PHASE = {}             # (animal, a, b) -> the moment of clip a check_swit
 def check_switch(animal, a, b, ticks):
     """One clip change: how far apart the two clips' poses are, and how hard the blend jumps against the clips' own
     moves (a loop left at the worst of four moments; a gait change at its moment from the plan, the one the game
-    changes at). Returns (lines, worst jump, worst turn)."""
+    changes at). Returns (lines, flagged, the moment of clip a judged: the one a picture of it must show)."""
     model = animal.model
     lines = []
     phases = [None]
@@ -883,12 +958,11 @@ def check_switch(animal, a, b, ticks):
                 else:
                     own = max(own, d)
         turn = (0.0, '')
-        for bn in set(before[-1]) | set(blend[-1]):
-            r0 = before[-1].get(bn, ((0, 0, 0),))[0]
-            r1 = blend[-1].get(bn, ((0, 0, 0),))[0]
-            d = max(abs(x - y) for x, y in zip(r0, r1)) / ticks
-            if d > turn[0]:
-                turn = (d, bn)
+        for p0, p1 in zip([before[-1]] + blend, blend):
+            for bn in set(p0) | set(p1):
+                d = max(abs(x - y) for x, y in zip(p0.get(bn, ((0, 0, 0),))[0], p1.get(bn, ((0, 0, 0),))[0]))
+                if d > turn[0]:
+                    turn = (d, bn)
         gap = sorted(((max(abs(x - y) for x, y in zip(before[-1].get(bn, ((0, 0, 0),))[0], blend[-1].get(bn, ((0, 0, 0),))[0])), bn)
                       for bn in set(before[-1]) | set(blend[-1])), reverse=True)
         for d, bn in gap:
@@ -909,7 +983,7 @@ def check_switch(animal, a, b, ticks):
                  + f'; blend jump {jump:.1f} px ({jb}, tick {jt}) against {own:.1f} in the clips; fastest turn {turn:.0f} deg a tick ({tb})'
                  + ('; the long way round (over 180 apart): ' + ', '.join(spins) if spins else '')
                  + ('  FLAGGED' if flag else ''))
-    return lines, flag
+    return lines, flag, ph
 
 
 # --- gait changes on the matching footfall (the Motion Studio, phase 2, step 3) ----------------------------------------
@@ -1124,21 +1198,26 @@ class Boxes:
 
     def depth(self, p):
         """How deep a point is inside the body (0 outside)."""
-        if any(p[i] < self.lo[i] or p[i] > self.hi[i] for i in range(3)):
-            return 0.0
+        x, y, z = p
         best = 0.0
         for _, cs, lo, hi in self.boxes:
-            if all(lo[i] <= p[i] <= hi[i] for i in range(3)):
-                best = max(best, box_depth(p, cs))
+            if lo[0] <= x <= hi[0] and lo[1] <= y <= hi[1] and lo[2] <= z <= hi[2]:
+                d = box_depth(p, cs)
+                if d > best:
+                    best = d
         return best
 
     def deepest(self, points):
-        """The deepest of these (bone, point) pairs inside the body, by bone group: {bone: depth}."""
+        """The deepest of these (bone, point) pairs inside the body, by bone group: {bone: depth}. (The points outside
+        the body's bounds are dropped in one pass first: most of them, and the test was 78 of the pair check's 95
+        seconds; R12-8.)"""
+        (x0, y0, z0), (x1, y1, z1) = self.lo, self.hi
         out = {}
         for bn, q in points:
-            d = self.depth(q)
-            if d > out.get(bn, 0.0):
-                out[bn] = d
+            if x0 <= q[0] <= x1 and y0 <= q[1] <= y1 and z0 <= q[2] <= z1:
+                d = self.depth(q)
+                if d > out.get(bn, 0.0):
+                    out[bn] = d
         return out
 
     def gap(self, p):
@@ -1151,6 +1230,9 @@ class Boxes:
 
 def with_edges_all(posed):
     return [(bn, q) for bn, cs, _ in posed for q in with_edges(cs)]
+
+
+_PREY_POSED = {}     # a prey's posed boxes and their points by (prey, size, clip, kind, tick): several pairs share them
 
 
 class Pair:
@@ -1205,10 +1287,22 @@ class Pair:
         return rows[min(k, len(rows) - 1)]
 
     def prey_posed(self, clip, kind, k):
+        """The prey's boxes at tick k of its clip, as a Boxes, and their corner and edge points."""
         held = self.poses.get(clip)
         pl = self._played.get(clip) or self._played.setdefault(clip, Played(self.prey, held['clip'] if held else clip))
         t = pl.length if held else ((k / 20) % pl.length if kind == 'loop' else min(k / 20, pl.length))
-        return [(bn, [self.prey_point(p) for p in cs], col) for bn, cs, col in self.prey.model.posed(pl.pose(t))]
+        key = (self.prey.name, self.ps, clip, kind, round(t * 20))
+        if key not in _PREY_POSED:
+            posed = [(bn, [self.prey_point(p) for p in cs], col) for bn, cs, col in self.prey.model.posed(pl.pose(t))]
+            _PREY_POSED[key] = (posed, Boxes(posed), with_edges_all(posed))
+        return _PREY_POSED[key]
+
+    def loop_ticks(self, clip, kind):
+        """A looping prey clip's length in ticks (0 for a clip played once or a still pose)."""
+        if kind != 'loop' or clip in self.poses:
+            return 0
+        self.prey_posed(clip, kind, 0)
+        return round(self._played[clip].length * 20)
 
     def prey_point(self, p):
         s = self.ps
@@ -1254,15 +1348,18 @@ def check_pair(holder, prey_name, spec, spots_wanted, step=2):
              f'{pair.da_p} model px)']
     flags = 0
     for clip, kind in spec['clips'].items():
-        n = round(Played(pair.prey, clip).length * 20) if kind == 'once' else 2 * (pair.h_ticks + pair.h_blend)
+        # a looping prey clip is posed once round at least (R12-6: the buffalo's 88-tick idle was judged for its first
+        # 38 ticks with a 15-tick bite), and each bite is also measured against every moment of the loop, since the
+        # game's holder takes hold at any moment of it (the holder stands at the loop's middle place whatever the tick)
+        loop = pair.loop_ticks(clip, kind)
+        n = round(Played(pair.prey, clip).length * 20) if kind == 'once' else max(2 * (pair.h_ticks + pair.h_blend), loop)
         lines.append(f'  {prey_name} {clip} ({kind}, {n} ticks):')
-        res = {s: {'gaps': [], 'off': [], 'head': 0.0, 'body': 0.0, 'prey_head': 0.0, 'prey': 0.0} for s in names}
+        res = {s: {'gaps': [], 'off': [], 'any': [], 'head': 0.0, 'body': 0.0, 'prey_head': 0.0, 'prey': 0.0} for s in names}
+        bitten = set()
         for k in range(0, n + 1):
             if k % step and not pair.bites(k):
                 continue
-            pposed = pair.prey_posed(clip, kind, k)
-            prey = Boxes(pposed)
-            ppts = with_edges_all(pposed)
+            pposed, prey, ppts = pair.prey_posed(clip, kind, k)
             row = pair.prey_place(clip, kind, k)
             for s in names:
                 r = res[s]
@@ -1275,6 +1372,9 @@ def check_pair(holder, prey_name, spec, spots_wanted, step=2):
                     # (review R12-7: and how far the jaw is from the spot itself, and how much of that is height; the
                     # gap to the nearest skin read 0 for a jaw well above or below its spot, on the same flank)
                     r['off'].append((math.dist(jaw, frame[3]), jaw[1] - frame[3][1]))
+                    if loop and s not in bitten:     # (R12-6: this bite against every moment of the prey's loop)
+                        bitten.add(s)
+                        r['any'] = [pair.prey_posed(clip, kind, j)[1].gap(jaw) for j in range(0, loop, step)]
                 if not hb.overlaps(prey):
                     continue
                 into = prey.near(hb).deepest(with_edges_all(hposed))
@@ -1295,6 +1395,8 @@ def check_pair(holder, prey_name, spec, spots_wanted, step=2):
                 bad.append('bites the air')
             if g and min(g) < -3.0:
                 bad.append('jaw buried')
+            if r['any'] and (max(r['any']) > 1.0 or min(r['any']) < -3.0):
+                bad.append('the bite misses at other moments of the loop')
             if r['body'] > 1.0 or r['prey'] > 1.0:
                 bad.append('bodies in each other')      # (its head on the hide is the bite itself)
             far = max(r['off'], default=(0.0, 0.0))
@@ -1302,7 +1404,8 @@ def check_pair(holder, prey_name, spec, spots_wanted, step=2):
                 bad.append('jaw off its spot')
             flags += bool(bad)
             gs = f'{min(g):+.1f} to {max(g):+.1f}' if g else 'no bite'
-            off = f', from its spot up to {far[0]:.1f} px ({far[1]:+.1f} in height)' if g else ''
+            off = (f', from its spot up to {far[0]:.1f} px ({far[1]:+.1f} in height)' if g else '') + (
+                f', at any moment of the loop {min(r["any"]):+.1f} to {max(r["any"]):+.1f}' if r['any'] else '')
             lines.append(f'    {s:12s} jaw to the hide at its {len(g)} bites {gs} px (+ in the air){off}; its head and the '
                          f'{prey_name} in each other {max(r["head"], r["prey_head"]):.1f} px (a bite); its body and the {prey_name} '
                          f'{max(r["body"], r["prey"]):.1f}' + (f'  << {", ".join(bad)}' if bad else ''))
@@ -1337,7 +1440,7 @@ def pair_strip(pair, clip, kind, spot, ticks, views, path, others=()):
     bite in the air), parts of one inside the other red; others: more spots held at once."""
     def scene(k):
         out, marks = [], []
-        prey = pair.prey_posed(clip, kind, k)
+        prey = pair.prey_posed(clip, kind, k)[0]
         out += prey
         pb = Boxes(prey)
         for s in (spot,) + tuple(others):
@@ -1488,10 +1591,10 @@ def strip(animal, pl, planted, times, views, flagged, path, title, held=None, an
     return path
 
 
-def switch_strip(animal, a, b, ticks, views, path):
+def switch_strip(animal, a, b, ticks, views, path, phase=None):
     # (review R12-11: drawn at the moment check_switch judged, the worst of the loop; it always left the loop at 0 s,
-    # so the picture of a flagged change showed a calm one)
-    phase = WORST_PHASE.get((animal.name, a, b))
+    # so the picture of a flagged change showed a calm one. The moment is handed in: a result kept from an earlier
+    # run has it too)
     before, blend, after, ca, cb = switch_poses(animal, a, b, ticks, phase)
     seq = [('end of ' + a, p) for p in before[-2:]] + [(f'blend {i + 1}/{ticks}', p) for i, p in enumerate(blend)] + \
           [(b + f' +{i + 1}', p) for i, p in enumerate(after[:2])]
@@ -1564,7 +1667,7 @@ def main(argv):
         return 1
     animal_name, args = argv[0], argv[1:]
     times, views, model, out_dir, names, switches = None, ('side', 'three', 'front'), None, None, [], False
-    changes, write = False, False
+    changes, write, fresh = False, False, False
     hold, angles = None, [90.0, 25.0, 155.0]
     pair_with, spots_wanted = None, []
     i = 0
@@ -1584,6 +1687,9 @@ def main(argv):
             i += 2
         elif a == '--switches':
             switches = True
+            i += 1
+        elif a == '--fresh':
+            fresh = True
             i += 1
         elif a == '--gait-changes':
             changes = True
@@ -1628,6 +1734,14 @@ def main(argv):
     bad_clips, bad = [], 0
     for name in chosen:
         flagged = set()
+        if not held and not times and not fresh:
+            # nothing drawn: its lines as they were last judged, while nothing they rest on has changed (R12-15)
+            lines, old = cached(animal, 'clip', name, _digest(cache_base(animal), animal.data[name]),
+                                lambda: check_clip(animal, name, flagged)[2])
+            print('\n'.join(lines))
+            if any('FLAGGED' in line for line in lines):
+                bad_clips.append(name)
+            continue
         pl, planted, lines = check_clip(animal, name, flagged)
         print('\n'.join(lines))
         if any('FLAGGED' in line for line in lines):
@@ -1655,11 +1769,13 @@ def main(argv):
             todo = [(a, b) for a, b in todo if a in chosen or b in chosen]
         print(f'== clip changes (GeckoLib\'s blend: {ticks} ticks, from {source}; {len(todo)} changes)')
         for a, b in todo:
-            lines, flag = check_switch(animal, a, b, ticks)
+            (lines, flag, phase), _ = (check_switch(animal, a, b, ticks), False) if fresh else cached(
+                animal, 'change', f'{a}__{b}', _digest(cache_base(animal), animal.data[a], animal.data[b], ticks),
+                lambda: list(check_switch(animal, a, b, ticks)))
             bad += flag
             print('\n'.join(lines))
             if times or flag:
-                png = switch_strip(animal, a, b, ticks, views, os.path.join(out_dir, f'sw_{a}_{b}.png'))
+                png = switch_strip(animal, a, b, ticks, views, os.path.join(out_dir, f'sw_{a}_{b}.png'), phase)
                 print('    drew', png)
         print(f'  {bad} change(s) flagged')
     # the count every caller reads (R12-3): exit 0 nothing flagged, 2 something flagged (1: a mistake in the call, a crash)

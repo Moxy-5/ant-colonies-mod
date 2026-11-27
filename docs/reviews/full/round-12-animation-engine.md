@@ -218,6 +218,8 @@ Graded B because today's measured depths are small; it would be A on a body that
 separating-axis test, 15 axes, cheap), giving the overlap's depth; or at least test the scene's lip line across the
 box with `box_depth`, as the reader's script did, and report the deeper of the two.
 
+**Status (2026-11-26, `claude/review-fix-12c`): open: not started. An exact box-against-block test changes what three checks flag (offline and both in the game), so it wants its own step with the films looked over; nothing was changed.**
+
 ### R12-6 (B, proven coverage; measured clean today): the pair check sees only part of a looping prey clip, at one phase, and not the blend or the walk
 (Merged: the checker reader, and the thread reader's "the hold checks sample fewer moments than the game shows".)
 **What is wrong:** for a prey clip that loops, `check_pair` poses both animals for `2 x (hold clip + blend)` ticks, a
@@ -240,6 +242,8 @@ bite/idle and takedown_pin/rest find the same depths as the part checked (nothin
 **Fix proposed:** for a loop, pose at least one whole prey loop and judge the bite at every prey tick a bite could fall
 on; start each one-shot's check at minus the blend, posed as `switch_poses` does; list walk and trot in the buffalo's
 `spots.clips` with a pair for them.
+
+**Status (2026-11-26, `claude/review-fix-12c`): half fixed: a looping prey clip is posed for at least one whole loop, and each spot's first bite is also measured against every moment of the prey's loop (flag: "the bite misses at other moments of the loop"). Left: the blend into the hold and the pairs on a walking or trotting prey.**
 
 ### R12-7 (B, proven): "jaw to the hide" measures the nearest box of the prey, not the spot, so a jaw 2.6 px off its spot reads 0.0
 **What is wrong:** the pair check's bite number is the jaw's distance to the nearest face of any prey box. The holder
@@ -268,6 +272,8 @@ this step alone, every time; the rule book promises the offline part in "a few s
 `deepest`; keep the prey's posed boxes per tick across pairs (several pairs share a prey clip); or test box against box
 (R12-5's separating axes) instead of point against box.
 
+**Status (2026-11-26, `claude/review-fix-12c`): fixed: the prey's poses are made once and kept, and the depth search drops points outside the boxes' bounds first. `lioness --pair buffalo` took 55 s where it took 2 min 12 s on the same loaded PC, with the same 11 flags.**
+
 ### R12-9 (B, proven by GeckoLib's own code): a bone the new clip does not move goes home over GeckoLib's 5-tick reset, not the blend
 (Also found by the thread reader.)
 **What is wrong:** the blend check eases every bone from the old pose to the new clip's first frame over the blend's
@@ -288,6 +294,8 @@ lastResetRotationTick) / getBoneResetTime()`); `GeoAnimatable.getBoneResetTime()
 **Fix proposed:** in `switch_poses` ease a bone missing from clip b over 5 ticks (read from the Java if an animal ever
 overrides it), and name it in the change's line.
 
+**Status (2026-11-26, `claude/review-fix-12c`): fixed: at a clip change each channel the new clip does not key eases home over GeckoLib's 5 ticks (`RESET_TICKS`), going on past the blend, and the fastest turn is measured tick by tick through it.**
+
 ### R12-10 (B, proven): the blend length is read from the Java by a pattern that misses three animals and every blend changed while playing
 (Also found by the thread reader.)
 **What is wrong:** `blend_ticks` reads the word after `"body",` in the controller's line. The monitor, hippo and otter
@@ -307,6 +315,8 @@ distichodus's four bolt and leap changes at 6 and at 3 ticks.
 file's `lead_ticks`) is what the Java reads too (`BodyPlans` already loads plans for `Gaits`); per-clip blends (the
 distichodus's 3) as a plan table `blends: {clip: ticks}` read by both. Until then, stop with an error when nothing can
 be read instead of a quiet fallback.
+
+**Status (2026-11-26, `claude/review-fix-12c`): half fixed: the blend length comes from the animal's move file when its controller names one (`lead_ticks`), and the checker stops with a message when a named controller's blend cannot be read (no quiet fallback to 4). Left: blends changed while playing (the distichodus's 3).**
 
 ### R12-11 (B, proven): the picture drawn for a flagged clip change shows a different moment from the one flagged
 **What is wrong:** `check_switch` judges a looping clip at the worst of four moments, or a gait change at its moment
@@ -338,6 +348,8 @@ whether the game's does that (the tick-held rows alone make every tick's move sh
 path and compares), or record the game's tail in a frame film and compare (R12-22); at least interpolate the rows
 between ticks, and until then label the tail line "rough, the course judges it" and do not count it.
 
+**Status (2026-11-26, `claude/review-fix-12c`): open: the label part was done with R12-2 (the dragged tail offline says "rough, not counted"). Matching it against the game's `TailDrag` was not started: it needs the game's rule moved into a table both read.**
+
 ### R12-13 (B, proven): a spot table can be behind its plan or the posing code and `--check` still passes
 (Merged: the checker reader, and the thread reader's "the fingerprint leaves out the posing code".)
 **What is wrong:** the table's fingerprint (what `spots.py --check` and the build's `checkSpotTables` compare) holds
@@ -355,7 +367,7 @@ with the build green.
 **Fix proposed:** hash the whole `checks` section, `chain`, and a digest of `clip_check.py` and `anim_lab.py` (as
 anim_lab's own cache does); or build the table and compare it with the file ("would write the same file").
 
-**Status (2026-11-26, `claude/review-fix-b6`): half fixed: the fingerprint now takes the plan's `checks.hinge`, `checks.tail_drag`, `checks.px` and `chain`; the four tables were written again (only their fingerprints changed). Left on purpose: the posing code is still `FORMAT`'s, bumped by hand; hashing `clip_check.py` would put every table behind at each edit of the checker.**
+**Status (2026-11-26, `claude/review-fix-12c`): fixed: on top of `claude/review-fix-b6`'s wider fingerprint, `spots.py --check` builds each table again and compares it with the file (about 7 s for the four tables), so a table behind the posing code fails the build too.**
 
 ### R12-14 (B, proven; measured clean today): names in a plan's "checks" are never checked, and a misspelt one silently switches its check off
 **What is wrong:** `body_plan.py check` checks the bones table, legs, spine and chain, but not the bone names and clip
@@ -383,6 +395,8 @@ user's first priority for the engine is making animations fast.
 Profile of one monitor clip (`water_drop_850`): 27 s, `place` 3.6 million calls, `with_edges` 215,000 calls (7.5 s).
 **Fix proposed:** keep each clip's lines by a hash of its clip data, the model, the plan's checks and clip_check's own
 file (as anim_lab does); work out the 12 edge pairs once; pose once per sample and read the knees from it.
+
+**Status (2026-11-26, `claude/review-fix-12c`): fixed: clip_check keeps each clip's and each clip change's result (`run-film/clip_cache/clip_check/`), remade when the plan, model, clip, move file, controller or any tool changes; `--fresh` redoes all. The crocodile's whole run with clip changes: 17.4 s, then 0.36 s.**
 
 ### R12-16 (B, proven): pair_report names the lion's strike clips and reads the jaw from another section of the plan
 **What is wrong:** a shared tool picks strike moments by the lion family's clip names written into it (`jump_smack`,
@@ -520,6 +534,8 @@ box corner with the recorded matrices, print the worst bone and FLAG over 0.2 px
 frame films it already makes (no new launch). For the insects, make `match` measure the same way (with the recorded
 waist and spine bends), or rename it to what it is and stop calling it proof.
 
+**Status (2026-11-26, `claude/review-fix-12c`): open: not started (measuring the offline pose against the game's needs the game's bone places written out per picture for insects; the animals have it through `record`).**
+
 ### R12-23 (B, proven): the lab's sizes and speeds are its own hand-typed tables, not the game's
 **What is wrong:** `RENDER_SCALE` and `WALK_SPEED` are species tables typed into the shared lab (shared pieces never
 name a species). They copy only the renderer's `withScale`; since real sizes (2026-11-05) each insect is also drawn at
@@ -536,6 +552,8 @@ matabele_minor 0.776, termite_major_soldier 0.746 blocks, against the real-sizes
 **Fix proposed:** read each insect's drawn scale and walking speed from data the game also reads (its body plan, or a
 table made from `InsectSizes` and the renderer, as clip_check reads the blend from the Java). Delete the two tables and
 the harvester rows. Add a note, or a BAD, when the play speed needed is over the game's cap of 20.
+
+**Status (2026-11-26, `claude/review-fix-12c`): open: not started.**
 
 ### R12-24 (B, proven): a standing clip's sliding foot is only a note, so the summary says "0 problem(s)"
 **What is wrong:** for clips that are not walks or turns, a planted foot moving along the ground faster than 1.5 units
@@ -563,7 +581,7 @@ l1=l2=4 with the target at the root gives ZeroDivisionError.
 the minimum distance, set `target` and `miss` from that as the too-far branch does, then work out the rest from the new
 distance. Add both cases to the self-check.
 
-**Status (2026-11-26, `claude/review-fix-b6`): fixed: an end nearer than the pieces fold to goes out to the nearest place they reach, with the miss saying by how much; an end at the root no longer divides by zero. Both cases are in the kit's self-check. Clips were not made again: a maker run again changes only poses that were wrong.**
+**Status (2026-11-26, `claude/review-fix-12c`): half fixed: a target nearer than the limb can fold to is reported as a miss, and a target at the root itself no longer crashes. The shape for a too-close target is back as it always was: `claude/review-fix-b6`'s right shape changed the hippo's four climb clips (up to 39 degrees) and four of the otter's (up to 24) the next time their makers ran, clips approved in the game. The right shape is for the animation rework, with those clips looked over.**
 
 ### R12-26 (B, proven): a pole along the leg's line crashes `two_bone` and flips the knee 180 degrees as the target crosses it
 **What is wrong:** `bend_way` takes the pole's part square to the root-target line. When the target lies on the pole's
@@ -578,7 +596,7 @@ passes the pole's line (a leg stretched straight forward or back in a pounce or 
 (the last frame's, or a second pole the maker gives) instead of normalising a near-zero vector; return a flag so the
 maker can say which frames were near it.
 
-**Status (2026-11-26, `claude/review-fix-b6`): fixed: when the limb's line runs along the pole (its square part under a fifth of it), the bend eases over to a second way square to the line, so nothing divides by zero and the joint does not flip sides; in the self-check. No flag is returned to the maker.**
+**Status (2026-11-26, `claude/review-fix-12c`): half fixed: a pole exactly along the leg's line no longer divides by nothing (a second way takes over). The knee still changes side as the target crosses that line: `claude/review-fix-b6`'s easing near the line changed the monitor's approved `death` and `bask` clips (up to 52 degrees) the next time its maker ran, so it is switched off (`NEAR_LINE`); for the animation rework.**
 
 ### R12-27 (B, proven): the kit returns a miss but every newer maker throws it away
 **What is wrong:** `two_bone` and `digitigrade_leg` say how far a foot fell short of its target, the cheapest early
@@ -651,6 +669,8 @@ the wrong kind.
 **Proof:** a scan of every `then(Loop|Play|PlayAndHold)("name")` in the entities against the files' `loop`.
 **Fix proposed:** one source: the Java plays each clip by the file's own loop type (through one helper), and a clip that
 must play both ways becomes two clips; or a unit test that compares the Java's loop types with the files.
+
+**Status (2026-11-26, `claude/review-fix-12c`): open: not started.**
 
 ### R12-33 (C, proven): the lab's catmull-rom curve is not GeckoLib 4.9.3's
 (Also found by the thread reader.)
@@ -775,7 +795,7 @@ notes are read by eye.
 **Fix proposed:** keep the list, but count changed and missing pictures in the headline ("N pictures changed: look,
 then approve") and return non-zero, so `approve` is the way past a change on purpose.
 
-**Status (2026-11-26, `claude/review-fix-b6`): half fixed: approved pictures not filmed again are a problem now (a film cut short), and the headline counts the changed pictures ("N PICTURE(S) CHANGED in M scene(s): look, then approve"). Left: changed pictures alone still exit 0, as the tool was written.**
+**Status (2026-11-26, `claude/review-fix-12c`): fixed: the headline counts changed and missing pictures, and changed pictures alone end the command with exit code 2 (1 a problem, 0 all as approved).**
 
 ### R12-40 (A, proven): a finding at an approved picture is let through however much worse it is
 **What is wrong:** in `film_checks`, when every picture where a part is flagged is a picture already in the approved
@@ -841,6 +861,8 @@ seen; the contact sheets look smooth because they repeat.
 **Fix proposed:** draw every GeckoLib animal at the camera's time in films too (one shared hook in the framework's
 renderer path); until then, refuse `frames N > 1` in a scene without insects, with a warning.
 
+**Status (2026-11-26, `claude/review-fix-12c`): open: not started.**
+
 ### R12-44 (B, proven): the camera's jump check measures "per tick" wrongly in three cases
 (Merged: the films reader, and the first half of the thread reader's "the film's jump check is weaker".)
 **What is wrong:** (1) the moves are scaled by one `framesPerTick` per scene, the value left at the scene's end, so
@@ -854,6 +876,8 @@ ticks a picture"). (3) Pictures more than 8 ticks apart are never compared (`TAK
 **Proof:** read; grepped the scenes for `frames` and for burst gaps.
 **Fix proposed:** keep each sample's real in-between time and tick, size each move by the time between its two
 samples; write "jump check off: pictures N ticks apart" into `checks.txt` when a burst is too sparse.
+
+**Status (2026-11-26, `claude/review-fix-12c`): open: not started (the plan: size each move by the ticks between its two pictures, and write "jump check off" for bursts too sparse to compare).**
 
 ### R12-45 (B, proven): a fish held in a mouth is checked and recorded at the wrong place
 **What is wrong:** the camera's checks and the recorder read GeckoLib's "local space" matrices and add the animal's own
@@ -872,6 +896,8 @@ missed; `record on 1 all` writes held-fish bones at the wrong place for `pair_re
 place), or have a holder's renderer tell the film code the held animal's root pose; skip held animals until then, with
 a note.
 
+**Status (2026-11-26, `claude/review-fix-12c`): open: not started.**
+
 ### R12-46 (B, proven absence, likely effects): two films at once, an open watch session, and no timeout
 **What is wrong:** nothing stops a second `runFilm` while another is running or a watch session is open: the three
 film tools never look at `run-film/film-watch/status.txt` or a lock. The second launch deletes `run-film/saves/film` and
@@ -888,6 +914,8 @@ session, the PC slowed for hours. The memory rule "films one at a time" is kept 
 and checks; a timeout from the scene count (about two minutes a scene) after which the tool stops the game and fails;
 the watch session closes itself after about 30 minutes with no request or change.
 
+**Status (2026-11-26, `claude/review-fix-12c`): half fixed: one film at a time on the PC (a lock file; `runFilm` and every tool that launches a film refuse while another runs, `ANTCOLONIES_FILM_LOCK` to pass), and a time limit of 5 minutes plus 2.5 a scene after which the game is stopped (new `tools/film_run.py`). Left: an open watch session has no idle limit.**
+
 ### R12-47 (B, to measure): the frame watch runs in every player's game and samples the drawing thread
 **What is wrong:** `FrameWatch` is always on, also in the released mod: a helper thread wakes every 5 ms for the whole
 session, and during any frame over 20 ms it takes the drawing thread's whole stack every 5 ms (taking another thread's
@@ -898,6 +926,8 @@ warnings during chunk loading. Probably small, but it is measuring code paid for
 **Proof:** read; no guard for the released game. The cost of `getStackTrace` on the drawing thread is not measured.
 **Fix proposed:** measure it once; keep the frame count (free) on, the stack sampling behind a config switch or for
 development only.
+
+**Status (2026-11-26, `claude/review-fix-12c`): fixed: the frame watch's helper thread and slow-frame lines run only in development (`!FMLEnvironment.production`), never in a player's game.**
 
 ### R12-48 (B, proven): the recorder writes the blocks only round where each animal was first drawn
 **What is wrong:** the recording's blocks are those 16 blocks round, 5 below and 10 above the animal's first recorded
@@ -910,6 +940,8 @@ read as "nothing to say".
 **Proof:** read both; whether a given hunt run lost its lines was not checked.
 **Fix proposed:** write the scene's blocks once per scene folder (a fixed box round the stage, or every block a
 recorded animal came near), not per animal at its first frame; have the report say "no ground known here".
+
+**Status (2026-11-26, `claude/review-fix-12c`): open: not started.**
 
 ### R12-49 (B, proven): insects in a running scene are drawn at a stale in-between time
 **What is wrong:** while filming, `AntRenderer` always draws insects at `FilmDirector.drawPartial()`. Outside bursts that
@@ -924,6 +956,8 @@ between ticks; insect recordings get a third of the samples asked for.
 **Fix proposed:** while the game is running (not frozen) draw insects at the game's own in-between time; the camera's
 time only in frozen bursts.
 
+**Status (2026-11-26, `claude/review-fix-12c`): open: not started (insects are on hold).**
+
 ### R12-50 (B, proven): a frame film whose checks saw no animal is still "ok"
 **What is wrong:** `FilmDirector.endScene` writes no `checks.txt` when the checks recorded nothing (an animal never in
 view, every `record` failing into a logged warning, the camera aimed at nothing). `verify_animal.check_films` then
@@ -934,6 +968,8 @@ A broken checker and an empty film look the same as a clean one.
 **Proof:** read.
 **Fix proposed:** always write `checks.txt` (with "0 moments checked"); a frame film with 0 moments checked is a hard
 failure in verify and a problem in the guard report.
+
+**Status (2026-11-26, `claude/review-fix-12c`): fixed: a frame film that wrote no `checks.txt` is a hard failure of `verify_animal`, and a guard scene with no camera checks is a problem when its approved film had them.**
 
 ### R12-51 (C, to measure): the frame-time meter re-sorts every frame of the launch each second
 **What is wrong:** every 60 frames `FilmFrameMeter.write` copies and sorts the full frame list of every scene so far
@@ -1117,6 +1153,8 @@ size is arithmetic (to measure on a film of a long hold).
 0, as the insects' player does. Better still, one clip clock for both players, so a lesson learned on one cannot be
 missing in the other.
 
+**Status (2026-11-26, `claude/review-fix-12c`): fixed: the animals' clip player carries the bit past a loop's end into the next round, as the insects' does (`SteadyController`).**
+
 ### R12-63 (B, proven defect, cost to measure): an otter holding a crab or frog reads and parses a body plan file twice every frame
 **What is wrong:** `HeldCatch.fish` keeps each prey's measures with `FISH.computeIfAbsent(name, ...)`, but for a prey
 with no `checks.held` (a crab, a bullfrog) the function returns null, and Java's `computeIfAbsent` keeps nothing for
@@ -1147,6 +1185,8 @@ early for a loop already on, so `clipTick` counts on at speed 1.
 **Fix proposed:** play the hold loops at 1.0 (their timing is a contact with another body, not a mood loop): one line,
 one rule.
 
+**Status (2026-11-26, `claude/review-fix-12c`): not a bug today: already fixed before this round's fixes (`LionEntity.animate` gives `loopRate()` only to loops that are not holds; the holds play at 1.0).**
+
 ### R12-65 (B, proven): `MoveRider`, the planned one home for block moves, lacks two lessons of the monitor's copy, and the drawing half is copied three times
 **What is wrong:** R9-42 asks to move the monitor and the hippo onto the shared `MoveRider`. Two things would be lost as
 written. (1) BUGS 330 / R9-37: the monitor's room checks ask for a whole block on the middle line too, because the move
@@ -1166,6 +1206,8 @@ R9-42 done as written, the monitor's freeze (BUGS 330) back.
 **Fix proposed:** before R9-42's move, put the middle line into `MoveRider`'s room checks (as `roomIn` already does)
 and its first-tick guard, and give `MoveRider` the client half as the one drawing helper the three models call. Then
 move the monitor and the hippo over, guarded by their course and frame films.
+
+**Status (2026-11-26, `claude/review-fix-12c`): open: not started; it belongs with R9-42 (moving the monitor and the hippo onto `MoveRider`), guarded by their course and frame films.**
 
 ### R12-66 (C, likely): the film watch's "reload the move files" swaps the moves under live plays
 **What is wrong:** `BlockMoves.reloadAll` replaces a file's data, but plays already running hold a move number and size
@@ -1311,7 +1353,7 @@ run by the build beside `checkSpotTables`; one unit test that loads every move f
 (the end level reached, `rise` and `along` rows of one length, one clip a size, and, with R12-58, a land move's end
 speed near zero or its rest 0).
 
-**Status (2026-11-26, `claude/review-fix-b6`): half fixed: `BlockMovesFileTest.everyAnimalsMoveFileLoads` loads all seven move files as the game does and checks each move of each size. Left: the staleness check against the animation files.**
+**Status (2026-11-26, `claude/review-fix-12c`): fixed: on top of the unit test that loads every move file, `model_parts.block_moves_behind` compares each move file's rows with its clip's path (all 7 match today; a self-test holds it), and the build's tool check watches the move files.**
 
 ### R12-73 (C, proven): the hippo's climb-out paths are not one row a tick, and the move writer never checks
 **What is wrong:** the game reads a move's path rows as ticks (row index = tick); `block_moves` drops the rows' own

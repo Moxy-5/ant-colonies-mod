@@ -898,7 +898,8 @@ def main(args):
             name = os.path.basename(film)[:-len('.film')]   # must not be judged by an earlier run's recording
             shutil.rmtree(os.path.join(SHOTS, name), ignore_errors=True)
             shutil.rmtree(os.path.join(KEPT, name), ignore_errors=True)
-        code = subprocess.run([gradle, 'runFilm', '-PfilmScene=' + ','.join(films)], cwd=PROJECT, check=False).returncode
+        import film_run
+        code = film_run.run(films, PROJECT)[0]          # one film at a time, never for ever (code review R12-46)
         for film in films:
             name = os.path.basename(film)[:-len('.film')]
             if os.path.isdir(os.path.join(SHOTS, name)):

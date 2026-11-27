@@ -91,7 +91,7 @@ def spin_a_whole_turn_at_a_clip_change_is_flagged():
     """R12-4 (BUGS 249): one pose written a whole turn on spins through the blend, whatever the blend's length."""
     animal = cc.Animal('lioness')
     ticks, _ = animal.blend_ticks()
-    _, before = cc.check_switch(animal, 'idle', 'walk', ticks)
+    _, before, _ = cc.check_switch(animal, 'idle', 'walk', ticks)
     need(not before, 'the real idle -> walk is flagged')
     animal.data['walk'] = copy.deepcopy(animal.data['walk'])
     bones = animal.data['walk']['bones']
@@ -104,7 +104,7 @@ def spin_a_whole_turn_at_a_clip_change_is_flagged():
         else:
             base = rot if isinstance(rot, list) else [0, 0, 0]
             bones[bone]['rotation'] = [base[0] + 360, base[1], base[2]]
-        lines, flag = cc.check_switch(animal, 'idle', 'walk', ticks)
+        lines, flag, _ = cc.check_switch(animal, 'idle', 'walk', ticks)
         need(flag and 'the long way round' in lines[0], f'{bone} a whole turn on is not flagged at {ticks} ticks: {lines[0]}')
 
 
@@ -124,6 +124,24 @@ def lab_body_pushed_into_the_floor_is_flagged():
     need(any(level == 'BAD' and 'sinks' in m for level, m in found), f'an ant 1.5 units in the floor is not flagged: {found}')
     gait = lab.Gait(model, clip)
     need(all(any(gait.down[k]) for k in gait.legs), 'feet under the floor do not count as down')
+
+
+@test
+def lab_loop_that_jumps_in_place_or_size_is_flagged():
+    """R12-21: a loop whose body ends 2.5 units from where it started, or whose abdomen ends a tenth bigger, jumps
+    where it starts again (only turns were read)."""
+    import anim_lab as lab
+    model = lab.Model('matabele_minor')
+    clip = lab.load_clips('matabele_minor')['idle']
+    seam = [m for level, m in lab.check(model, clip, quiet=True) if level == 'BAD' and 'loop starts again' in m]
+    need(not seam, f'the real idle has an open seam: {seam}')
+    bone = next(iter(clip.bones))
+    for channel, keys, word in (('position', {'0.0': [0, 0, 0], str(clip.length): [0, 2.5, 0]}, '(position)'),
+                                ('scale', {'0.0': [1, 1, 1], str(clip.length): [1.1, 1.1, 1.1]}, '(scale)')):
+        clip = lab.load_clips('matabele_minor')['idle']
+        clip.bones[bone][channel] = lab.keyframes(keys)
+        found = [m for level, m in lab.check(model, clip, quiet=True) if level == 'BAD' and word in m]
+        need(found, f'a loop jumping in {channel} is not flagged')
 
 
 # --- the course (tools/body_course.py) ----------------------------------------------------------------------------
@@ -299,6 +317,85 @@ def guard_part_much_deeper_at_an_approved_picture_is_flagged():
              'another part deep in the block at the approved picture passes')
     finally:
         gf.findings, gf.approved_meta = findings, approved_meta
+
+
+# --- the body plans (tools/body_plan.py check) ---------------------------------------------------------------------------
+@test
+def plan_check_names_that_are_not_there_are_problems():
+    """R12-14: every plan is clean (its bones table, and every bone and clip its "checks" name); a misspelt body
+    bone, jaw bone or clip pattern in "checks" is a problem, where it used to switch its check off without a word."""
+    import contextlib
+    import io
+    import body_plan
+    said = io.StringIO()
+    with contextlib.redirect_stdout(said):
+        bad = body_plan.check_all()
+    need(bad == 0, 'body_plan.py check finds problems: ' + ' | '.join(l for l in said.getvalue().splitlines() if ': OK' not in l))
+    plan = body_plan.load('crocodile')
+    bones = body_plan.geo_bones('crocodile')
+    need(not body_plan.checks_problems(plan, bones), 'the real plan has problems')
+    checks = plan.data['checks'] = copy.deepcopy(plan.data['checks'])
+    checks['body_bones'] = ['bodey']
+    checks['jaw'] = dict(checks['jaw'], bone='jaww')
+    checks['water'] = list(checks.get('water', [])) + ['swimm*']
+    found = ' | '.join(body_plan.checks_problems(plan, bones))
+    for word in ('bodey', 'jaww', 'swimm*'):
+        need(word in found, f'the misspelt "{word}" is no problem: {found}')
+
+
+# --- the move files (assets/<mod>/block_moves/, the game's copy of each move clip's path) ----------------------------------
+@test
+def move_file_behind_its_clip_is_flagged():
+    """R12-72: every move file matches its clips' path notes; a clip remade (its path 2 px further at one tick) with
+    the move file left as it was is named."""
+    import glob
+    import json
+    import mod_paths
+    import model_parts
+    names = sorted(os.path.basename(p)[:-5] for p in glob.glob(str(mod_paths.assets('savanna') / 'block_moves' / '*.json')))
+    need(len(names) >= 7, f'only {len(names)} move files found')
+    for name in names:
+        behind = model_parts.block_moves_behind(name)
+        need(not behind, 'a move file is behind its clips (write it again with its maker): ' + '; '.join(behind[:3]))
+    clips = json.loads((mod_paths.assets('savanna') / 'animations' / 'entity' / 'otter.animation.json')
+                       .read_text(encoding='utf-8'))['animations']
+    line = clips['step_down_1000']['timeline']
+    key = next(k for k, v in line.items() if (v if isinstance(v, str) else ' '.join(v)).startswith('path '))
+    words = (line[key] if isinstance(line[key], str) else ' '.join(line[key])).split()
+    words[2 + 3 * 6 + 2] = f'{float(words[2 + 3 * 6 + 2]) - 2.0:.3f}'      # tick 6: 2 px further forward
+    line[key] = ' '.join(words)
+    behind = model_parts.block_moves_behind('otter', clips=clips)
+    need(any('down' in b and 'along at tick 6' in b for b in behind), f'the remade clip was not noticed: {behind}')
+
+
+# --- one film at a time (tools/film_run.py) ----------------------------------------------------------------------------
+@test
+def film_lock_refuses_a_second_film_and_takes_over_a_dead_one():
+    """R12-46: with a live process holding the lock a second film stops with a line naming it; a lock whose process
+    is gone is taken over; a tool lets go only of its own lock."""
+    import json
+    import subprocess
+    import tempfile
+    import film_run
+    lock = os.path.join(tempfile.mkdtemp(), 'film.lock')
+    other = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])
+    try:
+        json.dump({'pid': other.pid, 'what': 'another film', 'folder': 'x', 'since': 'now'}, open(lock, 'w'))
+        try:
+            film_run.take('mine', 'here', lock)
+            need(False, 'a second film was let through while another process held the lock')
+        except SystemExit as e:
+            need('another film' in str(e), f'the refusal does not name the holder: {e}')
+        film_run.release(lock)
+        need(os.path.exists(lock), 'a tool let go of a lock that was not its own')
+    finally:
+        other.kill()
+        other.wait()
+    need(film_run.holder(lock) is None, 'a lock whose process is gone still counts as held')
+    film_run.take('mine', 'here', lock)
+    need(film_run.holder(lock)['pid'] == os.getpid(), 'the dead lock was not taken over')
+    film_run.release(lock)
+    need(not os.path.exists(lock), 'its own lock was not let go')
 
 
 def main(argv):

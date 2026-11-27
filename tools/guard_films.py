@@ -12,7 +12,8 @@ Each film is checked four ways:
      the body turns smoothly, never in stop-start jerks (docs/BUGS.md 36) or snaps; it tips onto and off a wall
      smoothly (the inside corner, which once snapped 30 degrees a tick); the walks for each speed are played;
   3. the pictures against the last ones the user approved (references/guard_films/): pictures that changed more than a
-     little are listed, to look at (a change on purpose is approved once and becomes the new reference);
+     little are listed, to look at, and counted in the report's first line (a change on purpose is approved once and
+     becomes the new reference; until then the run ends with exit code 2: 1 is a problem, 0 all as approved);
   4. the drawing time: run-film/screenshots/frames.txt (client/FilmFrameMeter), the crowd of 400 ants against the
      empty scene.
 A short video of all the films (run-film/guard_films.mp4, real speed) is made for the user to watch on the phone.
@@ -78,15 +79,14 @@ def scene_files(words=()):
 # ---------------------------------------------------------------------------------------------------------- filming
 
 def film(files):
-    gradle = [str(ROOT / "gradlew.bat")] if os.name == "nt" else ["./gradlew"]
-    scenes = ",".join(str(f.relative_to(ROOT)).replace("\\", "/") for f in files)
+    import film_run
+    scenes = [str(f.relative_to(ROOT)).replace("\\", "/") for f in files]
     print(f"Filming {len(files)} guard scene(s) ...", flush=True)
     output = ROOT / "run-film" / "guard_output.log"
     output.parent.mkdir(parents=True, exist_ok=True)
     with open(output, "w", encoding="utf-8", errors="replace") as log:
-        done = subprocess.run(gradle + ["runFilm", f"-PfilmScene={scenes}", "--console=plain", "-q"], cwd=ROOT,
-                              stdout=log, stderr=subprocess.STDOUT)
-    if done.returncode != 0:
+        code, _ = film_run.run(scenes, ROOT, stdout=log, extra=["--console=plain", "-q"])   # (code review R12-46)
+    if code != 0:
         print("The film camera did not finish (see run-film/guard_output.log and run-film/logs/latest.log).")
         return False
     return True
@@ -250,7 +250,14 @@ WORSE_FINDING = 1.3
 def film_checks(scene, problems, notes):
     found, lines = findings(scene)
     if found is None:
-        notes.append(f"{scene}: no insect checked by the camera")
+        # the camera judged no insect (none in view, or its checks broke): a problem where the approved film had some
+        # (code review R12-50: an empty check and a clean one looked the same); a note for a scene approved with none
+        # (the empty scene of the frame times) or approved before this was kept
+        if (approved_meta(scene) or {}).get("camera_checked"):
+            problems.append(f"{scene}: NO INSECT CHECKED BY THE CAMERA (the approved film had its checks): parts in "
+                            "blocks and jumps are not judged")
+        else:
+            notes.append(f"{scene}: no insect checked by the camera")
         return
     meta = approved_meta(scene)
     known = (meta or {}).get("findings", {})
@@ -329,10 +336,12 @@ CHANGED = {}                 # scene -> pictures that differ from the approved o
 
 
 def compare(scene, problems, notes):
+    """The scene's pictures against its approved ones, listed in the notes; returns how many changed or are missing
+    (counted in the report's first line and its exit code: `approve` is the way past a change on purpose; R12-39)."""
     meta = approved_meta(scene)
     if meta is None:
         notes.append(f"{scene}: no approved pictures yet (python tools/guard_films.py approve {scene})")
-        return
+        return 0
     old = zlib.decompress((APPROVED / f"{scene}.grey.z").read_bytes())
     size = SMALL_W * SMALL_H
     old_pictures = {n: old[i * size:(i + 1) * size] for i, n in enumerate(meta["pictures"])}
@@ -362,6 +371,7 @@ def compare(scene, problems, notes):
         notes.append(f"    {scene}/{name}: {why}")
     if len(changed) > 12:
         notes.append(f"    ... and {len(changed) - 12} more")
+    return len(changed)
 
 
 def approve(words, note=None):
@@ -376,7 +386,8 @@ def approve(words, note=None):
         old = approved_meta(scene) or {}
         body = []
         body_checks(scene, scene_logs(scene), body, [])
-        meta = {"pictures": names, "size": [SMALL_W, SMALL_H], "findings": found or {}, "body_findings": body_kinds(body)}
+        meta = {"pictures": names, "size": [SMALL_W, SMALL_H], "findings": found or {}, "body_findings": body_kinds(body),
+                "camera_checked": found is not None}
         if note is not None:
             if note:
                 meta["known_bugs"] = note
@@ -467,7 +478,7 @@ def video(files, slow=1.0):
 # ------------------------------------------------------------------------------------------------ the report
 
 def check(files):
-    problems, notes = [], []
+    problems, notes, changed = [], [], {}
     camera_log_checks(problems)
     for f in files:
         scene = f.stem
@@ -483,19 +494,21 @@ def check(files):
             problems += body
         elif body:
             notes.append(f"{scene}: {len(body)} body finding(s), as approved: {body[0].split(': ', 1)[-1]}")
-        compare(scene, problems, notes)
+        n = compare(scene, problems, notes)
+        if n:
+            changed[scene] = n
     frame_times(notes)
-    moved = sum(CHANGED.values())
-    look = (f"; {moved} PICTURE(S) CHANGED in {sum(1 for n in CHANGED.values() if n)} scene(s): look, then approve"
-            if moved else "")
-    lines = ["Guard films: " + ("ALL CHECKS PASS" if not problems else f"{len(problems)} PROBLEM(S)") + look, ""]
+    looks = (f"{sum(changed.values())} PICTURE(S) CHANGED in {len(changed)} scene(s) ({', '.join(changed)}): look, "
+             "then approve") if changed else ""
+    head = (f"{len(problems)} PROBLEM(S)" + (", " + looks if looks else "")) if problems else (looks or "ALL CHECKS PASS")
+    lines = ["Guard films: " + head, ""]
     if problems:
         lines += ["Problems:"] + ["  " + p for p in problems] + [""]
     lines += ["Notes:"] + ["  " + n for n in notes]
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
-    return not problems
+    return 1 if problems else 2 if changed else 0
 
 
 def main(args):
@@ -519,11 +532,11 @@ def main(args):
     if command == "run":
         if not film(files):
             return 1
-        ok = check(files)
+        code = check(files)
         video(files, slow)
-        return 0 if ok else 1
+        return code
     if command == "check":
-        return 0 if check(files) else 1
+        return check(files)
     if command == "approve":
         approve(rest, note)
         return 0

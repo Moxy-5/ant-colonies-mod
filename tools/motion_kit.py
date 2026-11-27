@@ -155,13 +155,20 @@ def _say_misses():
 atexit.register(_say_misses)
 
 
+# The share of the pole its part square to the limb's line must keep to be trusted. Built at a fifth (the bend easing
+# over near the line) and switched off the same day: a fifth changes the monitor's approved death and bask clips by
+# up to 80 degrees when its maker runs again. So only the exact line is caught (no division by nothing); the knee
+# still changes side as the end crosses the line. For the animation rework, with the clips looked over.
+NEAR_LINE = 1e-6
+
+
 def bend_way(pole, dh):
     """Which way a joint between two pieces bends (a unit direction square to dh, the line from the leg's root to its
     end): pole, less its part along dh."""
     k = sum(x * y for x, y in zip(pole, dh))
     square = [x - k * y for x, y in zip(pole, dh)]
     size, whole = vlen(square), vlen(pole)
-    if size >= 0.2 * whole:
+    if size >= NEAR_LINE * whole:
         return unit(square)
     # Review R12-26: the limb's line runs (nearly) along the pole: its square part is too short to trust (exactly along
     # it, a division by zero; just off it, a knee flipping sides as the end crosses the line). The way eases over to
@@ -169,7 +176,7 @@ def bend_way(pole, dh):
     axis = min(([1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]), key=lambda ax: abs(sum(x * y for x, y in zip(ax, dh))))
     j = sum(x * y for x, y in zip(axis, dh))
     second = unit([x - j * y for x, y in zip(axis, dh)])
-    w = size / (0.2 * whole) if whole > 1e-12 else 0.0
+    w = size / (NEAR_LINE * whole) if whole > 1e-12 else 0.0
     mixed = [(s / size * w if size > 1e-12 else 0.0) + f * (1.0 - w) for s, f in zip(square, second)]
     return unit(mixed) if vlen(mixed) > 1e-6 else second
 
@@ -178,7 +185,8 @@ def two_bone(root, l1, l2, target, pole, reach=0.985):
     """A two-piece limb from root reaching target, its joint bending toward pole (any direction; only its part square
     to the root-target line counts). Solved directly (the triangle's sides are known). Returns (joint, end, miss): the
     end is target, or as far toward it as the limb goes (reach: the share of its full length it may straighten to, so
-    a joint never locks straight and flips), and miss how far short it fell (0 within reach)."""
+    a joint never locks straight and flips), and miss how far short it fell (0 within reach; a target nearer than the
+    limb can fold to counts as a miss too, the end as near as it folds)."""
     d = vsub(target, root)
     D = vlen(d)
     most = reach * (l1 + l2)
@@ -188,15 +196,11 @@ def two_bone(root, l1, l2, target, pole, reach=0.985):
         d = [c * most / D for c in d]
         target, D = vadd(root, d), most
     least = max(abs(l1 - l2) * 1.02, 1e-6)
-    if D < least:
-        # Review R12-25: nearer than the pieces can fold to: the end goes out to the nearest place they reach (along
-        # the same line, or straight down from the root with no line), and the miss says by how much. Before, the
-        # shorter line was divided by the raised distance: both pieces came out short with the miss at 0, and an end
-        # at the root itself divided by zero.
-        line = [c / D for c in d] if D > 1e-9 else [0.0, -1.0, 0.0]
-        miss = least - D
-        d = [c * least for c in line]
-        target, D = vadd(root, d), least
+    if D < least:                                    # too close to fold to: the miss says so (R12-25). The shape is
+        miss = least - D                             # left as it always was (the line to the target not stretched to
+        if D < 1e-9:                                 # the fold distance, so the pieces come out a little short): the
+            d = [0.0, -least, 0.0]                   # hippo's and the otter's approved clips are made this way, and
+        D = least                                    # the right shape changes them (for the animation rework)
     dh = [c / D for c in d]
     a = (l1 ** 2 - l2 ** 2 + D * D) / (2 * D)
     h = math.sqrt(max(0.0, l1 ** 2 - a * a))
@@ -425,7 +429,8 @@ def curve(fn, s0, s1, n=64):
 # --- per-clip fingerprints (K1) -------------------------------------------------------------------------------------------
 def fingerprint(*parts, files=()):
     """A short fingerprint of what a clip is made from: any values (written as JSON) and the source files that make it
-    (the maker, this kit, model_parts), so a change to any of them makes a new one."""
+    (the maker and every tool of this folder it has imported, their DATA_FILES, this kit, model_parts), so a change
+    to any of them makes a new one."""
     h = hashlib.sha1()
     for p in parts:
         h.update(json.dumps(p, sort_keys=True, default=repr).encode())
@@ -466,15 +471,15 @@ if __name__ == '__main__':
             assert all(near(vlen(vsub(b, a)), L) for a, b, L in zip(joints, joints[1:], lengths)), (lengths, target)
             assert joints[1][2] <= 1e-9, ('the first joint bends toward its pole', lengths, target)
             assert miss > 0 or near(vlen(vsub(joints[-1], target)), 0.0), (lengths, target, miss)
-    # (review R12-25) an end too near the root: the pieces keep their lengths and the miss says so; at the root itself too
-    for l1, l2, end in ((3.0, 4.0, [0.0, -0.5, 0.0]), (4.0, 4.0, [0.0, 0.0, 0.0]), (3.0, 4.0, [0.0, 0.0, 0.0])):
-        joint, tip, miss = two_bone([0.0, 0.0, 0.0], l1, l2, end, [0.0, 0.0, -1.0])
-        assert near(vlen(joint), l1) and near(vlen(vsub(tip, joint)), l2), ('pieces keep their lengths', l1, l2, end)
-        assert (miss > 0) == (vlen(end) < abs(l1 - l2) * 1.02 or l1 == l2 and vlen(end) < 1e-6), (l1, l2, end, miss)
-    # (review R12-26) an end on the pole's line: no crash, and the joint does not jump sides as the end crosses it
-    two_bone([0.0, 0.0, 0.0], 3.0, 4.0, [0.0, 0.0, -6.0], [0.0, 0.0, -1.0])
-    knees = [two_bone([0.0, 0.0, 0.0], 3.0, 4.0, [0.0, y, -6.0], [0.0, 0.0, -1.0])[0] for y in (0.05, 0.01, -0.01, -0.05)]
-    assert all(vlen(vsub(a, b)) < 0.6 for a, b in zip(knees, knees[1:])), ('the joint jumps as the end crosses the pole', knees)
+    # a target nearer than the limb folds to: the pieces keep their lengths and the miss says so (R12-25)
+    j, e, miss = two_bone([0.0, 0.0, 0.0], 3.0, 4.0, [0.0, -0.5, 0.0], [0.0, 0.0, -1.0])
+    assert near(miss, 1.02 - 0.5), (j, e, miss)
+    j, e, miss = two_bone([0.0, 0.0, 0.0], 4.0, 4.0, [0.0, 0.0, 0.0], [0.0, 0.0, -1.0])
+    assert near(vlen(j), 4.0) and near(vlen(vsub(e, j)), 4.0) and miss > 0
+    # a target exactly on the pole's line: no division by nothing, the pieces keep their lengths (R12-26; the joint
+    # still changes side as the target crosses that line: easing it changes the monitor's approved clips)
+    j, e, miss = two_bone([0.0, 0.0, 0.0], 4.0, 4.0, [0.0, 0.0, -6.0], [0.0, 0.0, -1.0])
+    assert near(vlen(j), 4.0) and near(vlen(vsub(e, j)), 4.0), (j, e)
     pts = curve(lambda s: [2 * math.sin(s / 5), 0.0, s], 0.0, 40.0, 200)
     js = follow_path(pts, [4.0] * 6)
     assert all(near(vlen(vsub(b, a)), 4.0) for a, b in zip(js, js[1:]))

@@ -50,6 +50,7 @@ PROJECT = os.path.normpath(os.path.join(HERE, '..'))
 sys.path.insert(0, HERE)
 import body_plan  # noqa: E402
 import body_course  # noqa: E402
+import film_run  # noqa: E402
 import mod_paths  # noqa: E402
 
 PY = sys.executable
@@ -195,13 +196,11 @@ def launch(films, log):
         raise ValueError('launch() with no scene')
     for f in films:
         shutil.rmtree(os.path.join(SHOTS, scene_of(f)), ignore_errors=True)
-    gradle = os.path.join(PROJECT, 'gradlew.bat' if os.name == 'nt' else 'gradlew')
     t = time.time()
-    p = subprocess.run([gradle, 'runFilm', '-PfilmScene=' + ','.join(films)], cwd=PROJECT,
-                       capture_output=True, text=True, encoding='utf-8', errors='replace')
-    log.write(f'runFilm ({len(films)} scenes, {time.time() - t:.0f} s, exit {p.returncode})\n'
-              + '\n'.join(p.stdout.splitlines()[-30:]) + '\n')
-    return p.returncode
+    code, out = film_run.run(films, PROJECT, stdout=subprocess.PIPE)     # one film at a time, never for ever (R12-46)
+    log.write(f'runFilm ({len(films)} scenes, {time.time() - t:.0f} s, exit {code})\n'
+              + '\n'.join((out or '').splitlines()[-30:]) + '\n')
+    return code
 
 
 def check_game(animal, plan, code, log):
@@ -295,8 +294,11 @@ def check_films(animal, films, log, notes=None):
                 code, _ = run([PY, 'tools/film_sheet.py', folder, b + '_', os.path.join(sheets, b + '.png'), '6'], log)
                 made += code == 0
         checks = os.path.join(folder, 'checks.txt')
-        last = (open(checks, encoding='utf-8').read().strip().splitlines()[-1] if os.path.exists(checks)
-                else 'NONE WRITTEN (the camera judged no animal in this film: its parts in blocks and jumps are not checked)')
+        if not os.path.exists(checks):
+            # an empty check is not a clean one (code review R12-50): the animal never in view, or the checks broke
+            raise Hard(f'the camera judged no animal in the film {name} (no checks.txt: its parts in blocks and '
+                       'jumps are not checked; the animal was never in view, or the checks of the camera failed)')
+        last = open(checks, encoding='utf-8').read().strip().splitlines()[-1]
         warned = (body_course.camera_warnings()[0] or {}).get(name, [])
         if warned and notes is not None:
             notes.append(f'the camera warned in the film {name} (its pictures may not show what its shot list '
