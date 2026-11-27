@@ -7,13 +7,13 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**307 findings: 200 left (11 of them wait for your call), 107 done.**
+**340 findings: 233 left (19 of them wait for your call), 107 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
-| A: a player can meet it | 67 | 0 | 1 | 0 | 65 | 1 |
-| B: it will cost us when building on this | 143 | 103 | 3 | 4 | 32 | 1 |
-| C: a tidy-up | 97 | 87 | 0 | 2 | 7 | 1 |
+| A: a player can meet it | 70 | 3 | 1 | 0 | 65 | 1 |
+| B: it will cost us when building on this | 162 | 122 | 3 | 4 | 32 | 1 |
+| C: a tidy-up | 108 | 98 | 0 | 2 | 7 | 1 |
 
 | Round | System | Found | Left | Done |
 |---|---|---|---|---|
@@ -22,7 +22,7 @@ review stay in `docs/BUGS.md`.
 | 3 | the insect body | not read yet | | |
 | 4 | how bodies are drawn | not read yet | | |
 | 5 | the termites | not read yet | | |
-| 6 | the Matabele ants (not raids) | not read yet | | |
+| 6 | the Matabele ants (not raids) | 33 | 33 | 0 |
 | 7 | the giant trees | 36 | 27 | 9 |
 | 8 | the world | 20 | 17 | 3 |
 | 9 | the river hunters | 44 | 34 | 10 |
@@ -30,11 +30,27 @@ review stay in `docs/BUGS.md`.
 | 11 | the new raid code | 22 | 6 | 16 |
 | 12 | the animation engine | 73 | 55 | 18 |
 
-## Waiting for your call (11)
+## Waiting for your call (19)
 
 These change how the game looks or plays, or a balance number, so nothing is built until you say. Each has
 what happens today and my pick. Answer whenever you like: tell Claude the number and what you want.
 
+- **R6-2** (grade A, the Matabele ants (not raids)) a Matabele colony whose workers all die keeps its queen for ever, and its dead mound stays taken
+  - *Your call:* A Matabele colony has lost every worker (starved, killed in raids, old age). Today its queen lives on alone for ever, the colony never ends, and no other colony can take that dead mound. My pick: she starves on the file's own clock (5 days) once a colony that has had workers has none; a queen put down with a spawn egg, still waiting for her first workers, keeps her grace.
+- **R6-5** (grade B, the Matabele ants (not raids)) a limping ant stops to call for helpers who can never come
+  - *Your call:* After a raid that broke up, a limping ant on the way home stops and squeaks for 10 seconds every 40 while healthy nestmates walking home beside it go past: they count as "help is near" but their walk home outranks the rescue. Should an ant walking home by itself stop and carry a calling nestmate? My pick: yes (real Megaponera coming back from a raid do pick up a caller, Frank et al. 2017). The other way is the small fix: the hurt one no longer calls for them and just limps on.
+- **R6-6** (grade B, the Matabele ants (not raids)) the nest's defence calls out the wounded first, and ants carrying a hurt nestmate or carried themselves
+  - *Your call:* Break into a Matabele nest after a raid came home with hurt ants: today the ants with a fresh wound are the first to charge (their room is the one nearest the entrance), and now and then an ant stings with a nestmate hanging in its jaws. Should an ant with a fresh wound defend its nest? My pick: no for the wounded and for anyone carrying or carried (the design's "the hurt rest until the wound closes"; real Megaponera with a leg gone do fight again, but after the wound has closed).
+- **R6-12** (grade B, the Matabele ants (not raids)) one continuous size spread, but two bodies decide everything, and 77 in 100 workers get the full major's numbers
+  - *Your call:* Each ant has its own real length (5 to 18 mm), but only how big it is drawn and how much it carries follow it. Health, bite, breaking the termites' mud open, scouting and leading a raid all go by which of the two models is nearer, split at 10.6 mm: a 10.5 mm ant has half the health of a 10.7 mm one, and 77 in 100 workers count as full majors. Should an ant's strength follow its own length? My pick: yes: health and damage by length (as the carry load already is), breaking in and scouting from about 12.5 mm up (about 60 in 100).
+- **R6-13** (grade B, the Matabele ants (not raids)) the sting can kill an unarmoured player standing at the nest in about 2.5 seconds
+  - *Your call:* How dangerous should a Matabele swarm be? Today each sting is 2 hearts and up to 20 defenders sting, so a player standing still at a provoked nest with no armour dies in about 2.5 seconds (iron about 5, diamond about 10), while a player who keeps walking is almost never stung (R3-37). The real sting is among the most painful of any ant and not dangerous. My pick: painful, rarely deadly: keep 2 hearts a sting but let the whole colony land at most one sting a second on a player, with the pain (slowness, the red edge) growing with each sting; build it together with R3-37's fix.
+- **R6-17** (grade B, the Matabele ants (not raids)) the colony's hunger counts only the adults, while a new worker costs 11 termites
+  - *Your call:* A new worker costs 11 termites (6 for the queen's egg, 5 for the larva), while a grown worker eats 3 in its whole life; yet "hungry", which sends out the scouts and raids, counts only a day of the adults' food. So the queen and the young empty the pile and the colony flickers between fed and hungry. My pick: keep the 11 (no paper figure for what a Megaponera larva eats is known to me), measure a 10-day soak first, then let "hungry" count the whole need: the adults, the queen's next egg and the hungry larvae. No new number.
+- **R6-18** (grade B, the Matabele ants (not raids)) egg and brood times are minutes on a scale where a game day is a real day
+  - *Your call:* An egg comes 3 minutes after the queen's full meal, hatches in 1 minute, and the larva grows as fast as it is fed, so a fed colony turns termites into workers within minutes, while a worker lives 60 game days and a wound takes a day. Real ponerine brood takes weeks. My pick: look up the real Megaponera times and put them on the same day-for-a-day scale as the rest (then the young limit of 10 and the queen's rate need a second look with R6-17), or, if fast brood is wanted for play, write that down in the species file.
+- **R6-33** (grade C, the Matabele ants (not raids)) a dead Matabele worker leaves no body
+  - *Your call:* A Matabele killed in the field vanishes in a puff today. Should it lie there as a body, as the termites' dead do? My pick: yes (real dead raiders are left where they fall); it is one line, and the body crumbles by the rules already there.
 - **R7-12** (grade B, the giant trees) Lightning takes big trees faster than old age
   - *Your call:* Lightning near big trees. Today every bolt that lands within 24 blocks of a big tree is pulled onto it, so by my sum (not measured) one thunderstorm kills about 1 big tree in 8, and a Channeling trident thrown near big trees strikes the tree, not the mob. Change it so only the weather's own bolts are pulled, and a tree is struck at most once a storm? My pick: yes.
 - **R7-13** (grade B, the giant trees) Seedlings after rain fill the savanna in
@@ -63,14 +79,19 @@ what happens today and my pick. Answer whenever you like: tell Claude the number
 Grade A first. *Open* means looked at and left for a reason (the reason is given); *half fixed* says what
 is left; no word means nobody has started it. The findings that wait for your call are in the part above.
 
-### A: a player can meet it (1 left)
+### A: a player can meet it (3 left)
+
+**Round 6, the Matabele ants (not raids)** (`docs/reviews/full/round-06-matabele.md`)
+
+- **R6-1** a second player joining over LAN, or anyone on a server, is thrown out (or crashes) when a Matabele worker comes into view
+- **R6-3** a major with a fresh wound, or badly wounded, is sent out scouting alone
 
 **Round 7, the giant trees** (`docs/reviews/full/round-07-trees.md`)
 
 - **R7-33** A palm's crown can blink out at the screen's edge
   - *Open:* waits to be seen (2026-11-24). Read from how Minecraft hides parts of the world, never seen in the game; the fix is large (sharing a crown's faces out over its blocks) and is built only if the user sees fronds blink out.
 
-### B: it will cost us when building on this (102 left)
+### B: it will cost us when building on this (115 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -102,6 +123,22 @@ is left; no word means nobody has started it. The findings that wait for your ca
   - *Open:* left on purpose. Checked now: only the termite worker fits the tunnels (the tag `fits_termite_tunnels`), so only it takes a mouth's tube; the king, queen and nymph pass only the old chimney crown block, which no mound builds any ...
 - **R2-39** a mind pays for the same "no way" again a tick later, and a builder can ask 24 times in one tick
   - *Half fixed:* `Errand.walkOn` now treats a walk the legs gave up as "no way" (R2-2's fix): no second ask a tick later. Open: `BuildMoundGoal`'s many asks in one tick (round 5).
+
+**Round 6, the Matabele ants (not raids)** (`docs/reviews/full/round-06-matabele.md`)
+
+- **R6-4** a termite soldier clamped on a raider's leg vanishes when its mound is far from every player (a new side of R1-26)
+- **R6-7** "is this ant fit and free" is judged in nine places by nine different rules
+- **R6-8** "busy with a chore" leaves out wound care and rescue, so the ants tending the wounded are the first taken for a raid
+- **R6-9** the bite-out goal's "a foe right beside it: the fight first" never fires, so a shut-in ant with a termite soldier on it bites the wall instead of fighting
+- **R6-10** out of a raid column any nestmate carries any hurt ant; the size rule lives only in the raid
+- **R6-11** in a raid the hurt are fetched only after the attack, so a clamp squeezes all through it (a correction to R3-41)
+- **R6-14** a misspelt key or section in the species file quietly uses a number nobody chose, or switches a whole system off
+- **R6-15** two rules squeak at a player beside a raid column
+- **R6-16** a Matabele with no colony lives for ever, and one whose colony is gone joins any colony of its kind near it
+- **R6-19** the prey pile's count and its heaps drift apart, and nothing squares them
+- **R6-20** one block a player puts anywhere in the chimney hides every room of the nest
+- **R6-21** R1-28's Matabele side: which carriers lose their termites in a fold, and a meal that folds in as a whole new termite
+- **R6-22** what the player sees of the Matabele's food, care and defence has few tests, and two tests pass if the hurt ant dies
 
 **Round 7, the giant trees** (`docs/reviews/full/round-07-trees.md`)
 
@@ -201,7 +238,7 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R12-65** `MoveRider`, the planned one home for block moves, lacks two lessons of the monitor's copy, and the drawing half is copied three times
 - **R12-72** the move files have no staleness check (the spot tables do), and their unit test reads only the monitor's
 
-### C: a tidy-up (86 left)
+### C: a tidy-up (96 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -238,6 +275,19 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R2-34** on the server "is it climbing" reads the value sent to the drawing, a tick late
 - **R2-35** comments in the wrong place or saying the wrong thing
 - **R2-36** gaps in `DoorwayMotionTest`
+
+**Round 6, the Matabele ants (not raids)** (`docs/reviews/full/round-06-matabele.md`)
+
+- **R6-23** after each help call a limping ant stands 5 seconds more, because its "am I stuck" watch counts the call as being stuck
+- **R6-24** a rescuer that is hurt itself keeps its patient, and can be picked up with it: three ants in a stack
+- **R6-25** small things in the goals' turns
+- **R6-26** every idle ant in the nest searches for callers and patients when nobody is hurt
+- **R6-27** the sting's pain list is kept across worlds
+- **R6-28** a homeless queen floods every near dead mound every 10 s, the taken ones too; the dead mound book only grows
+- **R6-29** small things in the pile and the nest
+- **R6-30** the model lengths are written in two places
+- **R6-31** what a worker loses on going into the numbers: its length, its scout memory
+- **R6-32** comments, notes and numbers that disagree with the code, and dead leftovers
 
 **Round 7, the giant trees** (`docs/reviews/full/round-07-trees.md`)
 
