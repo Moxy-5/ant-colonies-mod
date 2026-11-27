@@ -563,39 +563,68 @@ def plan_text(data):
     return text + '\n'
 
 
-def keep_gaits(path, data):
-    """The plan to write over the file at path, with that file's gait table kept (2026-11-25, the Motion Studio phase 2).
-    The game reads each walker's gaits from its plan (framework/.../entity/body/Gaits.java) and will not make the animal
-    without them, but the model makers write plans without that section: rerunning one dropped it. Kept where it stood
-    among the file's sections. After a gait clip is remade, find its gait change moments again:
-    python tools/clip_check.py <animal> --gait-changes --write."""
-    if 'gaits' in data or not os.path.exists(path):
+# Sections a model maker writes only part of: what the maker leaves out of them is kept too (one level down).
+MIXED = ('checks', 'verify')
+# Lists inside those that others add entries to: the maker's entries first, then every other entry the file had.
+JOINED = ('switches',)
+
+
+def keep_sections(path, data, say=True):
+    """The plan to write over the file at path, keeping everything of that file the maker's plan lacks (the Motion
+    Studio, the new phase 2, ideas 56 and 58, 2026-11-27; it grew from keep_gaits, 2026-11-25).
+
+    A model maker writes what it knows of an animal (its bones, legs, chain, its own checks and clip changes). Other
+    tools and Claude add the rest to the same file: the gait table (clip_check.py --gait-changes --write), the spots,
+    holds and strikes (tools/spots.py reads them), checks.controller and checks.drawn_ahead (read from the Java), the
+    course, the verify films, clip changes the game makes. The game cannot do without some of them, and rerunning a
+    maker wiped them (lion_models.py game, buffalo_models.py game). The rule, for every maker alike: the maker's sections
+    and values win; a section of the file the maker does not write is kept where it stood; inside "checks" and
+    "verify" a key the maker does not write is kept; the file's "switches" entries the maker lacks are kept after the
+    maker's own. With say, prints what was kept (a key the maker dropped on purpose shows there: delete it by hand)."""
+    if not os.path.exists(path):
         return data
     try:
         with open(path, encoding='utf-8') as f:
             old = json.load(f)
     except ValueError:
         return data
-    if 'gaits' not in old:
+    if not isinstance(old, dict) or not isinstance(data, dict):
         return data
-    keys = list(old)
-    i = keys.index('gaits')
-    after = keys[i - 1] if i > 0 else None
-    if after is None:
-        return {'gaits': old['gaits'], **data}
-    if after not in data:
-        return {**data, 'gaits': old['gaits']}
-    kept = {}
-    for k, v in data.items():
-        kept[k] = v
-        if k == after:
-            kept['gaits'] = old['gaits']
-    return kept
+    kept = []
+
+    def merge(was, new, where, depth):
+        out = []
+        for k, v in new.items():
+            if k in was and depth == 0 and k in MIXED and isinstance(v, dict) and isinstance(was[k], dict):
+                v = merge(was[k], v, where + [k], depth + 1)
+            elif k in was and k in JOINED and isinstance(v, list) and isinstance(was[k], list):
+                extra = [e for e in was[k] if e not in v]
+                if extra:
+                    kept.append(f"{'.'.join(where + [k])} (+{len(extra)})")
+                    v = v + extra
+            out.append((k, v))
+        names = list(was)
+        for i, k in enumerate(names):
+            if k in new:
+                continue
+            kept.append('.'.join(where + [k]))
+            before = next((names[j] for j in range(i - 1, -1, -1) if any(n == names[j] for n, _ in out)), None)
+            at = 0 if before is None else next(j for j, (n, _) in enumerate(out) if n == before) + 1
+            out.insert(at, (k, was[k]))
+        return dict(out)
+
+    merged = merge(old, data, [], 0)
+    if say and kept:
+        print(f'  {os.path.basename(path)}: kept from the plan on disk: ' + ', '.join(kept))
+    return merged
+
+
+keep_gaits = keep_sections        # (its old name, for a maker on another branch that still calls it)
 
 
 def write_plan(model, data):
     os.makedirs(os.path.dirname(plan_path(model)), exist_ok=True)
-    data = keep_gaits(plan_path(model), data)
+    data = keep_sections(plan_path(model), data)
     with open(plan_path(model), 'w', encoding='utf-8', newline='\n') as f:
         f.write(plan_text(data))
 

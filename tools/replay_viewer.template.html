@@ -138,9 +138,6 @@ function buildGround(blocks, water) {
   const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial(), boxes.length);
   const m = new THREE.Matrix4(), c = new THREE.Color();
   boxes.forEach(([x, y, z, b], i) => {
-    const col = column(x, z);                   // each column's block tops, for the feet
-    if (!groundTops.has(col)) groundTops.set(col, []);
-    groundTops.get(col).push(y + b[4]);
     const w = Math.max(b[3] - b[0], 0.01), h = Math.max(b[4] - b[1], 0.01), d = Math.max(b[5] - b[2], 0.01);
     m.makeScale(w, h, d).setPosition(x + (b[0] + b[3]) / 2, y + (b[1] + b[4]) / 2, z + (b[2] + b[5]) / 2);
     mesh.setMatrixAt(i, m);
@@ -186,10 +183,10 @@ function unpack(a, all) {
 
 let animals = [], timeline = [], now = 0, playing = false, clock = 0, speed = 1, picked = null, follow = false, ready = false;
 // each moment's game tick, and the game ticks that ran unrecorded just before it (a film's "wait" and "until" steps
-// run the game on while the client draws nothing, or draws none of these animals); more than GAP is called a gap (a
-// tick or two is the noise of reading the server's tick live while the client draws)
+// run the game on while the client draws nothing, or draws none of these animals); more than GAP is called a gap
+// (all three from tools/recording.py's line_up, packed by tools/replay.py)
 let tickAt = [], gapBefore = [];
-const GAP = 3;
+let GAP = 3;
 
 function buildAnimal(a, i, all) {
   a.index = i;
@@ -441,136 +438,32 @@ function sunToView() {
   sun.position.set(t.x + 6, t.y + 18, t.z + 10); sun.target.position.copy(t); sun.target.updateMatrixWorld();
 }
 
-// --- feet: on the ground or lifted, and sliding, measured from the recording (the Motion Studio, idea 6) -----------
-// Each foot is the last bone of a leg in the animal's body plan, with the toes and claws below it (as the offline
-// checker, tools/clip_check.py, takes them). Every corner of its boxes is measured against the recorded ground under
-// that corner (a paw on a step's lip, its claws over the edge, is judged by the part on the step). Nothing of the
-// game's rules: only where the game drew the foot, against the recorded blocks. The limits are in the animal's own
-// model pixels (its root bone's recorded size), so a calf, a cub and a grown lion are judged alike: in blocks a calf's
-// pixel is a third of a bull's. (My picks, set from the lion hunt's numbers by this stage's review, 2026-11-27.)
-const DOWN_PX = 1;        // a foot whose lowest corner is this near the ground stands on it: the offline checker's own
-                          // limit for a foot "hanging" (a still hoof resting 0.7 px up, as the cow's in mood_alert, stands)
-const CONTACT_PX = 0.25;  // the corners this near the ground bear on it: a slide is how far those same corners moved
-                          // between two moments (standing feet rest about 0.16 px up at every size; a paw rolling off
-                          // its toes lifts its other corners past this at once, so its forward swing is not a slide)
-const SLIDE_PX = 0.15;    // a standing foot whose bearing corners move more than this a tick slides: four times the
-                          // drift of still feet (95 in 100 under 0.04 px a tick) and under the slowest walker's whole
-                          // pace (the tortoise, about 0.2 px a tick), so a foot carried along with the body shows
-const CATCH_UP = 3;       // after ticks not recorded the game eases the animal to its new place over 3 ticks (Minecraft's
-                          // own steps for an entity sent a new place): no slide is judged in them
-const groundTops = new Map();                   // each column's block tops (filled with the ground)
-const column = (x, z) => (Math.floor(x) + 32768) * 65536 + (Math.floor(z) + 32768);
-function groundUnder(x, y, z) {
-  const tops = groundTops.get(column(x, z));
-  let best = null;
-  if (tops) for (const t of tops) if (t <= y + 0.5 && (best === null || t > best)) best = t;
-  return best;
-}
-// one model pixel in blocks: the root bone's recorded size over 16 (as tools/body_course.py), at its first moment
-function pxOf(a) {
-  if (a.px) return a.px;
-  for (let j = 0; j < a.n; j++) {
-    const o = j * a.B * 12;
-    if (hidden(a.M, o)) continue;
-    const s = a.turn[0];
-    return (a.px = Math.hypot(a.M[o] * s, a.M[o + 4] * s, a.M[o + 8] * s) / 16 || 1 / 16);
-  }
-  return (a.px = 1 / 16);
-}
-// l1 r1 l2 r2 ... (front to back): front and hind for four legs, front, middle and hind for six, numbers past that
-function legLabel(key, rows) {
-  const side = key[0] === 'l' ? 'left' : key[0] === 'r' ? 'right' : '';
-  const n = parseInt(key.slice(1), 10);
-  const row = rows === 2 ? ['front', 'hind'][n - 1] : rows === 3 ? ['front', 'middle', 'hind'][n - 1] : 'leg ' + n;
-  return ((row || key) + ' ' + side).trim();
-}
-// the ticks since the last ticks not recorded, at each moment of the scene (Infinity before the first)
-let sinceGap = null;
-function sinceGapAt(t) {
-  if (!sinceGap) {
-    sinceGap = new Float64Array(timeline.length);
-    let last = -Infinity;
-    for (let k = 0; k < timeline.length; k++) { if (gapBefore[k] > GAP) last = timeline[k]; sinceGap[k] = timeline[k] - last; }
-  }
-  return sinceGap[t];
-}
-// the animal's feet and, for every moment, each foot's state (0 lifted, 1 on the ground, 2 on the ground and
-// sliding, -1 no ground recorded under it, -2 not drawn), slide (model pixels a tick, NaN when not judged), lowest
-// height over the ground (pixels) and middle (blocks, for its path)
+// --- feet: on the ground or lifted, and sliding (the Motion Studio, idea 6) -------------------------------------------
+// Measured by tools/recording.py (the one feet rule, the new phase 2, idea 57: tools/replay.py packs what it found, so
+// the page, the strips, tools/pair_report.py and tools/body_course.py judge feet alike); the page only draws it. Each
+// foot is the last bone of a leg in the animal's body plan with the toes and claws below it; on the ground within
+// RULE.downPx of a model pixel, sliding when its touching corners move more than RULE.slidePx a tick (the limits there).
+let RULE = {};
+// one model pixel in blocks (the animal's first bone's recorded size over 16), from tools/recording.py
+function pxOf(a) { return a.px || 1 / 16; }
+// the animal's feet: for every moment each foot's state (0 lifted, 1 on the ground, 2 on the ground and sliding,
+// -1 no ground recorded under it, -2 not drawn), slide (model pixels a tick, NaN when not judged), lowest height over
+// the ground (pixels) and middle (blocks, for its path)
 function feetOf(a) {
-  if (a.feet) return a.feet;
-  const index = new Map(a.bones.map((b, i) => [b.name, i]));
-  const kids = new Map();
-  a.bones.forEach((b, i) => { if (b.parent) { if (!kids.has(b.parent)) kids.set(b.parent, []); kids.get(b.parent).push(i); } });
-  const below = i => { const out = [i]; for (let k = 0; k < out.length; k++) (kids.get(a.bones[out[k]].name) || []).forEach(c => out.push(c)); return out; };
-  const legs = Object.entries(a.legs || {}).filter(([, chain]) => chain && chain.length && index.has(chain[chain.length - 1]));
-  const rows = new Set(legs.map(([k]) => k.slice(1))).size;
-  const order = k => (parseInt(k.slice(1), 10) || 0) * 2 + (k[0] === 'r' ? 1 : 0);
-  legs.sort((x, y) => order(x[0]) - order(y[0]));
-  const n = a.n, B = a.B, M = a.M, px = pxOf(a);
-  a.feet = legs.map(([key, chain]) => {
-    const bone = index.get(chain[chain.length - 1]), parts = below(bone);
-    const corners = parts.reduce((sum, bi) => sum + a.bones[bi].cubes.length * 8, 0);
-    const foot = {key, name: legLabel(key, rows), bone, parts, state: new Int8Array(n), slide: new Float32Array(n).fill(NaN),
+  if (a.feetMade) return a.feetMade;
+  const n = a.n;
+  a.feetMade = (a.footData || []).map(f => {
+    const foot = {key: f.key, name: f.name, state: Int8Array.from(f.state), slide: new Float32Array(n).fill(NaN),
                   height: new Float32Array(n).fill(NaN), mid: new Float32Array(n * 3)};
-    // every corner of the foot at this moment and the one before (x, z), and which of them bore on the ground
-    let now2 = new Float32Array(corners * 2), was2 = new Float32Array(corners * 2);
-    let bear = new Uint8Array(corners), bore = new Uint8Array(corners);
     for (let j = 0; j < n; j++) {
-      const p = a.pos[j];
-      let low = Infinity, drawn = false, known = false, sx = 0, sz = 0, cnt = 0, lx = 0, lz = 0, lowY = Infinity, q = 0;
-      bear.fill(0);
-      for (const bi of parts) {
-        const o = (j * B + bi) * 12, s = a.turn[bi], v = a.move[bi], off = hidden(M, o);
-        for (const c of a.bones[bi].cubes) for (let k = 0; k < 24; k += 3, q++) {
-          if (off) continue;                     // a part not drawn: none of its corners bears
-          drawn = true;
-          const x = c[k], y = c[k + 1], z = c[k + 2];
-          const wx = (M[o] * x + M[o + 1] * y + M[o + 2] * z) * s + M[o + 3] * v + p[0];
-          const wy = (M[o + 4] * x + M[o + 5] * y + M[o + 6] * z) * s + M[o + 7] * v + p[1];
-          const wz = (M[o + 8] * x + M[o + 9] * y + M[o + 10] * z) * s + M[o + 11] * v + p[2];
-          now2[q * 2] = wx; now2[q * 2 + 1] = wz;
-          if (wy < lowY) { lowY = wy; lx = wx; lz = wz; }
-          if (bi === bone) { sx += wx; sz += wz; cnt++; }
-          const g = groundUnder(wx, wy, wz);
-          if (g === null) continue;
-          known = true;
-          const h = (wy - g) / px;
-          if (h < low) low = h;
-          if (h < CONTACT_PX) bear[q] = 1;
-        }
-      }
-      if (!drawn) foot.state[j] = -2;
-      else {
-        foot.mid[j * 3] = cnt ? sx / cnt : lx; foot.mid[j * 3 + 1] = lowY; foot.mid[j * 3 + 2] = cnt ? sz / cnt : lz;
-        if (!known) foot.state[j] = -1;
-        else {
-          foot.height[j] = low;
-          foot.state[j] = low < DOWN_PX ? 1 : 0;
-          // its slide since its moment before: the corners bearing at both moments, how far they moved (only when
-          // that moment was at most two ticks before, and not while the game eases the animal on after ticks not
-          // recorded)
-          const dt = j > 0 ? a.key[j] - a.key[j - 1] : 0;
-          if (foot.state[j] === 1 && foot.state[j - 1] >= 1 && dt > 0 && dt <= 2 && sinceGapAt(a.slot[j]) > CATCH_UP) {
-            let sum = 0, both = 0;
-            for (let i = 0; i < corners; i++) {
-              if (!bear[i] || !bore[i]) continue;
-              sum += Math.hypot(now2[i * 2] - was2[i * 2], now2[i * 2 + 1] - was2[i * 2 + 1]);
-              both++;
-            }
-            if (both) {                         // (none in common: it changed the part it stands on; not judged)
-              foot.slide[j] = sum / both / dt / px;
-              if (foot.slide[j] > SLIDE_PX) foot.state[j] = 2;
-            }
-          }
-        }
-      }
-      [now2, was2] = [was2, now2];
-      [bear, bore] = [bore, bear];
+      if (f.slide[j] !== null) foot.slide[j] = f.slide[j];
+      if (f.height[j] !== null) foot.height[j] = f.height[j];
+      const m = f.mid[j];
+      if (m) { foot.mid[j * 3] = m[0]; foot.mid[j * 3 + 1] = m[1]; foot.mid[j * 3 + 2] = m[2]; }
     }
     return foot;
   });
-  return a.feet;
+  return a.feetMade;
 }
 // the body's drawn step since the animal's recorded moment before: how far it moved (blocks) and turned (degrees) a
 // tick, or null (the camera follows the animal, so a jump shows here, not in a picture)
@@ -600,14 +493,16 @@ const FOOT = {strip: '#f4f1e8', down: '#2b2a24', slide: '#d23c22', up: '#cfc9b8'
 let chartHold = null;                           // the moments shown while a press on the chart is held (so the same
                                                 // place on it stays the same moment while the moment shown moves)
 let chartDrag = false, chartPointer = null;       // a press held on the chart; the pointer's place over it (or null)
-$('chartLegend').innerHTML = [
+function chartLegend() {
+  $('chartLegend').innerHTML = [
   [`background:${FOOT.down}`, 'on the ground'],
-  [`background:${FOOT.slide}`, `sliding (on the ground, its touching part moving more than ${SLIDE_PX} of a model pixel a tick)`],
+  [`background:${FOOT.slide}`, `sliding (on the ground, its touching part moving more than ${RULE.slidePx} of a model pixel a tick)`],
   [`background:${FOOT.up};outline:1px solid ${FOOT.strip}`, 'lifted'],
   [`background:${FOOT.noGround}`, 'no ground recorded under it'],
   [`background:repeating-linear-gradient(90deg,${FOOT.hidden} 0 2px,${FOOT.strip} 2px 4px)`, 'not drawn'],
   [`width:0;border-left:2px dashed ${FOOT.gap};border-radius:0`, 'game ticks not recorded'],
 ].map(([style, words]) => `<span><i style="${style}"></i>${words}</span>`).join('');
+}
 function cssVar(name, fallback) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback; }
 function clipColour(name) { let h = 7; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return `hsl(${h % 360}, 42%, 64%)`; }
 // the last moment whose clock value is at most c (0 if none): the clock is the client's ticks, so a film recording
@@ -941,24 +836,17 @@ st.onFrame.push(() => {
   animals = meta.animals;
   animals.forEach((a, i) => buildAnimal(a, i, all));
   buildGround(meta.blocks, meta.water);
-  const keys = new Set();
-  animals.forEach(a => a.key.forEach(k => keys.add(k)));
-  timeline = [...keys].sort((x, y) => x - y);
+  // the scene's line of moments, each moment's game tick and the ticks not recorded before it: worked out by
+  // tools/recording.py (line_up), the same line the feet are judged on
+  timeline = meta.line.timeline;
+  RULE = meta.line.rule;
+  GAP = RULE.gap;
+  chartLegend();
   $('scrub').max = timeline.length - 1;
   const slotOf = new Map(timeline.map((k, t) => [k, t]));
   animals.forEach(a => lineUp(a, slotOf));
-  // a moment's game tick: the earliest its animals read (the server's tick is read live while the client draws, so a
-  // server sprinting through an "until" can be a few ticks on between the first animal drawn and the last), then no
-  // later than the next moment's less the client ticks between (a frozen step of k ticks runs on the server before
-  // the client draws its first tick: all k moments read the step's end)
-  const whole = k => Math.floor(k + 1e-6);
-  tickAt = new Array(timeline.length).fill(Infinity);
-  animals.forEach(a => a.key.forEach((k, j) => { const t = a.slot[j]; if (a.ft[j] !== null && a.ft[j] < tickAt[t]) tickAt[t] = a.ft[j]; }));
-  for (let t = timeline.length - 2; t >= 0; t--) tickAt[t] = Math.min(tickAt[t], tickAt[t + 1] - (whole(timeline[t + 1]) - whole(timeline[t])));
-  tickAt = tickAt.map((v, t) => isFinite(v) ? v : (t ? tickAt[t - 1] : 0));
-  // the ticks not recorded before a moment: the game's ticks since the moment before, or the client's (a tick none of
-  // these animals was drawn in), whichever is more, less the one tick between two moments in a row
-  gapBefore = tickAt.map((v, t) => t ? Math.max(0, Math.max(v - tickAt[t - 1], whole(timeline[t]) - whole(timeline[t - 1])) - 1) : 0);
+  tickAt = meta.line.tickAt;
+  gapBefore = meta.line.gapBefore;
   // the animal buttons: the name picks it (and looks at it), Hide hides or shows it
   animals.forEach(a => {
     const b = document.createElement('button');

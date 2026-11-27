@@ -640,51 +640,49 @@ def analyse(rec, plan):
     pops.sort(key=lambda p: -p[1])
     out['pops'] = pops
 
-    # feet: the foot bone's own sole (its toes and claws are left to the inside check: they may hang lower while it
-    # swings) over the ground under it, while the animal is on land; a step is the sole leaving the ground by over a
-    # pixel and coming back; a planted foot (sole within half a pixel) should stay put in the world
+    # feet: the one feet rule (tools/recording.py; the new phase 2, idea 57, BUGS 456: a foot is the leg's last bone
+    # with its toes and claws below it, as the replay page and the offline checker take it, never the chain's third
+    # bone), judged while the animal is on land. A step is a lift (the rule's "lifted") and coming back down; a planted
+    # foot's slide is the rule's (its bearing corners' move a tick), against how far the body goes meanwhile.
+    keys = [recording.clock(f) for f in frames]
+    _, slots, _, _, since = recording.line_up([keys], [[f.get('ft') for f in frames]])
+    ground = recording.Ground([[x, y, z, *boxes] for (x, y, z), boxes in rec.blocks.items()])
+    judged = recording.feet(rec.header, frames, legs, ground, keys, [since[t] for t in slots[0]])
     feet = {}
     foot_series = {}
     pos_speed = [0.0] + [math.hypot(frames[i]['pos'][0] - frames[i - 1]['pos'][0], frames[i]['pos'][2] - frames[i - 1]['pos'][2])
-                         / max(times[i] - times[i - 1], 1e-3) for i in range(1, len(frames))]
-    for key, bones in legs.items():
-        if len(bones) < 3 or bones[2] not in rec.index:
-            continue
-        foot = bones[2]
-        hovers, planted_slide, body_speed, ts, lifts = [], [], [], [], []
-        last, swing = None, None
+                         / max(keys[i] - keys[i - 1], 1e-3) for i in range(1, len(frames))]
+    for foot in judged:
+        key = foot['key']
+        hovers, slid, body_speed, ts, lifts = [], [], [], [], []
+        planted, swing = 0, None
         for fi, f in enumerate(frames):
-            pts = [p for box in rec.corners(f, foot) for p in box]
-            if not pts:
-                last = None
+            state, h = foot['state'][fi], foot['height'][fi]
+            if state == recording.NOT_DRAWN:
                 continue
-            sole = min(pts, key=lambda p: p[1])
-            ground = rec.ground_under(sole[0], sole[1], sole[2])
-            land = f['ground'] and not f['water'] and ground is not None
-            h = sole[1] - ground if ground is not None else None
-            ts.append((times[fi], h if land else None))
-            piv = rec.pivot(f, foot)
-            if land:
-                hovers.append(h)
-                if h > 1.0 * px:
-                    swing = max(swing or 0.0, h)
-                elif swing is not None and h < 0.5 * px:
-                    lifts.append(swing)
-                    swing = None
-                if last is not None and h < 0.5 * px and last[2] < 0.5 * px:
-                    dt = max(times[fi] - last[0], 1e-3)
-                    planted_slide.append(math.hypot(piv[0] - last[1][0], piv[2] - last[1][2]) / dt)
+            land = f['ground'] and not f['water'] and h is not None
+            ts.append((times[fi], h * px if land else None))
+            if not land:
+                continue
+            hovers.append(h * px)
+            if state == recording.LIFTED:
+                swing = max(swing or 0.0, h * px)
+            elif swing is not None:
+                lifts.append(swing)
+                swing = None
+            if foot['slide'][fi] is not None:
+                planted += 1
+                if pos_speed[fi] > 0.005:
+                    slid.append(foot['slide'][fi] * px)
                     body_speed.append(pos_speed[fi])
-            last = (times[fi], piv, h if land else 99)
         foot_series[key] = ts
         if hovers:
-            pairs = [(s, b) for s, b in zip(planted_slide, body_speed) if b > 0.005]
             feet[key] = dict(
                 median=statistics.median(hovers), low=min(hovers), high=max(hovers),
                 floating=sum(1 for h in hovers if h > 3 * px) / len(hovers),
                 sunk=sum(1 for h in hovers if h < -1.0 * px) / len(hovers),
-                slide=(sum(s for s, _ in pairs) / sum(b for _, b in pairs)) if pairs else None,
-                planted=len(planted_slide), steps=len(lifts),
+                slide=(sum(slid) / sum(body_speed)) if body_speed else None,
+                planted=planted, steps=len(lifts),
                 lift=statistics.median(lifts) if lifts else None)
     out['feet'] = feet
     out['foot_series'] = foot_series
@@ -874,7 +872,7 @@ def check_scene(job):
         if parts:
             summary.append((P(parts[0][1]), f'{scene}: {parts[0][0]} pops {P(parts[0][1]):.1f} px at t {parts[0][2]:.1f} ({len(parts)} pops of parts)'))
     if res['feet']:
-        lines.append('  feet on land (the foot bone sole over the ground, px: middle, lowest, highest; share floating over 3 px; share sunk; how far a planted foot slides against how far the body goes; steps and their usual lift):')
+        lines.append("  feet on land (tools/recording.py's feet rule: the foot's lowest corner over the ground, px: middle, lowest, highest; share floating over 3 px; share sunk; how far a planted foot slides against how far the body goes; steps and their usual lift):")
         for key, ft in sorted(res['feet'].items()):
             slide = f'{ft["slide"]:.2f}' if ft['slide'] is not None else '-'
             lift = f'{P(ft["lift"]):.1f} px' if ft['lift'] is not None else '-'

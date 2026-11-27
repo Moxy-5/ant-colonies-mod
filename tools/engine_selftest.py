@@ -462,6 +462,82 @@ def move_file_behind_its_clip_is_flagged():
     need(any('down' in b and 'along at tick 6' in b for b in behind), f'the remade clip was not noticed: {behind}')
 
 
+# --- the plans and the clips made against another animal (the new phase 2, ideas 56 and 58) ----------------------------
+@test
+def a_maker_rewriting_a_plan_keeps_what_others_added():
+    """Idea 58: a maker's plan (no gait table, spots, holds, strikes, course or verify; no controller or drawn-ahead
+    check; half its clip changes) written over each plan on disk gives back exactly the plan on disk."""
+    import json
+    import body_plan
+    for model in ('lioness', 'buffalo', 'otter', 'martial_eagle'):
+        path = body_plan.plan_path(model)
+        full = json.load(open(path, encoding='utf-8'))
+        maker = copy.deepcopy(full)
+        for k in ('gaits', 'spots', 'holds', 'strikes', 'course', 'verify'):
+            maker.pop(k, None)
+        for k in ('controller', 'drawn_ahead', 'game_turns'):
+            maker['checks'].pop(k, None)
+        maker['checks']['switches'] = maker['checks'].get('switches', [])[:3]
+        merged = body_plan.keep_sections(path, maker, say=False)
+        need(merged == full and list(merged) == list(full), f'{model}: the plan came back different')
+    path = body_plan.plan_path('lioness')
+    maker = copy.deepcopy(json.load(open(path, encoding='utf-8')))
+    maker['legs']['l1'] = ['made', 'up']                                    # the maker's own value wins
+    need(body_plan.keep_sections(path, maker, say=False)['legs']['l1'] == ['made', 'up'], "a maker's own value was not kept")
+
+
+@test
+def a_hold_made_against_a_prey_that_changed_is_flagged():
+    """Idea 56: every hold clip made against the buffalo's spots matches its table now; the buffalo's held_down rows
+    moved 1 px up (its clip remade, its table written, the lioness's clips not) names the lioness's hold_down."""
+    import json
+    import spots
+    need(not spots.partners_stale(), 'a clip is already behind its prey: ' + '; '.join(spots.partners_stale()))
+    table = json.load(open(spots.table_path('buffalo'), encoding='utf-8'))
+    rows = table['spots']['clips']['held_down']
+    table['spots']['clips']['held_down'] = [[v + (1.0 if i % 3 == 1 else 0.0) for i, v in enumerate(r)] for r in rows]
+    behind = spots.partners_stale({'buffalo': table})
+    need(any(b.startswith('lioness:') and 'hold_down' in b and 'buffalo' in b for b in behind), f'not named: {behind}')
+    need(not any('throat_hold' in b for b in behind), f'a clip made against other rows was named too: {behind}')
+
+
+# --- the one feet rule (tools/recording.py; the new phase 2, idea 57) --------------------------------------------------
+@test
+def feet_rule_sees_a_carried_foot_slide_and_leaves_a_still_or_lifted_one_alone():
+    """BUGS 456, 457's lesson: one foot (a 2 px cube, a model pixel 1/16 block) standing still, carried along the ground
+    0.5 px a tick, lifted 3 px and swung, and after 10 ticks not recorded; the rule must say down, sliding, lifted,
+    and judge no slide in the 3 ticks after the gap."""
+    import recording
+    px = 1 / 16                                           # (a recorded matrix of scale 1: a model pixel is 1/16 block)
+    cube = [v for x in (0, 2 * px) for y in (0, 2 * px) for z in (0, 2 * px) for v in (x, y, z)]
+    header = {'bones': [{'name': 'body', 'cubes': []}, {'name': 'foot', 'parent': 'body', 'cubes': [cube]}]}
+    def m(x, y):
+        mat = [1.0, 0, 0, x, 0, 1.0, 0, y, 0, 0, 1.0, 0]
+        return {'b': [mat, mat], 'pos': [0.5, 1.0, 0.5]}
+    moments, ticks = [], []
+    for t in range(6):                                    # still on the ground
+        moments.append(m(0.0, 0.0)); ticks.append(t)
+    for t in range(6, 12):                                # carried along, 0.5 px a tick
+        moments.append(m((t - 5) * 0.5 * px, 0.0)); ticks.append(t)
+    for t in range(12, 16):                               # lifted 3 px and swung
+        moments.append(m((t - 5) * 2 * px, 3 * px)); ticks.append(t)
+    for t in range(26, 32):                               # after 10 ticks not recorded, carried again
+        moments.append(m((t - 20) * 0.5 * px, 0.0)); ticks.append(t)
+    for mo, t in zip(moments, ticks):
+        mo['ft'], mo['pt'] = t, 1.0
+    keys = [recording.clock(mo) for mo in moments]
+    _, slots, _, gaps, since = recording.line_up([keys], [ticks])
+    ground = recording.Ground([[x, 0, 0, [0, 0, 0, 1, 1, 1]] for x in range(4)])
+    foot = recording.feet(header, moments, {'l1': ['foot']}, ground, keys, [since[t] for t in slots[0]])[0]
+    st = foot['state']
+    need(st[1:6] == [recording.DOWN] * 5 and max(foot['slide'][1:6]) < 0.01, f'a still foot: {st[1:6]} {foot["slide"][1:6]}')
+    need(st[7:12] == [recording.SLIDING] * 5 and abs(foot['slide'][8] - 0.5) < 0.01, f'a carried foot: {st[7:12]} {foot["slide"][7:12]}')
+    need(st[12:16] == [recording.LIFTED] * 4, f'a lifted foot: {st[12:16]}')
+    need(gaps[16] == 10 and st[16:19] == [recording.DOWN] * 3 and foot['slide'][16:19] == [None] * 3,
+         f'judged right after the gap: {gaps[16]} {st[16:19]} {foot["slide"][16:19]}')
+    need(st[20] == recording.SLIDING, f'not judged again after the catch-up: {st[19:22]}')
+
+
 # --- one film at a time (tools/film_run.py) ----------------------------------------------------------------------------
 @test
 def film_lock_refuses_a_second_film_and_takes_over_a_dead_one():

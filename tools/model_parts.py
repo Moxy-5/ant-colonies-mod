@@ -272,7 +272,7 @@ def write_assets(files, mod='savanna', faces=True):
         path.parent.mkdir(parents=True, exist_ok=True)
         if isinstance(data, dict) and rel.startswith('body_plans/'):
             import body_plan
-            data = body_plan.keep_gaits(str(path), data)     # its gait table is not the maker's to drop
+            data = body_plan.keep_sections(str(path), data)  # what others added to the plan is not the maker's to drop
         if isinstance(data, bytes):
             path.write_bytes(data)
         else:
