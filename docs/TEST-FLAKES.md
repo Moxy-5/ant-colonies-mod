@@ -6,7 +6,7 @@ from the list of bugs (`docs/OPEN-BUGS.md`) on purpose. **This file is written b
 `python tools/open_bugs.py`; never edit it by hand.** Each number is an entry in `docs/BUGS.md` tagged
 `[flake]`, one per test: a new failure of a listed test is a line on its entry.
 
-**49 flaky tests.**
+**48 flaky tests.**
 
 - **62** The fallen tree up a bowl fails beside other tests (`aFallenTreeLiesOnTheSlopeUphill`)
 - **75** The minors at the holes test failed once beside the fight tests (`minorsGuardTheHolesAndLineTheForagersTrailThenGoInLast`)
@@ -38,7 +38,6 @@ from the list of bugs (`docs/OPEN-BUGS.md`) on purpose. **This file is written b
 - **315** A second raid, begun right after the first turned home with its scout killed, stood in its muster 25 s (deadline 20 s) (`aRaidWhoseScoutIsKilledOnTheMarchOutTurnsHomeAndNobodyIsLeftOut`)
 - **332** `aTadpoleBesideFourFrogsDoesNotBecomeAFifth` failed twice beside others, "5 bullfrogs (4 wanted: no froglet beside the 4)"
 - **338** Three breeding tests failed together beside other tests, and the catfish's hidden-barb test failed once alone (`tilapiaBreedInANestPitAndTheMotherKeepsHerFryInHerMouth`, `crocodilesCourtNestAndTheMotherCarriesHerYoungToTheWater`)
-- **363** The low-mound stream march test (`aRaidFromALowDeadMoundStreamsAlongItsTrail`) fails now and then beside other tests, each time on a different check
 - **364** The otters' nose-touch test failed once beside others (`playingOttersTouchNosesAndRestSideBySideWithoutOverlapping`)
 - **367** `crocodilesSpawnApartAndBaskTogether` failed beside others
 - **420** `antsGoUnderAnOverhangAndOutTheOtherSide` failed beside others

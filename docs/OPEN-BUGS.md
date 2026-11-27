@@ -15,7 +15,7 @@ for the number there).
 | Waiting for your call | 19 |
 | Behind the scenes (code review) | 185 |
 | Tool faults | 5 |
-| *Test flakes, in `docs/TEST-FLAKES.md`* | *49* |
+| *Test flakes, in `docs/TEST-FLAKES.md`* | *48* |
 
 ## A: it breaks play (1)
 
@@ -34,10 +34,10 @@ A player will likely see it, and the game goes on.
 - **253** The bullfrog's feet jump at the start of its hops, its hind feet sink into the ground when it sits, and its walk flickers in between hops.
 - **256** Young crocodiles draw their tails and heads deep inside blocks at steps and banks.
 - **313** A raid's leader can stand still 30 seconds on a ridge before the raid goes on (found by a test).
-- **361** Matabele majors that chase termites into their tunnels during an attack cannot find their way back to the column: they stand 30 seconds, then walk home alone.
-- **362** Raiders are sometimes sent to stand on top of a termite mud-crust plate, which they cannot reach: they stand 30 seconds before going on.
+- **361** Matabele majors that chase termites deep into their tunnels during an attack can still be left with no way back to the column: they stand 30 seconds, then walk home alone (a major walled in by the termites now bites its way out). *(half fixed)* *(half fixed)*
 - **378** A buffalo calf's feet slide when it runs with the herd.
 - **411** A raid's leader can end up in a pond with no way out and stand there 30 seconds (found by a test that fails alone 4 runs in 9).
+- **416** Ants and termites cannot step onto a low flat piece (a lying mud-crust plate, a carpet, a bottom slab) that hangs a block over the ground; raiders told to stand on one stand 30 seconds.
 - **427** The bullfrog's feet and hands whip the long way round when it climbs out of the water or starts to swim.
 - **R3-38** A Matabele that lost a leg has all six again after it goes into the nest out of sight and comes out. *(half fixed)*
 - **R4-18** A busy river costs frames: about 6.5 ms a frame for 103 river animals in view (it was 13.3). *(half fixed)*
