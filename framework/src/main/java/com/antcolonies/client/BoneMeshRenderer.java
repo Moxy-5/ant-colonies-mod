@@ -27,14 +27,14 @@ public class BoneMeshRenderer<T extends Entity & GeoAnimatable> extends GeoEntit
         super(context, model);
     }
 
-    /** A bone's boxes from its ready-made faces ({@link BoneMesh}), the buried ones left out. */
+    /** A bone's boxes from its ready-made faces ({@link BoneMesh}), the buried ones and those turned away from the eye left out. */
     @Override
     public void renderCubesOfBone(PoseStack poseStack, GeoBone bone, VertexConsumer buffer, int packedLight,
             int packedOverlay, int colour) {
         if (BoneMesh.PLAIN) {
             super.renderCubesOfBone(poseStack, bone, buffer, packedLight, packedOverlay, colour);
         } else if (!bone.isHidden()) {
-            BoneMesh.draw(poseStack.last(), bone, buffer, packedLight, packedOverlay, colour);
+            BoneMesh.draw(poseStack.last(), bone, buffer, packedLight, packedOverlay, colour, BoneMesh.eyeAtTheMiddle());
         }
     }
 }

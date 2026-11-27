@@ -12,9 +12,10 @@ writes run-film/screenshots/frames.txt, and a scene's cost is its middle frame t
 The animals' scenes (code review R4-18, 2026-11-26): f_river is a busy river all in view at once (about half the
 spawn caps of the small kinds and all of the big ones, about 14,400 boxes), g_savanna a buffalo herd and a pride. The
 fish stand in pools; every animal has NoAI. To time GeckoLib's own box drawing against the ready-made faces
-(client/BoneMesh), film them once more with -PplainBoxes:
+(client/BoneMesh), film them once more with -PplainBoxes; with -PallFaces the ready-made faces are all written,
+those turned away from the camera too:
 
-  ./gradlew runFilm -PfilmScene=perf/a_empty,perf/f_river,perf/g_savanna [-PplainBoxes]
+  ./gradlew runFilm -PfilmScene=perf/a_empty,perf/f_river,perf/g_savanna [-PplainBoxes | -PallFaces]
 
 The scenes are made by this script, not by hand: change the crowds here and run it again.
 """

@@ -11,7 +11,7 @@ review stay in `docs/BUGS.md`.
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
-| A: a player can meet it | 82 | 2 | 1 | 3 | 75 | 1 |
+| A: a player can meet it | 82 | 1 | 1 | 4 | 75 | 1 |
 | B: it will cost us when building on this | 195 | 61 | 17 | 15 | 100 | 2 |
 | C: a tidy-up | 145 | 135 | 0 | 2 | 7 | 1 |
 
@@ -95,6 +95,7 @@ is left; no word means nobody has started it. The findings that wait for your ca
 **Round 4, how bodies are drawn** (`docs/reviews/full/round-04-bodies-drawn.md`)
 
 - **R4-18** every animal is drawn the slow way the insects were moved off, with more boxes and from further away
+  - *Half fixed:* measured, then two of the insects' savings given to every animal. Measured (new drawing-cost scenes `f_river`, 103 river animals of about 14,400 boxes all in view, and `g_savanna`, 12 buffalo and a pride of 6; ...
 
 **Round 7, the giant trees** (`docs/reviews/full/round-07-trees.md`)
 

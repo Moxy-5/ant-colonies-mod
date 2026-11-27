@@ -241,6 +241,10 @@ neoForge {
             if (project.hasProperty('plainBoxes')) {
                 systemProperty 'antcolonies.plainBoxes', 'true'
             }
+            // -PallFaces: the ready-made faces all written, those turned away from the camera too (client/BoneMesh), to compare
+            if (project.hasProperty('allFaces')) {
+                systemProperty 'antcolonies.allFaces', 'true'
+            }
             // -PposeReuse=half (or never): far insects' kept poses (client/PoseMemory) every other frame at any distance,
             // to measure them (films work every pose out otherwise)
             if (project.hasProperty('poseReuse')) {
