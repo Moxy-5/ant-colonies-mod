@@ -106,8 +106,14 @@ public class AntRenderer<T extends AbstractAntEntity> extends BoneMeshRenderer<T
         addRenderLayer(new ClampedHeadLayer<>(this, context));
     }
 
+    /** Insects are drawn at the camera's own time in every frozen take (their films were approved so). */
     @Override
-    public void render(T ant, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource buffers,
+    protected float filmPartial(float gamePartial) {
+        return FilmDirector.insectPartial(gamePartial);
+    }
+
+    @Override
+    protected void draw(T ant, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource buffers,
             int packedLight) {
         if (far != null && drawnFar(ant)) {
             far.render(ant, entityYaw, partialTick, poseStack, buffers, packedLight);
@@ -123,19 +129,10 @@ public class AntRenderer<T extends AbstractAntEntity> extends BoneMeshRenderer<T
         climbIntoWall = (float) climb.intoWallFor(ant.getBbWidth(), drawWidth);
         ant.setClimbPose(climbLift * drawHeight, climbIntoWall * drawWidth); // for drawing it over an edge
         showLegs(ant, plan);
+        super.draw(ant, entityYaw, partialTick, poseStack, buffers, packedLight);
         if (FilmDirector.active()) {
-            // The in-game camera: every picture at the in-between time it asks for (a frozen game's own one jitters),
-            // the insect's place included (the game put it where its own in-between time says).
-            float partial = FilmDirector.drawPartial();
-            Vec3 shift = ant.getPosition(partial).subtract(ant.getPosition(partialTick));
-            poseStack.pushPose();
-            poseStack.translate(shift.x, shift.y, shift.z);
-            super.render(ant, entityYaw, partial, poseStack, buffers, packedLight);
-            poseStack.popPose();
-            FilmDirector.noteRendered(ant, getGeoModel());
-            return;
+            FilmDirector.noteRendered(ant, getGeoModel(), partialTick);
         }
-        super.render(ant, entityYaw, partialTick, poseStack, buffers, packedLight);
     }
 
     /**

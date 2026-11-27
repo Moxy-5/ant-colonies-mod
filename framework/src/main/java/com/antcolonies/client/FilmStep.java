@@ -281,8 +281,11 @@ final class FilmStep {
 
     @SubscribeEvent
     public static void onMessage(ClientChatReceivedEvent.System event) {
+        if (!FilmDirector.active()) {
+            return;                                     // normal play: nothing read (review R12-54)
+        }
         String text = event.getMessage().getString();
-        if (FilmDirector.active() && text.startsWith(MARK)) {
+        if (text.startsWith(MARK)) {
             String[] parts = text.substring(MARK.length()).trim().split(" ");
             markStepSeen = Integer.parseInt(parts[0]);
             markTickSeen = Integer.parseInt(parts[1]);

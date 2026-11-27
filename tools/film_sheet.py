@@ -6,7 +6,9 @@ from PIL import Image, ImageDraw
 folder, prefix, out = sys.argv[1:4]
 cols = int(sys.argv[4]) if len(sys.argv) > 4 else 6
 crop = tuple(map(float, sys.argv[5].split(','))) if len(sys.argv) > 5 else (0, 0, 1, 1)
-names = sorted(n for n in os.listdir(folder) if n.startswith(prefix) and n.endswith('.png'))
+# a burst's own pictures only: its name, then digits (a burst walk_ does not take walk_fast_'s; review R12-52)
+names = sorted(n for n in os.listdir(folder) if n.startswith(prefix) and n.endswith('.png')
+               and n[len(prefix):-4].isdigit())
 if len(sys.argv) > 7:
     names = names[int(sys.argv[6]):int(sys.argv[7]) + 1:int(sys.argv[8]) if len(sys.argv) > 8 else 1]
 ims = []

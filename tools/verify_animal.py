@@ -290,7 +290,7 @@ def check_films(animal, films, log, notes=None):
         os.makedirs(sheets, exist_ok=True)
         made = 0
         for b in bursts_of(f):
-            if any(n.startswith(b + '_') for n in pics):
+            if any(n.startswith(b + '_') and n[len(b) + 1:-4].isdigit() for n in pics):
                 code, _ = run([PY, 'tools/film_sheet.py', folder, b + '_', os.path.join(sheets, b + '.png'), '6'], log)
                 made += code == 0
         checks = os.path.join(folder, 'checks.txt')

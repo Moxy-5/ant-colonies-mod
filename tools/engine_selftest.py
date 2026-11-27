@@ -144,6 +144,58 @@ def lab_loop_that_jumps_in_place_or_size_is_flagged():
         need(found, f'a loop jumping in {channel} is not flagged')
 
 
+@test
+def standing_foot_that_slides_is_a_fault_unless_the_clip_works_with_it():
+    """R12-24: a foot sliding along the ground in a standing clip was only a note. The grooming clip's front leg is
+    named in the plan as a working foot (a note); with the name taken away it is a fault."""
+    import copy
+    import anim_lab as lab
+    model = lab.Model('matabele_minor')
+    clip = lab.load_clips('matabele_minor')['groom_antenna_l']
+    slides = lambda: [level for level, m in lab.check(model, clip, quiet=True) if 'moves along the ground while standing' in m]
+    need(slides() and 'BAD' not in slides(), f'the grooming leg is not a note: {slides()}')
+    kept = model.plan.data
+    try:
+        model.plan.data = copy.deepcopy(kept)
+        model.plan.data['checks']['working_feet'] = {}
+        need('BAD' in slides(), f'a sliding standing foot nobody named is not a fault: {slides()}')
+    finally:
+        model.plan.data = kept
+
+
+@test
+def lab_sizes_and_speeds_are_the_games():
+    """R12-23: the lab's scale and walking speed tables against the game's own numbers (the renderers' scales, each
+    insect's movement speed attribute), and its real sizes read from the game's size table."""
+    import re
+    import anim_lab as lab
+    java = os.path.join(lab.PROJECT, 'savanna', 'src', 'main', 'java', 'com', 'antcolonies', 'savanna')
+    read = lambda *parts: open(os.path.join(java, *parts), encoding='utf-8').read()
+    client = read('client', 'SavannaClientEvents.java')
+    termite = float(re.search(r'RENDER_SCALE = ([0-9.]+)F', read('client', 'TermiteQueenModel.java')).group(1))
+    speeds = lambda name: [float(x) for x in re.findall(r'MOVEMENT_SPEED, ([0-9.]+)', read('entity', name + '.java'))]
+    soldier = speeds('TermiteSoldierEntity')
+    game = {'matabele_major': speeds('MatabeleEntity')[0], 'matabele_minor': speeds('MatabeleEntity')[1],
+            'matabele_queen': speeds('MatabeleQueenEntity')[0], 'termite_worker': speeds('TermiteWorkerEntity')[0],
+            'termite_king': speeds('TermiteKingEntity')[0], 'termite_queen': speeds('TermiteQueenEntity')[0],
+            'termite_minor_soldier': max(soldier), 'termite_major_soldier': min(soldier)}
+    need(set(lab.RENDER_SCALE) == set(game) == set(lab.WALK_SPEED), 'the lab tables and the insects differ: '
+         f'{sorted(set(lab.RENDER_SCALE) ^ set(game))} {sorted(set(lab.WALK_SPEED) ^ set(game))}')
+    for name, attribute in game.items():
+        if name.startswith('matabele'):
+            scale = float(re.search(r'%s_SCALE = ([0-9.]+)F' % name.upper(), client).group(1))
+        else:
+            scale = termite
+        need(abs(lab.RENDER_SCALE[name] - scale) < 1e-6, f'{name}: the lab draws it at {lab.RENDER_SCALE[name]}, the game at {scale}')
+        walk = attribute * lab.SPEED_PER_ATTRIBUTE
+        need(abs(lab.WALK_SPEED[name] - walk) < 0.03 * walk,
+             f'{name}: the lab walks it at {lab.WALK_SPEED[name]} blocks a second, the game at {walk:.2f}')
+        need(lab.size_factor(name) != 1.0, f'{name}: no real size read from the game (InsectSizes.java)')
+    # the size table's own example: a termite major soldier is 0.40 blocks long
+    soldier_model = lab.Model('termite_major_soldier')
+    need(abs(soldier_model.length * soldier_model.blocks_per_unit - 0.40) < 0.02, 'the major soldier is not 0.40 blocks long in the lab')
+
+
 # --- the course (tools/body_course.py) ----------------------------------------------------------------------------
 def recording(folder, places):
     """A made-up course recording: one bone, the animal at these places, a moment a tick."""
@@ -185,6 +237,48 @@ def course_scene_with_no_recording_is_the_worst_finding():
     need(bc.not_run(summary), f'no recording is not a finding: {summary}')
     bc, summary = course_scene([(-5.5, -60, 0.5), (-5.4, -60, 0.5)])
     need(bc.not_run(summary), f'two moments recorded is not a finding: {summary}')
+
+
+@test
+def step_lip_inside_a_box_is_seen_by_the_course_and_the_checker():
+    """R12-5: a box riding over a step's lip takes the lip into its underside with every corner outside the step.
+    The review's case: a belly 20 x 6 x 6 px pitched up 20 degrees across a step 8 px high."""
+    import gzip, json, math, tempfile
+    import body_course as bc
+    import clip_check as cc
+    # the course: a half block at x 1 on a flat floor, a box 2 long tipped 20 degrees over its lip (blocks)
+    c, s_ = math.cos(math.radians(20)), math.sin(math.radians(20))
+    turn = [c, -s_, 0, 0.2, s_, c, 0, 1.15, 0, 0, 1, 0.2]          # about z; its low corner in front of the step
+    head = {'bones': [{'name': 'root', 'parent': None, 'cubes': [[0, 0, 0, 2, 0, 0, 0, .4, 0, 2, .4, 0,
+                                                                 0, 0, .6, 2, 0, .6, 0, .4, .6, 2, .4, .6]]}],
+            'blocks': [[x, 0, 0, [0, 0, 0, 1, 1, 1]] for x in range(-1, 4)], 'water': []}
+    more = {'more': 1, 'blocks': [[1, 1, 0, [0, 0, 0, 1, 0.5, 1]]], 'water': []}
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, 'body.jsonl.gz')
+        with gzip.open(path, 'wt', encoding='utf-8') as f:
+            f.write(json.dumps(head) + '\n' + json.dumps(more) + '\n')
+            f.write(json.dumps({'t': 0, 'pt': 0, 'pos': [0, 0, 0], 'b': [turn], 'clips': {}, 'ground': True,
+                                'water': False}) + '\n')
+        rec = bc.Recording(path)
+    need(len(rec.frames) == 1 and (1, 1, 0) in rec.blocks, 'the blocks of a "more" line are not read (R12-48)')
+    box = rec.corners(rec.frames[0], 'root')[0]
+    need(all(rec.depth_in(p) == 0.0 for p in box), 'the made-up box has a corner in a block: the case is wrong')
+    deep, at = rec.lip_in(box)
+    need(deep > 0.04, f'the lip of the step inside the box is not seen by the course ({deep})')
+    need(((1.0, 1.0, 0.0), (1.0, 1.0, 1.0)) not in rec.lips((0, 0, 0)), 'the seam of a flat floor counts as a jutting edge')
+    need(((0.0, 1.0, 0.0), (1.0, 1.0, 0.0)) in rec.lips((0, 0, 0)), 'the open side of the floor row is no edge')
+    # the offline checker: the same in model px, the step's face at z 0, 8 high (forward is -z)
+    class Step:
+        def lip(self):
+            return 8.0, 0.0
+    lo = [(x, y, z) for z in (0.0, -20.0) for y in (0.0, 6.0) for x in (-3.0, 3.0)]
+    posed = [(x, 6.0 + y * c - (z + 8) * s_, (z + 8) * c + y * s_) for x, y, z in lo]
+    corners = [posed[i] for i in (0, 1, 2, 3, 4, 5, 6, 7)]
+    # (box_depth reads corner 0 and its neighbours 1, 2, 4 as the box's three edges)
+    corners = [posed[0], posed[1], posed[2], posed[3], posed[4], posed[5], posed[6], posed[7]]
+    need(cc.lip_depth(Step(), corners) > 1.0, f'the lip inside the belly is not seen offline ({cc.lip_depth(Step(), corners)})')
+    flat = type('Flat', (), {'lip': lambda self: None})()
+    need(cc.lip_depth(flat, corners) == 0.0, 'flat ground has a lip')
 
 
 @test

@@ -70,9 +70,9 @@ public class OtterRenderer extends BoneMeshRenderer<OtterEntity> {
      * here is what shows; it is not drawn on its own while held.
      */
     @Override
-    public void render(OtterEntity otter, float yaw, float partialTick, PoseStack poseStack, MultiBufferSource buffers, int packedLight) {
+    protected void draw(OtterEntity otter, float yaw, float partialTick, PoseStack poseStack, MultiBufferSource buffers, int packedLight) {
         headSeen = false;
-        super.render(otter, yaw, partialTick, poseStack, buffers, packedLight);
+        super.draw(otter, yaw, partialTick, poseStack, buffers, packedLight);
         Entity fish = otter.getFirstPassenger();
         HeldCatch.Fish f = HeldCatch.fish(fish);
         if (!headSeen || f == null) {
@@ -107,9 +107,7 @@ public class OtterRenderer extends BoneMeshRenderer<OtterEntity> {
         // (on the ground on its other flank, so its sag curls its ends up off the ground)
         poseStack.mulPose(Axis.ZP.rotationDegrees(eating ? -90.0F : 90.0F));
         poseStack.translate(0.0, -f.middle() * fishPx, -grip.along() * fishPx);      // the gripped point at the teeth
-        @SuppressWarnings("unchecked")
-        EntityRenderer<Entity> drawer = (EntityRenderer<Entity>) entityRenderDispatcher.getRenderer(fish);
-        drawer.render(fish, 0.0F, partialTick, poseStack, buffers, packedLight);
+        drawHeld(fish, partialTick, poseStack, buffers, packedLight);
         poseStack.popPose();
     }
 

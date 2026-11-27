@@ -84,6 +84,17 @@ public final class ReportShot {
                     for (int i = 0; i < 30 && !Files.exists(waiting); i++) {
                         Thread.sleep(100);
                     }
+                    // Minecraft writes the picture on another thread straight into that file: there is not yet whole.
+                    // Wait until its size has stood still for two looks (review R12-55)
+                    long size = -1;
+                    for (int i = 0; i < 30 && Files.exists(waiting); i++) {
+                        long now = Files.size(waiting);
+                        if (now > 0 && now == size) {
+                            break;
+                        }
+                        size = now;
+                        Thread.sleep(100);
+                    }
                     if (Files.exists(waiting)) {
                         Path shots = reportFolder.resolve("screenshots");
                         Files.createDirectories(shots);

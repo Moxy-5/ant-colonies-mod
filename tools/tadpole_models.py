@@ -244,6 +244,9 @@ def clips():
         snap = smooth(f / 0.15) if f < 0.15 else 1.0 - smooth(min(1.0, (f - 0.15) / 0.3))
         return _legs(_wave({}, t, 2 * math.pi / 0.15, 1.0 * (1.0 - snap) + 0.2, curl=snap * 0.9))
     make('scatter', SCATTER_LEN, scatter, loop=False)
+    # struggle: thrashing in a hunter's jaws: the scatter round and round, its own clip (code review R12-32: the game
+    # looped "scatter", whose file says it plays once)
+    make('struggle', SCATTER_LEN, scatter)
 
     # flop: out of the water, on its side, curling and springing
     # (lying on its side its sideways swing goes up and down, so the curl only lifts the tail off the ground: FLOP_CURL's
@@ -271,7 +274,7 @@ def WORKSHOP_CLIPS():
 
 
 WORKSHOP_CLIP_INFO = {
-    'scale': 0.15 / (LENGTH / 16), 'water': ['idle', 'swim', 'graze', 'scatter', 'death'], 'surface': 0.5,
+    'scale': 0.15 / (LENGTH / 16), 'water': ['idle', 'swim', 'graze', 'scatter', 'struggle', 'death'], 'surface': 0.5,
     'notes': {
         'idle': 'Hanging in the water, the tail tip shivering.',
         'swim': 'The fast wave down the tail; the game plays it faster the faster it swims.',

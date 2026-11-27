@@ -89,24 +89,63 @@ def model_file(name, *parts):
 
 OUT = os.path.join(PROJECT, 'references', 'anim_lab')
 
-# The renderer's scale for each model (client/ClientEvents.java and TermiteQueenModel.RENDER_SCALE).
-RENDER_SCALE = {'worker_ant': 0.65, 'queen_ant': 1.3, 'termite_king': 0.75, 'termite_queen': 0.75,
+# The renderer's scale for each model (SavannaClientEvents' scales and TermiteQueenModel.RENDER_SCALE; the makers
+# build with these, so they stay a table here: tools/engine_selftest.py checks each against the game's own, code
+# review R12-23). An insect's real size on top of it comes from the game's own table (size_factor below).
+RENDER_SCALE = {'termite_king': 0.75, 'termite_queen': 0.75,
                 'termite_worker': 0.75, 'termite_minor_soldier': 0.75, 'termite_major_soldier': 0.75,
                 # the Matabele (2026-10-23, in the game since the same day, SavannaClientEvents): the major twice a termite major soldier's length,
                 # the minor 45% of it, the model viewer's starting sizes (the sizes are still the user's to pick)
                 'matabele_major': 0.633, 'matabele_minor': 0.455,
                 # the queen (2026-10-24): her body 1.2 times a major's, the user's pick ("because it will be cool")
                 'matabele_queen': 0.76}
-# Normal walking speed in blocks a second (my estimate from the movement speed attribute: a ground mob's top speed is
-# about attribute x 0.25 / 0.454 blocks a tick at the normal speed modifier; the worker's 0.25 gives about 2.75 b/s,
-# about 6 body lengths a second, which is what real Pogonomyrmex walk). The in-game camera can measure the real one.
-WALK_SPEED = {'worker_ant': 2.75, 'queen_ant': 0.9, 'termite_worker': 2.4, 'termite_king': 1.3, 'termite_queen': 0.9,
+# Normal walking speed in blocks a second: the game's movement speed attribute times SPEED_PER_ATTRIBUTE (a ground
+# mob's top speed is about attribute x 0.25 / 0.454 blocks a tick at the normal speed modifier). The in-game camera
+# can measure the real one; tools/engine_selftest.py checks each against the game's attribute (R12-23).
+SPEED_PER_ATTRIBUTE = 0.25 / 0.454 * 20
+WALK_SPEED = {'termite_worker': 2.4, 'termite_king': 1.3, 'termite_queen': 0.9,
               'termite_minor_soldier': 2.6, 'termite_major_soldier': 1.9,
               # Matabele raid columns: majors and minors march together at one speed, about 2 major body lengths a
               # second (my estimate from Frank's raid films, to confirm; the game's speed is set when the ant goes in)
               'matabele_major': 2.5, 'matabele_minor': 2.5,
               # the queen walks with her colony when it moves house, slower than a raid (my pick, to confirm)
               'matabele_queen': 1.5}
+
+_SIZES = {}
+
+
+def size_factor(name):
+    """How much smaller than its model's own size the game draws this insect (real sizes, 2026-11-05): its real length
+    on the scale over its model's drawn length, read from the game's own table (species/InsectSizes.java of the mod
+    that holds the model; code review R12-23: the lab left it out, so every "blocks" it printed was 2 to 3 times too
+    big). 1 for a model with no row there."""
+    if name not in _SIZES:
+        _SIZES[name] = 1.0
+        try:
+            folder = os.path.join(PROJECT, mod_paths.mod_folder(mod_paths.model_mod(name)), 'src', 'main', 'java')
+        except Exception:                                # a model of no mod (a draft): its own size
+            return 1.0
+        for at, _, files in os.walk(folder):
+            if 'InsectSizes.java' in files:
+                text = open(os.path.join(at, 'InsectSizes.java'), encoding='utf-8').read()
+                per_mm = re.search(r'BLOCKS_PER_MM\s*=\s*([\d.]+)F?\s*/\s*([\d.]+)F?', text)
+                const = re.search(r'BY_MOB\.put\("%s",\s*(\w+)\)' % re.escape(name), text)
+                body = const and re.search(r'(?<!\w)%s\s*=\s*new Body\(([\d.]+)F?,\s*([\d.]+)F?\)' % const.group(1), text)
+                if per_mm and body:
+                    _SIZES[name] = (float(body.group(1)) * float(per_mm.group(1)) / float(per_mm.group(2))
+                                    / float(body.group(2)))
+    return _SIZES[name]
+
+
+def most_rate():
+    """The fastest the game plays a walk matched to the ground (AntAnimationController.MOST_RATE; 20 when unreadable)."""
+    try:
+        text = open(os.path.join(PROJECT, 'framework', 'src', 'main', 'java', 'com', 'antcolonies', 'entity', 'body',
+                                 'AntAnimationController.java'), encoding='utf-8').read()
+        return float(re.search(r'MOST_RATE\s*=\s*([\d.]+)', text).group(1))
+    except (OSError, AttributeError):
+        return 20.0
+
 
 LEG_COLOURS = {'l1': (220, 40, 40), 'l2': (240, 150, 20), 'l3': (200, 190, 30),
                'r1': (40, 90, 230), 'r2': (30, 170, 200), 'r3': (150, 60, 210)}
@@ -282,7 +321,7 @@ class Model:
         self.feet = self._find_feet()
         zs = [p[2] for _, cs, _ in self.cubes for p in cs]
         self.length = max(zs) - min(zs)              # body length in model units
-        self.blocks_per_unit = self.scale / 16.0
+        self.blocks_per_unit = self.scale * size_factor(name) / 16.0   # as the game draws it (its real size)
 
     def chain(self, name):
         out = []
@@ -1142,6 +1181,22 @@ def is_leg(model, bone):
     return model.leg_of(bone) is not None
 
 
+# A standing foot may slide this far in all (model units) before it is a fault (R12-24; the review's pick).
+STAND_SLIDE = 0.5
+
+
+def working_feet(model, clip_name):
+    """The feet this clip works with on purpose (the body plan's "checks.working_feet": clip pattern -> leg keys, or
+    "*" for all): they are not standing feet, whatever their height says."""
+    import fnmatch
+    table = (model.plan.data.get('checks') or {}).get('working_feet', {}) if model.plan else {}
+    out = set()
+    for pattern, feet in table.items():
+        if fnmatch.fnmatch(clip_name, pattern):
+            out |= set(model.plan.legs) if feet == '*' else set(feet)
+    return out
+
+
 def check(model, clip, speed_bps=None, quiet=False):
     """Checks one clip. Returns a list of (level, message); level 'BAD' or 'NOTE'."""
     out = []
@@ -1217,6 +1272,9 @@ def check(model, clip, speed_bps=None, quiet=False):
         out.append(('NOTE', f'at {speed_bps:g} blocks a second ({speed_bps / body_blocks:.1f} body lengths a second) the walk '
                             f'must play {cycles:.1f} cycles a second = playback speed {cycles * clip.length:.2f} '
                             f'(each leg steps {cycles:.1f} times a second)'))
+        if cycles * clip.length > most_rate():
+            out.append(('NOTE', f'the game plays a walk at most {most_rate():g} times as fast as made: at this speed '
+                                f'the legs fall behind the ground (the feet slide)'))
         if clip.stride is None:
             out.append(('NOTE', 'no stride note in the clip: the game can only guess how fast to play it'))
         elif abs(clip.stride - gait.stride()) > 0.03 * gait.stride():
@@ -1246,12 +1304,16 @@ def check(model, clip, speed_bps=None, quiet=False):
             moves = [math.dist(gait.tips[i][k][::2], gait.tips[i + 1][k][::2]) for i in range(n)
                      if gait.down[k][i] and gait.down[k][i + 1]]
             if moves and max(moves) / dt > 1.5:
-                # (review R12-24, tried 2026-11-26: as a fault over half a unit this flagged the approved grooming,
-                # clamp, head bang and falling clips, whose working or falling feet read as "down"; it stays a note,
-                # now with how far the foot went in all, until a clip can name the feet it works with.)
+                # A fault from STAND_SLIDE units in all (code review R12-24), but for the feet the clip works with: a
+                # grooming front leg, a clamped soldier's scrabbling feet, a falling insect's legs read as "down" too,
+                # so the body plan names them ("checks": {"working_feet": {clip pattern: [feet] or "*"}}); the first
+                # try without that list flagged the approved grooming, clamp, head bang and falling clips.
                 slid = sum(m for m in moves if m / dt > 1.5)
-                out.append(('NOTE', f'foot {k} moves along the ground while standing '
-                            f'({max(moves) / dt:.1f} units a second, {slid:.2f} units in all)'))
+                working = k in working_feet(model, clip.name)
+                out.append(('NOTE' if working or slid <= STAND_SLIDE else 'BAD',
+                            f'foot {k} moves along the ground while standing '
+                            f'({max(moves) / dt:.1f} units a second, {slid:.2f} units in all'
+                            + ('; a foot this clip works with)' if working else ')')))
     # Sinking into the floor, clipping, loop seams, snaps: sampled through the clip.
     floor = gait.ground if model.feet else 0.0
     sunk = clipped = None

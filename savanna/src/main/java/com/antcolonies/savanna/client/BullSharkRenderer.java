@@ -72,9 +72,9 @@ public class BullSharkRenderer extends BoneMeshRenderer<BullSharkEntity> {
     }
 
     @Override
-    public void render(BullSharkEntity shark, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight) {
+    protected void draw(BullSharkEntity shark, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight) {
         preySeen = false;
-        super.render(shark, entityYaw, partialTick, poseStack, bufferSource, packedLight);
+        super.draw(shark, entityYaw, partialTick, poseStack, bufferSource, packedLight);
         CatfishEntity prey = preySeen ? shark.heldDrawn() : null;
         if (prey == null) {
             return;
@@ -86,7 +86,7 @@ public class BullSharkRenderer extends BoneMeshRenderer<BullSharkEntity> {
         poseStack.scale(undo, undo, undo);
         poseStack.mulPose(Axis.YP.rotationDegrees(90.0F));                  // across the jaws
         poseStack.translate(0, -CATFISH_MID * prey.getScale(), 0);        // its middle between the teeth
-        entityRenderDispatcher.getRenderer(prey).render(prey, 0, partialTick, poseStack, bufferSource, packedLight);
+        drawHeld(prey, partialTick, poseStack, bufferSource, packedLight);
         poseStack.popPose();
     }
 

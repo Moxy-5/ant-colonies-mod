@@ -53,10 +53,12 @@ class Animal:
         self.pivot = [tuple(b.get('pivot', (0, 0, 0))) for b in bones]
         self.cubes = [[tuple(c[i:i + 3] for i in range(0, 24, 3)) for c in b['cubes']] for b in bones]
         self.tops = {}                     # each column's block tops (the ground and anything on it)
-        for entry in self.header['blocks']:
-            x, y, z = entry[:3]
-            for box in entry[3:]:
-                self.tops.setdefault((x, z), []).append(y + box[4])
+        # (the first line's blocks, and those of each "more" line written as the animal went on: R12-48)
+        for line in [self.header] + [line for line in lines[1:] if 'blocks' in line]:
+            for entry in line['blocks']:
+                x, y, z = entry[:3]
+                for box in entry[3:]:
+                    self.tops.setdefault((x, z), []).append(y + box[4])
         self.by_time = {}
         for f in self.frames:
             self.by_time.setdefault(f['ft'], []).append(f)
@@ -234,6 +236,7 @@ def report(folder, prey_name):
         # feet: planted feet sliding
         slides = []
         prev = {}
+        unknown = 0
         for f in holds:
             for foot in feet_of(a):
                 boxes = a.boxes(f, {foot})
@@ -241,16 +244,24 @@ def report(folder, prey_name):
                     continue
                 low = min((p for box in boxes for p in box), key=lambda p: p[1])
                 ground = a.ground_under(low)
+                unknown += ground is None
                 planted = ground is not None and low[1] - ground < 0.1
                 key = foot
-                if planted and key in prev and prev[key][0] == f['ft'] - 1:
-                    slides.append(math.hypot(low[0] - prev[key][1][0], low[2] - prev[key][1][2]))
-                prev[key] = (f['ft'], low) if planted else (None, None)
+                # a tick's worth: the drawn places are in-between ones, so by the real time between the two moments
+                # (review R12-17: neighbouring ticks' moments lie anywhere from near 0 to near 2 ticks apart)
+                now = f['ft'] + f.get('pt', 0.0)
+                if planted and key in prev and prev[key][0] is not None and 0.25 <= now - prev[key][0] <= 2.0:
+                    slides.append(math.hypot(low[0] - prev[key][1][0], low[2] - prev[key][1][2]) / (now - prev[key][0]))
+                prev[key] = (now, low) if planted else (None, None)
         if slides:
             say(f'feet while holding: {len(slides)} planted-foot ticks, slide middle {statistics.median(slides):.3f}, '
                 f'9 in 10 under {sorted(slides)[int(len(slides) * 0.9)]:.3f}, most {max(slides):.3f} blocks a tick')
-        moved = [math.hypot(f2['pos'][0] - f1['pos'][0], f2['pos'][2] - f1['pos'][2])
-                 for f1, f2 in zip(holds, holds[1:]) if f2['ft'] - f1['ft'] == 1]
+        elif unknown:
+            say(f'feet while holding: NO GROUND KNOWN under its feet at {unknown} foot moments (no blocks recorded '
+                'there): sliding not judged')
+        apart = lambda f1, f2: f2['ft'] + f2.get('pt', 0.0) - f1['ft'] - f1.get('pt', 0.0)
+        moved = [math.hypot(f2['pos'][0] - f1['pos'][0], f2['pos'][2] - f1['pos'][2]) / apart(f1, f2)
+                 for f1, f2 in zip(holds, holds[1:]) if 0.25 <= apart(f1, f2) <= 2.0]
         if moved:
             say(f'its box while holding moved middle {statistics.median(moved):.3f}, most {max(moved):.3f} blocks a tick')
     return out

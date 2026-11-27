@@ -134,5 +134,6 @@
  "approved": {
   "why": "The major soldier's wall lift and push, set by eye in M7 (2026-10-15) so its feet touch the wall and its tail clears the floor.",
   "keys": []
- }
+ },
+  "checks": {"working_feet": {"paralysed*": "*", "clamp_hold": "*", "head_bang": "*"}}
 }

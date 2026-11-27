@@ -129,5 +129,6 @@
   "front_end": 4.95,
   "rear_end": 4.01,
   "tightest_curve": 2.42
- }
+ },
+  "checks": {"working_feet": {"paralysed*": "*"}}
 }

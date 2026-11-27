@@ -321,7 +321,7 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity, Rive
     private static final RawAnimation SIP_CLIP = RawAnimation.begin().thenPlay("sip");
     private static final RawAnimation NIBBLE_CLIP = RawAnimation.begin().thenLoop("nibble");
     private static final RawAnimation SCATTER = RawAnimation.begin().thenPlay("scatter");
-    private static final RawAnimation STRUGGLE = RawAnimation.begin().thenLoop("scatter");
+    private static final RawAnimation STRUGGLE = RawAnimation.begin().thenLoop("struggle");
     private static final RawAnimation FLOP = RawAnimation.begin().thenLoop("flop");
     private static final RawAnimation HELD = RawAnimation.begin().thenLoop("held");
     private static final RawAnimation HELD_DOWN = RawAnimation.begin().thenLoop("held_down");

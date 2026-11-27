@@ -128,5 +128,6 @@
   "front_end": 5.04,
   "rear_end": 5.04,
   "tightest_curve": 2.72
- }
+ },
+  "checks": {"working_feet": {"paralysed*": "*", "clamp_hold": "*"}}
 }

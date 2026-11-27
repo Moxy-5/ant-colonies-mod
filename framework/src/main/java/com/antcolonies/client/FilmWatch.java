@@ -62,6 +62,13 @@ final class FilmWatch {
     /** How often the files are looked at (client ticks), and how many looks in a row they must stay still first. */
     private static final int POLL = 10;
     private static final int STILL = 2;
+    /**
+     * A session with no shoot for this long closes itself (code review R12-46; the review's pick, 30 minutes): a
+     * forgotten one kept the game drawing, and the one-film-at-a-time lock taken, for hours.
+     */
+    private static final long IDLE_MILLIS = Long.getLong("antcolonies.film.watchIdleMinutes", 30L) * 60_000L;
+    /** When the last shoot ended (0 while one runs). */
+    private static long readySince;
 
     /** The files last copied (assets) or filmed (shot lists): their time and size. */
     private static Map<Path, String> assets;
@@ -156,6 +163,7 @@ final class FilmWatch {
             shooting = false;
             lastTook = String.format(Locale.ROOT, "%.1f", (System.currentTimeMillis() - shootStart) / 1000.0);
             state = "ready";
+            readySince = System.currentTimeMillis();
             answered.clear();
             answered.addAll(answering);
             answering.clear();
@@ -169,6 +177,14 @@ final class FilmWatch {
         if (Files.exists(control.resolve("stop"))) {
             LOG.info("Film watch: asked to stop");
             state = "stopped";
+            writeStatus(mc);
+            mc.stop();
+            return;
+        }
+        if (!shooting && readySince > 0 && System.currentTimeMillis() - readySince > IDLE_MILLIS) {
+            LOG.info("Film watch: no shoot for {} minutes, closing", IDLE_MILLIS / 60_000L);
+            state = "stopped";
+            lastError = "closed by itself: no shoot for " + IDLE_MILLIS / 60_000L + " minutes (start it again with tools/film.sh watch)";
             writeStatus(mc);
             mc.stop();
             return;

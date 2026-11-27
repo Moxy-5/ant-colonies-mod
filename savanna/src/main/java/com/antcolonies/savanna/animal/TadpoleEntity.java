@@ -340,7 +340,7 @@ public class TadpoleEntity extends AbstractSchoolingFish implements GeoEntity {
     private static final RawAnimation SWIM = RawAnimation.begin().thenLoop("swim");
     private static final RawAnimation GRAZE_CLIP = RawAnimation.begin().thenLoop("graze");
     private static final RawAnimation SCATTER = RawAnimation.begin().thenPlay("scatter");
-    private static final RawAnimation STRUGGLE = RawAnimation.begin().thenLoop("scatter");
+    private static final RawAnimation STRUGGLE = RawAnimation.begin().thenLoop("struggle");
     private static final RawAnimation FLOP = RawAnimation.begin().thenLoop("flop");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
     /** The swim clip's beat is made for this speed (blocks a tick); it plays faster or slower by it. */
