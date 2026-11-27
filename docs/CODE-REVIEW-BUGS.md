@@ -7,20 +7,20 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**307 findings: 200 left (11 of them wait for your call), 107 done.**
+**344 findings: 237 left (14 of them wait for your call), 107 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
-| A: a player can meet it | 67 | 0 | 1 | 0 | 65 | 1 |
-| B: it will cost us when building on this | 143 | 103 | 3 | 4 | 32 | 1 |
-| C: a tidy-up | 97 | 87 | 0 | 2 | 7 | 1 |
+| A: a player can meet it | 73 | 6 | 1 | 0 | 65 | 1 |
+| B: it will cost us when building on this | 159 | 119 | 3 | 4 | 32 | 1 |
+| C: a tidy-up | 112 | 102 | 0 | 2 | 7 | 1 |
 
 | Round | System | Found | Left | Done |
 |---|---|---|---|---|
 | 1 | the colony brain | 50 | 30 | 20 |
 | 2 | the legs | 43 | 18 | 25 |
 | 3 | the insect body | not read yet | | |
-| 4 | how bodies are drawn | not read yet | | |
+| 4 | how bodies are drawn | 37 | 37 | 0 |
 | 5 | the termites | not read yet | | |
 | 6 | the Matabele ants (not raids) | not read yet | | |
 | 7 | the giant trees | 36 | 27 | 9 |
@@ -30,11 +30,17 @@ review stay in `docs/BUGS.md`.
 | 11 | the new raid code | 22 | 6 | 16 |
 | 12 | the animation engine | 73 | 55 | 18 |
 
-## Waiting for your call (11)
+## Waiting for your call (14)
 
 These change how the game looks or plays, or a balance number, so nothing is built until you say. Each has
 what happens today and my pick. Answer whenever you like: tell Claude the number and what you want.
 
+- **R4-9** (grade C, how bodies are drawn) a mud coat on one of Minecraft's own animals is kept and sent but never drawn
+  - *Your call:* should Minecraft's own animals (pigs, cows, horses) show mud after walking through it? Today they carry the mud as numbers and shed bits of it, but look clean. My pick: leave them clean (a mask per vanilla animal is art work for little gain) and stop giving them a coat at all.
+- **R4-29** (grade B, how bodies are drawn) a crocodile's or monitor's drawn head over a bank is up to about a block from its head hit box
+  - *Your call:* should a crocodile's and monitor's hit boxes follow the body where it lies over a bank (head dipped to the water, chest up on a step)? Today the hit boxes stay level at the animal's own height, so a swing or arrow at a dipped head can pass through it. My pick: yes, but only after it is seen in play to matter; it is server work for every crocodile and monitor every tick.
+- **R4-32** (grade B, how bodies are drawn) a dying buffalo or lion on a step drops its tilt at once and dies with its legs hanging in the air
+  - *Your call:* should a buffalo or lion killed on a step fall along the slope it stood on? Today it straightens level in a fifth of a second and its death plays with one end hanging over the lower ground. My pick: yes, keep its tilt through the death.
 - **R7-12** (grade B, the giant trees) Lightning takes big trees faster than old age
   - *Your call:* Lightning near big trees. Today every bolt that lands within 24 blocks of a big tree is pulled onto it, so by my sum (not measured) one thunderstorm kills about 1 big tree in 8, and a Channeling trident thrown near big trees strikes the tree, not the mob. Change it so only the weather's own bolts are pulled, and a tree is struck at most once a storm? My pick: yes.
 - **R7-13** (grade B, the giant trees) Seedlings after rain fill the savanna in
@@ -63,14 +69,23 @@ what happens today and my pick. Answer whenever you like: tell Claude the number
 Grade A first. *Open* means looked at and left for a reason (the reason is given); *half fixed* says what
 is left; no word means nobody has started it. The findings that wait for your call are in the part above.
 
-### A: a player can meet it (1 left)
+### A: a player can meet it (7 left)
+
+**Round 4, how bodies are drawn** (`docs/reviews/full/round-04-bodies-drawn.md`)
+
+- **R4-1** a screen that guesses "missed" never takes the server's "gripped", so a lioness is drawn standing on the ground while the buffalo carries her off
+- **R4-12** a reed or a hippo grass mat that the server marks "pushed" but the client gives no spring is drawn by nobody: it vanishes
+- **R4-18** every animal is drawn the slow way the insects were moved off, with more boxes and from further away
+- **R4-23** a crocodile, a Nile monitor and an otter vanish at the screen's edge while most of their body is still in view
+- **R4-24** a player or animal held by a crocodile gets a shadow stood on edge (and spun round in the death roll)
+- **R4-25** on a slow or stalling server the crocodile's death roll jumps back, and a held player's view spins back with it
 
 **Round 7, the giant trees** (`docs/reviews/full/round-07-trees.md`)
 
 - **R7-33** A palm's crown can blink out at the screen's edge
   - *Open:* waits to be seen (2026-11-24). Read from how Minecraft hides parts of the world, never seen in the game; the fix is large (sharing a crown's faces out over its blocks) and is built only if the user sees fronds blink out.
 
-### B: it will cost us when building on this (102 left)
+### B: it will cost us when building on this (116 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -102,6 +117,23 @@ is left; no word means nobody has started it. The findings that wait for your ca
   - *Open:* left on purpose. Checked now: only the termite worker fits the tunnels (the tag `fits_termite_tunnels`), so only it takes a mouth's tube; the king, queen and nymph pass only the old chimney crown block, which no mound builds any ...
 - **R2-39** a mind pays for the same "no way" again a tick later, and a builder can ask 24 times in one tick
   - *Half fixed:* `Errand.walkOn` now treats a walk the legs gave up as "no way" (R2-2's fix): no second ask a tick later. Open: `BuildMoundGoal`'s many asks in one tick (round 5).
+
+**Round 4, how bodies are drawn** (`docs/reviews/full/round-04-bodies-drawn.md`)
+
+- **R4-2** every muddy animal near the camera is drawn two or three times over
+- **R4-3** every young worker is drawn twice at any distance
+- **R4-4** the clamped-head layer finds the leg by the drawn model's plan, not the full model's, and builds the plan's name for every bone
+- **R4-11** what the player sees of these parts has no automatic check outside the films
+- **R4-13** a fly cloud goes silent for good after the sound system reloads
+- **R4-14** the bullfrog's head tip relies on every clip it plays keying the head, and nothing checks it
+- **R4-19** each walking insect re-reads its walk clip's speed note as text every frame
+- **R4-20** every insect the client knows searches for edges and corners every tick, drawn or not
+- **R4-21** the crocodile and the monitor read the ground under every joint every frame
+- **R4-26** a GeckoLib animal held by a crocodile is never turned with the roll, laid along or made to struggle
+- **R4-27** the termite queen's own posing overwrites her walk and turn clips' body bob and forebody swing
+- **R4-28** resource reload does not refresh the monitor's tail rest pose or the otter's faces
+- **R4-30** crossing the near line (48 or 64 blocks) snaps a crocodile's or monitor's whole pose
+- **R4-31** a doum grove makes each chunk rebuild redo every crown, and a ripening bunch redoes a whole crown
 
 **Round 7, the giant trees** (`docs/reviews/full/round-07-trees.md`)
 
@@ -201,7 +233,7 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R12-65** `MoveRider`, the planned one home for block moves, lacks two lessons of the monitor's copy, and the drawing half is copied three times
 - **R12-72** the move files have no staleness check (the spot tables do), and their unit test reads only the monitor's
 
-### C: a tidy-up (86 left)
+### C: a tidy-up (100 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -238,6 +270,23 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R2-34** on the server "is it climbing" reads the value sent to the drawing, a tick late
 - **R2-35** comments in the wrong place or saying the wrong thing
 - **R2-36** gaps in `DoorwayMotionTest`
+
+**Round 4, how bodies are drawn** (`docs/reviews/full/round-04-bodies-drawn.md`)
+
+- **R4-5** an insect not yet drawn keeps the worker's body numbers and size 1 for its edge pose, its spine and its turning steps
+- **R4-6** small per-frame allocations
+- **R4-7** the texture-exists caches are never cleared on a resource reload
+- **R4-8** a lost leg of a species no longer signed up throws an exception every frame it is drawn
+- **R4-10** wrong or stale comments
+- **R4-15** fly clouds do per-fly work each frame that could be done once
+- **R4-16** small fly and tongue mismatches
+- **R4-17** a muddy footprint can float over the edge of a block
+- **R4-22** three animal models build their file names from text on every call, and the crab re-registers its bones between looks
+- **R4-33** two writes to shared bones that do not leave GeckoLib's marks as they were
+- **R4-34** a dying hippo keeps turning its head and pupils toward what it watches
+- **R4-35** throwaway objects made every frame per animal
+- **R4-36** hand-copied numbers and files read past the resource system
+- **R4-37** wrong or misplaced comments
 
 **Round 7, the giant trees** (`docs/reviews/full/round-07-trees.md`)
 

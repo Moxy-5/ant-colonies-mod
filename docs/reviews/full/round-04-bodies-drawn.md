@@ -48,6 +48,74 @@ tidy-up. Proof: **proven** (the path walked through the code, lines named), **li
 **to measure**. A finding's `R` number is its only number. Findings keep their numbers for good; a fix session adds a
 status line under a finding and never rewrites it.
 
+**Count:** 37 findings: 6 A, 16 B, 15 C (48 in the readers' files; 6 were the same thing found from two sides and are
+merged, each merged finding says so; the rest of the difference is the readers' own numbering). The findings are in
+the order the readers finished: the framework slice (R4-1 to R4-11), the small animals and effects (R4-12 to R4-17),
+the thread (R4-18 to R4-22), the big animals (R4-23 to R4-37).
+
+## The short of it
+
+The insects' drawing is in good shape and the server sends next to nothing: no value of the mod's goes out every
+tick for any insect or animal, the insect renderer has its three savings (ready-made faces, a far model, far poses
+reused), its layers stop at once when there is nothing to show, and the body's turning, slope and edge pose are
+worked out per tick and only blended per frame. No drawing code can be reached on a dedicated server. Nothing here is
+a candidate for a rewrite.
+
+What is wrong lies almost all on the animals' side, the newer code:
+
+1. **The animals are drawn the slow way** (R4-18): none of the insects' three savings, more boxes each than any insect
+   (monitor 665, bullfrog 393, lion 322, crab about 250), and draw distances pushed out to 64 to 128 blocks. A full
+   river is two to four times the boxes of a two-colony raid, each box several times dearer. With it: a muddy animal
+   drawn two or three times over (R4-2) and the crocodile and monitor reading some hundreds of blocks every frame
+   (R4-21). None of it is measured.
+2. **Five things a player can see:** reeds and hippo grass vanishing for about two seconds beside whoever walks
+   through them (R4-12); a crocodile, monitor or otter popping out of sight at the screen's edge with much of its body
+   still in view (R4-23); the shadow of whatever a crocodile holds stood on edge or spun round (R4-24); a lioness
+   drawn standing on the ground while the buffalo she grips carries her off, when the server's word arrives after the
+   screen's own guess (R4-1); the death roll rewinding on a slow server (R4-25).
+3. **Small traps for the next clip or model:** code that adds to a bone and relies on every clip keying that bone
+   (R4-14, R4-33), the termite queen's model throwing away her walk clips' bob (R4-27), tables kept for the whole
+   sitting that a reload does not renew (R4-7, R4-28).
+
+## The ones that matter most
+
+1. **R4-12:** reeds and hippo grass blink out of sight beside a walking player or animal, and round big animals more
+   than 64 blocks off. One rule mends it: every marked plant the client can see gets a spring.
+2. **R4-23:** the crocodile (7.5 blocks long, culled by a box 0.9 wide), the monitor and the otter vanish at the
+   screen's edge. The buffalo's and lion's fix, never given to these three.
+3. **R4-18 with R4-2 and R4-21:** measure a full river first (one scene, animals muddy and clean); then give the
+   animals the insects' drawing path. This is the round's one lag risk.
+4. **R4-24 and R4-25:** the crocodile's hold: the held one's shadow, flames and name tag turned with it, and the roll
+   on the wrong clock.
+5. **R4-1:** the strike's hit or miss must be the server's word both ways round, with the unit test `Strikes.Ride`
+   never had.
+
+## For the user to decide
+
+Three findings carry a `**Your call**` line; none blocks the others' fixes.
+- **R4-9:** should Minecraft's own animals show mud? My pick: no, and stop giving them a coat.
+- **R4-29:** should a crocodile's and monitor's hit boxes follow the body over a bank? My pick: yes, once it is seen
+  to matter in play.
+- **R4-32:** should a buffalo or lion killed on a step fall along the slope? My pick: yes.
+If R4-18's measurement says the river is dear, shorter draw distances for the small many-boxed animals (a frog 40
+blocks off is a few pixels) would be a fourth question, asked then with the numbers.
+
+## What this round did not do
+
+- **Nothing was run or measured.** Every lag finding is a count of work, never a time. The five visible faults are
+  walked through the code, not filmed or seen in play; R4-1 and R4-25 are "likely" (each names its unchecked link).
+- **The leading session checked the six grade A candidates' lines itself** (each finding says what was checked) and one
+  more that a reader graded A: the silent fly cloud (R4-13) is B (one link unchecked, a rare trigger, mended by walking
+  away). One C finding was corrected: a player's mud is drawn (`MudPlayerLayer`); only Minecraft's own animals carry a
+  coat nobody draws (R4-9). The B and C findings are the readers' own, read but not walked a second time.
+- **The NeoForge lines behind R4-24** (where the "before drawing" event is posted) were read by the slice reader in the
+  21.1.256 sources; the leading session did not open them again.
+- **Round 12's files were not read again** (listed at the top), nor the entities' own client ticks (rounds 3 and 9), nor
+  the particles' inside beyond the blood mist and the footprint.
+- `docs/BUGS.md` was searched by class and animal name, not read whole.
+- The readers' scratch scripts (box counts from the model files, the list of every synced value set) lived in a session
+  scratchpad and are gone; each finding names what its script did.
+
 ---
 
 ## Slice: the framework's body code, the insect renderers and layers, the mud coat
@@ -173,13 +241,16 @@ bodies, and catches it, every frame. An old world with a harvester's lost leg ly
 **Fix proposed:** a lookup that returns null (`SpeciesBodies.find`) or check on load and discard the piece
 (`LostLegEntity.readAdditionalSaveData`). Old test worlds are disposable (the user), so tidy-up only.
 
-### R4-9 (C, proven): a player's mud coat is kept and sent but never drawn
+### R4-9 (C, proven for Minecraft's own animals): a mud coat on one of Minecraft's own animals is kept and sent but never drawn
+(Corrected by the leading session: the reader's "a player wears mud nobody sees" is wrong. `MudPlayerLayer`, added to the player renderers in `SavannaMudClient.java:55`, draws a player's mud. What holds: Minecraft's own animals (a pig, a cow) carry a coat that nothing draws, and the two leftovers named at the end, which the leading session did not check.)
 **What is wrong:** `SavannaMudBlock.muddy` puts mud on any living thing but insects ("a player in soupy mud gets muddy legs
 (2)"), and the coat is synced to the player, but only GeckoLib renderers carry `MudCoatLayer`, so a player (or any
 vanilla mob: the pig in `MudTests`) wears mud nobody sees; only its shed bits fly. Also the coat attachment is not
 copied on death, and a dimension change gives the client a new player entity with no coat until the next change.
 **Where:** `savanna/.../block/SavannaMudBlock.java:245-252`; `coat/MudCoat.java:83-96, 144-149`.
 **Fix proposed:** say in `docs/DESIGN.md` that vanilla bodies carry the coat as data only, or leave players out of `muddy`.
+
+**Your call (2026-11-26):** should Minecraft's own animals (pigs, cows, horses) show mud after walking through it? Today they carry the mud as numbers and shed bits of it, but look clean. My pick: leave them clean (a mask per vanilla animal is art work for little gain) and stop giving them a coat at all.
 
 ### R4-10 (C): wrong or stale comments
 - `AntRenderer.java:40` and `InsectModel.java:16`: "the queen draws the worker's model, so she gets the worker's plan" (the
@@ -494,6 +565,7 @@ with their entity), `PlantPushClient.SWAYS` (emptied on a world change), `BodyPl
 never emptied on a resource reload (R4-7). Nothing grows without limit.
 
 ### R4-18 (A, the mechanism proven; the size to measure): every animal is drawn the slow way the insects were moved off, with more boxes and from further away
+(Also found by the big animals' reader as "the big animals have no far model": a herd of buffalo or a pride 100 blocks off costs as much to draw as one beside the player; that reader's test scene: 20 buffalo and a pride at 40, 80 and 120 blocks.)
 **What is wrong:** The insects were given three savings because drawing a crowd was too slow: their boxes are turned
 into ready-made faces once (`BoneMesh`), far ones use a model with a quarter of the boxes, and far ones reuse their
 last pose every other frame. The animals have none of the three. Each animal box is drawn by GeckoLib's own path: a
@@ -568,6 +640,7 @@ cannot be seen there), and/or set the insects' tracking range to fit the 48 bloc
 `DRAW_DISTANCE`.
 
 ### R4-21 (B, to measure): the crocodile and the monitor read the ground under every joint every frame
+(Also found by the big animals' reader, who counted it: crocodile 9 pieces by 3 columns, 2 footings and 4 planted feet, about 150 block lookups a frame; monitor 20 by 3 columns, footings, water checks, 4 feet and the dragged tail's 12 joints, about 400 a frame. `StandTilt`'s 4 reads a frame for a lion or buffalo are fine as they are.)
 **What is wrong:** To lay spine and tail along the ground, the crocodile (within 64 blocks) and the monitor (within
 48) ask the world for the ground height three times under every joint, each ask reading water and block shape down
 several blocks, and then again under each foot. That is some hundreds of block reads per animal per **frame**, not per
@@ -584,6 +657,7 @@ an estimate from the chain lengths in the body plans, not a count.
 their slope tilt). The shape of the fix already exists in `AbstractAntEntity.tiltOnSlope`.
 
 ### R4-22 (C, proven small): three animal models build their file names from text on every call, and the crab re-registers its bones between looks
+(Also found by the big animals' reader, who adds: the crab joins bone names and looks four bones up each frame, the monitor joins 4 to 12 bone names a frame, the termite queen 24.)
 **What is wrong:** `CrocodileModel`, `CrabModel` and `LionModel` make a new name object (and the text for it) each time
 GeckoLib asks which model, picture or clip file to use, several times per animal per frame. The crab uses one model
 object for four looks (plain, male, female, with eggs), so whenever two crabs drawn one after the other differ,
@@ -663,3 +737,269 @@ if those leave time unexplained.
   few objects a frame); its real cost is part of R12-47's measurement.
 - The joint counts behind R4-21's "hundreds" and the block reads behind R4-20's "20 to 30" are my estimates from the
   loops, not counts from a run.
+
+---
+
+## Slice: the savanna's big animals and the termite royals (models and renderers)
+
+Read: the crocodile's, monitor's, hippo's, lion's, buffalo's, otter's and crab's models and renderers, `CrocodileRollClient`, `DoumModel`, `StandTilt`, `SwimFold`, the termite queen's model and renderer, `TermiteNymphRenderer`. Calls followed into the entities, the framework, GeckoLib 4.9.3 (`javap`) and Minecraft 1.21.1 in the NeoForge 21.1.256 sources. Three of this reader's eighteen findings were the same thing the thread reader found and are merged there: the ground read every frame (R4-21), no far model for the animals (R4-18), names built every frame (R4-22).
+
+### R4-23 (A, proven): a crocodile, a Nile monitor and an otter vanish at the screen's edge while most of their body is still in view
+**What is wrong:** Minecraft decides whether to draw an animal at all from a "culling box": if that box is outside the
+screen, nothing of the animal is drawn. By default the culling box is the animal's walking box (plus half a block). The
+crocodile's walking box is 0.9 blocks wide but its drawn body is 7.5 blocks long; the monitor's box is 0.7 wide for a
+body 4.5 long; the otter's 0.75 for a body 2.6 long. The hippo, buffalo and lion were given a bigger culling box for
+exactly this (BUGS 271: "its head and rump blinked away at the screen's edge"); the crocodile, monitor and otter never
+were.
+**What the player would see:** turn the camera so a crocodile's middle goes just off the side of the screen: its whole
+body, head or tail still well on screen (up to about 2.8 blocks of it), pops out of sight; it pops back when the middle
+comes back. Same at the top or bottom edge (looking down on one basking below you), and when its middle is behind a
+corner of the view. Smaller for the monitor (about 1.4 blocks of tail) and the otter (about 0.4 blocks).
+**Where:** no `getBoundingBoxForCulling` in `savanna/.../animal/CrocodileEntity.java`, `MonitorEntity.java`,
+`OtterEntity.java` (all three are multipart: `isMultipartEntity` true, `getParts()` = their hit chains); against
+`HippoEntity.java:854-857`, `BuffaloEntity.java:971-981`, `LionEntity.java:905-916`. Sizes: `SavannaEntities.java:190`
+(crocodile 0.9), `:211` (monitor 0.7), `:271` (otter 0.75); lengths `CrocodileEntity.java:175-176`,
+`MonitorEntity.java:262`, `OtterEntity.java:291`.
+**Proof:** Minecraft 1.21.1 (NeoForge 21.1.256 sources) `EntityRenderer.shouldRender:52-58` draws only if
+`getBoundingBoxForCulling().inflate(0.5)` is in the view; `Entity.getBoundingBoxForCulling:3030` is `getBoundingBox()`;
+GeckoLib 4.9.3's `GeoEntityRenderer` does not override `shouldRender` (checked with javap); none of the three sets
+`noCulling` (grep). The hit chains' parts are not drawn, so they do not widen it either.
+**Checked by the leading session:** a search of both mods finds `getBoundingBoxForCulling` only in the buffalo, lion, hippo, fly cloud and remains, and no `noCulling` anywhere; the crocodile, monitor and otter have none. Not seen in the game.
+**Fix proposed:** the buffalo's and lion's rule for all three: the walking box joined with every hit bead's box
+(`chain.parts()`), inflated a little for the snout and tail tip past the last bead, and a fixed inflate on the first
+tick before the beads are placed. One shared helper on the hit chain (the four copies would become one), e.g.
+`HitChain.cullingBox(box, extra)`.
+
+### R4-24 (A, proven): a player or animal held by a crocodile gets a shadow stood on edge (and spun round in the death roll)
+**What is wrong:** `CrocodileRollClient` tips the held one's drawing (laid flat along the snout, leaning back in the tug
+of war, spun round the spine in the roll) by changing the drawing's frame in NeoForge's "before drawing a living thing"
+event. That event comes before the animal's own renderer saves the frame, and nothing puts the frame back afterwards. So
+everything Minecraft draws for that animal after its body with the same frame is tipped too: its shadow on the ground,
+the flames if it burns, its name tag, and the F3+B hit box.
+**What the player would see:** a friend held on the bank by a crocodile (laid flat along its snout, turned 90 degrees):
+their round ground shadow is turned with them and drawn standing upright in the air, a dark see-through patch about a
+block wide, about a block (half their height) out from their middle toward or away from the snout. A cow in the tug of war has its shadow tilted 12 to 18 degrees, half sunk into the ground and half in the
+air, rocking with each heave. In a roll in the shallows a shadow on the river bed is swung round in circles. A held
+friend's name tag is turned with them (out in front, sideways).
+**Where:** `savanna/.../client/CrocodileRollClient.java:41-75` (`onDraw`: `pose.translate` / `mulPose` with no push or
+pop), `:83-109` (`layAlong`, `struggle`).
+**Proof:** NeoForge 21.1.256's patched `LivingEntityRenderer.render:52-54` posts `RenderLivingEvent.Pre` before its own
+`poseStack.pushPose()`; its `popPose` at `:136` only undoes its own push; `super.render` (the name tag) and the `Post`
+event run after that pop at `:137-139`. `EntityRenderDispatcher.render:160-183` then draws the flame (`:164`), the
+shadow (`renderShadow`, `:174`, its quads made from `poseStack.last()`, `:374`) and the hit box with the same stack before
+its own `popPose`. Not filmed.
+**Checked by the leading session:** `CrocodileRollClient.onDraw` (lines 41-75), `layAlong` and `struggle` change the pose stack with no push and no pop, and there is no `Post` handler. The NeoForge lines (the `Pre` event posted before the renderer's own push; the shadow drawn after with the same stack) are the reader's reading of the sources, which agrees with how the leading session knows that code; not opened a second time.
+**Fix proposed:** `pose.pushPose()` at the start of each turning branch of `onDraw` and a `RenderLivingEvent.Post`
+handler that pops it for the same entity (keep a flag on the event's entity or test the same condition again). The body
+and its layers are still turned; the shadow, flame and name tag are not. (Or cancel the held one's shadow while held.)
+
+### R4-25 (A, likely): on a slow or stalling server the crocodile's death roll jumps back, and a held player's view spins back with it
+**What is wrong:** the roll's angle is worked out from the world's game time on the player's computer minus the tick the
+roll started on the server (`rollAngle`). As R12-61 proved for block moves, the player's side adds one to that time every
+one of its own ticks (20 a second whatever the server does) and is set straight back to the server's time by a packet
+once a second. R12-61's fix (`MoveClock`, never follow a rewind) covers block moves only; the roll was missed ("lions and
+buffalo count their own ticks" -- the crocodile does not).
+**What the player would see:** on a server at 15 ticks a second each 2-second roll plays out on screen in about 1.5 s,
+the crocodile lies upright still while the server is still rolling, then the time packet sets the clock back and it
+flips back into mid-roll (a 5-tick step back of a three-turn roll is over 100 degrees). The held player's camera does
+the same (`onCamera`): the world spins, stops, and spins backwards. During an autosave stall the same, bigger.
+**Where:** `savanna/.../animal/CrocodileEntity.java:600-611` (`(int) level().getGameTime() - start + partialTick`), read
+by `CrocodileModel.java:91-99`, `CrocodileRollClient.java:30-38` and `:48`.
+**Proof:** walked; the client clock behaviour is R12-61's walk in Minecraft 1.21.1 (`ClientLevel.tick`,
+`ClientPacketListener.handleSetTime`). Not seen in play (no slow server run), hence "likely".
+**Checked by the leading session:** `CrocodileEntity.rollAngle` (lines 600-611) reads `level().getGameTime()` on the screen; the mechanism is R12-61's, fixed there for block moves only. "Likely" as R12-61 was: no slow server was run.
+**Fix proposed:** the roll's drawn time through one never-rewinding clock per crocodile (the framework's `MoveClock`,
+keyed by the roll's start tick), used by the model, the held one's drawing and the camera alike.
+
+### R4-26 (B, proven): a GeckoLib animal held by a crocodile is never turned with the roll, laid along or made to struggle
+**What is wrong:** the held one's roll, lay-along and struggle are done in NeoForge's `RenderLivingEvent.Pre`, which only
+Minecraft's own `LivingEntityRenderer` fires. Every animal of this mod is drawn by GeckoLib's `GeoEntityRenderer`, which
+extends `EntityRenderer` and fires GeckoLib's own `GeoRenderEvent.Entity.Pre` instead.
+**What the player would see:** today the crocodile's big prey that it drags and rolls are Minecraft's animals and
+players, which work. A bullfrog (an `Animal`, so big prey by `isPrey`) or any of the planned savanna land animals made
+huntable is drawn upright and still in the jaws while the crocodile spins three turns round it.
+**Where:** `savanna/.../client/CrocodileRollClient.java:41-56`; `CrocodileEntity.java:2446-2478` (`isPrey`: any `Animal`).
+**Proof:** GeckoLib 4.9.3 bytecode (javap): `GeoEntityRenderer.firePreRenderEvent` calls `GeckoLibEvents.fireEntityPreRender`,
+whose NeoForge side (`GeckoLibEventsNeoForge`) posts `GeoRenderEvent$Entity$Pre`; no `RenderLivingEvent` anywhere in
+the renderer.
+**Fix proposed:** also listen to `GeoRenderEvent.Entity.Pre`/`Post` (same turn, with R4-24's push and pop), or turn the
+held one from the crocodile's own renderer as `OtterRenderer` draws its fish.
+
+### R4-27 (B, proven): the termite queen's own posing overwrites her walk and turn clips' body bob and forebody swing
+**What is wrong:** the queen's model sets her `body` bone's height and length place and her `forebody` bone's turn to
+fixed values every frame (her settling and droop). It sets them outright instead of adding to what the clip put there.
+Her walk clips (`walk_slow`, `walk`, `walk_fast`) move `body` (the bob) and turn `forebody`, her turn clips turn
+`forebody`, and `paralysed` / `paralysed_fall` move `body`. All of that is thrown away for the queen.
+**What the player would see:** a young queen that walks (one put down with a spawn egg, and later a founding queen in
+M9.5) glides with a rigid body: no bob, no swing of the front of her body as she walks or turns, unlike the king beside
+her, who plays the same clips. Her six abdomen segments are set outright too, but no clip moves them.
+**Where:** `savanna/.../client/TermiteQueenModel.java:78-85` (`setPosY(lift)`, `setPosZ(-forward)`, `setRotX(-droop)`);
+the clips in `animations/entity/termite_queen.animation.json` (checked with a script: `body` position and `forebody`
+rotation in the walks and turns).
+**Proof:** read both. The queen's `lift`, `forward` and `droop` are all 0 at size 0, so a small queen loses the clip's
+values to zeros.
+**Fix proposed:** add to the clip's values (`bone.getPosY() + lift`, `bone.getRotX() - droop`) with the marks left as
+they were (the crocodile's `turnUp` pattern), and keep the absolute set only for the bones no clip moves.
+
+### R4-28 (B, proven): resource reload does not refresh the monitor's tail rest pose or the otter's faces
+**What is wrong:** two drawing tables are kept in `static` fields read once for the whole run of the game:
+`MonitorModel.TAIL` (a `DraggedTail` that reads the 12 tail bones' rest pose from the first baked model and never again,
+`ready` stays true) and `OtterModel.FACE` (`FaceLayer.of` keeps the face file in a static map, read from the jar).
+Minecraft makes the renderers and models anew on a resource reload (F3+T, a resource pack, the film watch mode's reload)
+and GeckoLib bakes new bones, but these two keep the old data, and each monitor's `tail` drag keeps the old lengths too.
+R12-42 fixed this kind of staleness for the spot tables and body plans; these two were not covered.
+**What the player would see:** in normal play nothing (the files do not change). In the film watch mode after a remade
+monitor model or a changed otter face file, the films show the old tail lengths and the old faces until the game is
+restarted (the look the user is shown is not the one on disk). A resource pack's otter face or monitor model is ignored
+by these parts.
+**Where:** `savanna/.../client/MonitorModel.java:104-105, 250-251`; `framework/.../client/DraggedTail.java:93-96`;
+`savanna/.../client/OtterModel.java:29`; `framework/.../client/FaceLayer.java:104-116`.
+**Proof:** walked: `prepare` returns at once once `ready`; `LOADED.computeIfAbsent` never cleared (no other writer, grep).
+That the film watch mode reloads renderers is read from R12-42's notes, not checked again here.
+**Fix proposed:** make both instance fields of the model (made anew with it, as `fold` already is), and drop an
+entity's `tail` drag when its model changes (keep the model's identity beside it).
+
+### R4-29 (B, likely): a crocodile's or monitor's drawn head over a bank is up to about a block from its head hit box
+**What is wrong:** the hit beads (`HitChain`) were added so "a swing or an arrow at what you see lands", and are set at
+the box's height plus a fixed height, along its heading. But the drawn body lies on what is under it (`GroundBend`): the
+shoulders lift onto a bank up to 1.6 blocks, and the neck and head tip down over a bank's edge up to 50 degrees. Neither
+moves the beads.
+**What the player would see:** a crocodile lying at the water's edge with its head dipped to the water: aim at its snout
+and the swing or arrow passes through it (the bead is up at the bank's height); aim at the air above it and it hits.
+Same for one rising onto a bank, and for the monitor. Not tried in a game.
+**Where:** `framework/.../animal/HitChain.java:66-70`; `CrocodileModel.java:105-124`; `MonitorModel.java:146-165`;
+`GroundBend.java:45` (`MAX_LIFT = 1.6`), `:31` (`MAX_STEEP = 50`).
+**Proof:** walked: the beads take only `owner.getY() + link.up() * scale`; the bend is client-only drawing. How far apart
+in a real bank scene is not measured (it depends on the bank), hence "likely".
+**Fix proposed:** worth the user's eye first (how often a player fights a crocodile at a bank). If so, the beads could
+take the same ground heights on the server (`GroundBend.support` at each bead, eased per tick), which also fixes arrows
+at a crocodile half up a bank.
+
+**Your call (2026-11-26):** should a crocodile's and monitor's hit boxes follow the body where it lies over a bank (head dipped to the water, chest up on a step)? Today the hit boxes stay level at the animal's own height, so a swing or arrow at a dipped head can pass through it. My pick: yes, but only after it is seen in play to matter; it is server work for every crocodile and monitor every tick.
+
+### R4-30 (B, proven): crossing the near line (48 or 64 blocks) snaps a crocodile's or monitor's whole pose
+**What is wrong:** beyond `NEAR` the models skip the body's lie, the legs and the tail drag and reset their eased state
+(`legNanos = 0`, `legStand` set, `drawnNanos = 0`); coming inside, the first frame eases with "a whole second has passed"
+(`dt = 1.0`, so `k = 1`): the bend, the folded or standing legs and the dragged tail all appear at once. Leaving, they
+vanish at once.
+**What the player would see:** walking or flying toward a monitor lying over a step or wading at a bank: at 48 blocks
+its chest and head drop onto the step, its legs fold and its tail swings down over the edge in one frame (the user
+watches from far in spectator). The crocodile the same at 64 blocks (its head dipping to the water). Small on flat
+ground (nothing to bend).
+**Where:** `MonitorModel.java:130-139`; `CrocodileModel.java:101-104` (the bend kept and eased by `GroundBend`, but
+`legs` and `eyes` read `legNanos`/`eyeNanos` from far frames too; the bend's own `lastNanos` gap > 0.5 s snaps).
+**Proof:** walked: `GroundBend.update:118-120` (`dt > 0.5` gives `k = 1`), `MonitorModel.legs:280-282` same.
+**Fix proposed:** on the first near frame after a gap ease in from the clip pose over the usual ease (start the eased
+values at their "none" and let `dt` be one frame), or keep the cheap parts (the bend at a lower rate) out to the draw
+distance so there is no line.
+
+### R4-31 (B, to measure): a doum grove makes each chunk rebuild redo every crown, and a ripening bunch redoes a whole crown
+**What is wrong:** the doum palm pieces' quads are cached by look, at most 24. Each grown palm's look is its own (its
+dice and its place in the tree's grid), and a crown, each of its 2 or 3 bunches, and its ground fronds are separate
+keys, so a grove of more than about 6 palms overflows the cache and every chunk rebuild works the boxes out again. A
+bunch block works out the whole crown (`PalmPieces.crown`) and keeps only its own bunch; its key holds its fruit stage,
+so every ripening step (a block change, which rebuilds the chunk section) works out a crown again for each bunch.
+**What the player would see:** chunk sections with palms take longer to redraw on the chunk builder threads; possibly a
+late-appearing section when flying fast over a palm grove. Not measured.
+**Where:** `savanna/.../client/DoumModel.java:60-71, 91-103`; `block/DoumLook.java:45-63`.
+**Proof:** walked; cost of `PalmPieces.crown` not measured.
+**Fix proposed:** measure a chunk rebuild in a grove; if it shows, a bigger cache (crowns are a few hundred quads each),
+or a bunch key without the crown's own frond boxes (build the bunch from the crown's plan only).
+
+### R4-32 (B, likely): a dying buffalo or lion on a step drops its tilt at once and dies with its legs hanging in the air
+**What is wrong:** `StandTilt` tilts a standing body to the ground under its front and hind feet only while the animal
+is alive; dead (`isAlive()` false from the killing blow) the wanted heights jump to the box's own height, eased over
+0.2 s. On a step the death clip then plays level about the box, which stands on the higher block.
+**What the player would see:** a buffalo killed with its front feet up a 1-block step straightens in a fifth of a second,
+then falls over with its hind end hanging up to a block over the lower ground, for the 1.5 s of its death clip, before
+its carcass appears. The lion the same (1.2 s).
+**Where:** `StandTilt.java:61-64`; `BuffaloEntity.java:120, 934-939`; `LionEntity.java:126`.
+**Proof:** walked. Not filmed.
+**Fix proposed:** keep the last tilt through the death (hold `drawn.frontY/hindY` when `!isAlive()`), so the death clip
+falls on the slope it stood on; the carcass (`RemainsEntity`, not in this slice) would want the same ground.
+
+**Your call (2026-11-26):** should a buffalo or lion killed on a step fall along the slope it stood on? Today it straightens level in a fifth of a second and its death plays with one end hanging over the lower ground. My pick: yes, keep its tilt through the death.
+
+### R4-33 (C, proven): two writes to shared bones that do not leave GeckoLib's marks as they were
+**What is wrong:** the bones are shared by every animal of a kind, and GeckoLib puts a bone back to its own animal's clip
+pose next frame only if nothing marked it; every other added turn in these models keeps the marks as they were. Two do
+not: the otter's jaw held open round a catch (`jaw.setRotX(Math.min(...))`) and the crocodile's eyelids
+(`lid.setScaleY`). Both are harmless today only by luck of the data: every one of the otter's 42 clips keys the jaw
+(checked with a script), and every crocodile drawn sets its lids every frame.
+**What the player would see:** nothing today. An otter clip made without a jaw key would leave the next otter drawn with
+the first one's jaw open.
+**Where:** `OtterModel.java:70-77`; `CrocodileModel.java:164-170`.
+**Fix proposed:** the same `marked` / `resetStateChanges` pattern as the rest of each model.
+
+### R4-34 (C, proven): a dying hippo keeps turning its head and pupils toward what it watches
+**What is wrong:** `HippoModel.eyes` has no alive check: the head turn (up to 18 degrees) and the pupils keep following
+what caught its eye (the killer, often) through the death clip, as the body rolls onto its side. The crocodile, the
+monitor, the buffalo, the lion and the otter all stop or ease out when dying.
+**What the player would see:** for the one second of its death, the hippo's head stays turned to the player and its
+pupils follow them while it rolls over.
+**Where:** `HippoModel.java:55, 64-87`; `HippoEntity.java:657-660` (the client keeps ticking `attention` while dying).
+**Fix proposed:** `turnHead && hippo.isAlive()`, and the pupils left to the clip when dead (as the buffalo).
+
+### R4-35 (C, proven): throwaway objects made every frame per animal
+**What is wrong:** small per-frame allocations (rule book 1j): `new String[] {...}` round each pupil and lid loop
+(crocodile, monitor, hippo, crab), `new StandTilt(...)` for every lion every frame (the buffalo keeps one), `new GeoBone[]`
+and `new boolean[]` in the monitor, two `Quaternionf` per folding leg bone, a `Vector3d` per placed animal, `new
+FaceLayer.Frame` per otter. Each is small; together they are steady garbage with many animals on screen.
+**Where:** `CrocodileModel.java:164, 200`; `MonitorModel.java:119, 284, 385-386, 471`; `HippoModel.java:69`;
+`CrabModel.java:70`; `LionModel.java:73`; `OtterModel.java:68`.
+**Fix proposed:** static name arrays, the lion's `StandTilt` kept on its `Measures`, a scratch quaternion pair; fold into
+R4-22's tidy-up.
+
+### R4-36 (C, proven): hand-copied numbers and files read past the resource system
+**What is wrong:** `TermiteQueenModel` holds the abdomen's build numbers (`SEG_LENGTH`, `HEIGHT`, `CENTER_Y`, `TAPER`)
+"kept in step" by hand with `tools/termite_models.py` (they agree today), the very pattern R12-70 found drifted for the
+monitor; no test compares them. `SwimFold` (and `FaceLayer`) read their files from the mod's jar with
+`getResourceAsStream`, so a resource pack that changes the monitor's swim clip changes the clip but not the fold drawn
+toward it.
+**Where:** `TermiteQueenModel.java:24-28`; `SwimFold.java:40-46`.
+**Fix proposed:** a unit test reading the queen's geo for the six segments' sizes (or read them at load); `SwimFold`
+through the resource manager is optional (resource packs are not a goal of the mod).
+
+### R4-37 (C, proven): wrong or misplaced comments
+- `MonitorModel.java:101-103`: the javadoc "The tail, base to tip, dragged" stands above `HAND_OVER`'s own javadoc;
+  `TAIL` (line 104) has none.
+- `MonitorModel.java:128-129`: "never on a move" reads as "far off it is never on a move"; it means the far rule is not
+  used on a move.
+- `CrocodileModel.java:18-21` (class doc) says nothing of the legs, eyes, lids, roll and carried young it also draws;
+  `HippoRenderer`/`HippoModel` docs fine.
+
+### Solid in this slice (do not "fix")
+- **No drawing code is reachable on a dedicated server:** nothing outside `savanna/.../client/` imports a class in it
+  (grep); `CrocodileRollClient` and `SavannaClientEvents` are `Dist.CLIENT` event subscribers; entities only mention
+  `CrocodileRollClient` in a comment.
+- **Per-animal drawing state lives on the entity**, never in the shared model or renderer: blink and eye clocks, head
+  and eye aims, leg stands, the drawn place and hand-over, `DrawnGround`, `GroundBend`, `TailDrag`, `Attention`.
+  The models' added turns keep GeckoLib's change marks as they were (but R4-33's two), so one animal's pose never leaks
+  into the next; the monitor puts its trunk hinges back before every monitor.
+- **`OtterRenderer`'s scratch fields** are written and read inside one `render` call and reset at its start; the held
+  fish is drawn only through the otter (its own renderer refuses while held), at the head's real drawn frame.
+- **The eases run on `DrawClock` game time** with `1 - exp(-dt/ease)`: the same at any frame rate, frozen when paused
+  or `/tick freeze`; a gap over half a second snaps (R4-30 is the one place this is seen).
+- **The hippo, buffalo and lion culling boxes** take in the hit beads (BUGS 271); R4-23 is only that the other three
+  never got it.
+- **`LionRenderer.applyRotations`** keeps a rider at its own heading (the hunt film's jaw 1.4 blocks off); the buffalo
+  held and its holders drawn level (R12-71) agree with the spot tables.
+- **`DoumModel`**: quads baked into the chunk (no per-frame cost), the cache locked round get and put with the work
+  outside (several chunk threads), a fresh cache with each resource reload; the block entity always gives model data.
+- **`SwimFold`** reads both sides from the clip and fails loudly on a missing bone (R12-70 fixed; `SwimFoldTest`).
+- **`TermiteNymphRenderer`**: the meal is never 0 (`setMeal` keeps it at least 1); a worker nymph's `null` rank is
+  handled.
+- **The teen crocodile's model** has the grown one's joint places, so the bend and legs fit it; its missing `carried`
+  bone is null-checked.
+- **`CrocodileRollClient.onCamera`** turns only the viewer's own camera, from synced data, so each player sees their
+  own hold; other players see the held one turned (for Minecraft-drawn bodies, R4-26).
+
+### What this reader did not check
+- No frame cost was measured (R4-21, R4-18, R4-22, R4-31 are "to measure"); no game, film or test was run.
+- That GeckoLib 4.9.3 applies the entity's own `getScale()` (assumed, as round 12 did).
+- `MudCoatLayer` / `MudCoatLook`, `FaceLayer.draw`, `InsectModel`/`BodyLanguage`, `AntRenderer` (the queen's culling
+  and far pose) and `RemainsEntity` (the carcass): framework or other slices, read only as far as a finding needed.
+- The entities' client ticks (`Attention.tick`'s entity search every 5 ticks) and their synced data: game logic, not
+  read for cost here.
+- Whether the film watch mode's reload remakes the renderers (R4-28's one link, taken from R12-42's notes).
+- Multiplayer was not run: R4-24's upright shadow and R4-25's rewind are walked in the code, not seen.
