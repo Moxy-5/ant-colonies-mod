@@ -175,6 +175,8 @@ in either mod's `client/` or network code fills the map on a client (searched). 
 - **Fix proposed:** `ownSize` returns 1 while `lengthMm` is 0, before it asks for the sizes (a client never has a
   length; its SCALE comes from the server, which sends it). One line, no new rule.
 
+**Status (2026-11-26, `claude/review-fix-a-4-6`): fixed: `MatabeleEntity.ownSize` answers 1 while the worker has no length yet, before it asks for the species file, so a screen (which never has a length, and has no species files) no longer throws; its size comes from the server's scale as before. Not run with a second client: no test or session of ours can (the game tests are a server, `runClient` shares the server's memory).**
+
 ### R6-2 (A, proven): a Matabele colony whose workers all die keeps its queen for ever, and its dead mound stays taken
 
 **Checked again by the lead.** Read `Colony.isFounding` (`Colony.java:763-765`), `QueenCare.royalsGetHungry`
@@ -236,6 +238,8 @@ the rule the raids keep.
   on the way checks the wound (grep of `wounds` in `Scouts.java` and `MatabeleScoutGoal.java`: none).
 - **Fix proposed:** one test of "may leave the nest for a colony errand", used by both: `Scouts.fit` calls
   `raiderFit` plus "a major" (fewer rules: one judge, not two). Then the scout command finds another major.
+
+**Status (2026-11-26, `claude/review-fix-a-4-6`): fixed: one judge of "may leave the nest on a colony errand": `Scouts.fit` is `Raids.raiderFit` and a major, so a major with an open wound, badly wounded or wanting rescue is no scout and the scout command takes another. A trip already under way still goes on when the scout is wounded out there (`MatabeleScoutGoal.fitToGoOn`, as the finding says is right). Checked in `eachScoutKeepsItsOwnWay...` (the command passes every wounded major over; a freshly wounded one may not set out).**
 
 ---
 

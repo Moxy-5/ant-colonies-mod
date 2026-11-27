@@ -1932,6 +1932,20 @@ public class MatabeleRaidTests {
                     Scouts.Trip after = raids.scouts().plan(level, a);
                     helper.assertTrue(after != null && after.reach() == first && Math.abs(Scouts.turnBetween(after.heading(), 0.0)) < 0.05,
                             "the trip after the find is " + after);
+
+                    // review R6-3: a major with an open wound is no scout (the raid's own rule: the hurt rest until
+                    // the wound closes); the scout command passes every wounded major over and takes the whole one
+                    List<MatabeleEntity> all = colony.population().realMembers(level).stream()
+                            .filter(ant -> ant instanceof MatabeleEntity matabele && matabele.hasMajorBody())
+                            .map(ant -> (MatabeleEntity) ant).toList();
+                    MatabeleEntity whole = all.get(all.size() - 1);
+                    all.stream().filter(major -> major != whole).forEach(major -> major.wounds().setForTests(20, null));
+                    MatabeleEntity sent = raids.scouts().sendNow(level);
+                    helper.assertTrue(sent == whole, "with every other major freshly wounded the scout command sent "
+                            + (sent == null ? "nobody" : sent.wounds().isOpen() ? "a wounded major" : "another major") + " of " + all.size());
+                    helper.assertTrue(raids.scouts().mayScout(level, whole), "the whole major the command sent may not scout");
+                    whole.wounds().setForTests(20, null);
+                    helper.assertTrue(!raids.scouts().mayScout(level, whole), "a major with a fresh wound may set out scouting");
                 })
                 .thenSucceed();
     }

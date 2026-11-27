@@ -2993,6 +2993,15 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         return true;
     }
 
+    /**
+     * Drawn whenever any of its body is in view (review R4-23): its walking box is 0.75 wide, its body 2.6 blocks long.
+     * Its box with its hit beads, and a little more for the tail's tip and its rolls and dives.
+     */
+    @Override
+    public net.minecraft.world.phys.AABB getBoundingBoxForCulling() {
+        return chain.cullingBox(0.4, 0.4);
+    }
+
     @Override
     public net.neoforged.neoforge.entity.PartEntity<?>[] getParts() {
         return chain.parts();

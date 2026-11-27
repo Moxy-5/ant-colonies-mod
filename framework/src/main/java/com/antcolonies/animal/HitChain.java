@@ -2,6 +2,7 @@ package com.antcolonies.animal;
 
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.entity.PartEntity;
 
 /**
@@ -30,6 +31,8 @@ public final class HitChain {
     private final Mob owner;
     private final Link[] links;
     private final BodyPart[] parts;
+    /** Whether the beads were set on the body yet (not before the animal's first tick). */
+    private boolean placed;
 
     public HitChain(Mob owner, Link... links) {
         this.owner = owner;
@@ -55,8 +58,32 @@ public final class HitChain {
         }
     }
 
+    /**
+     * The box Minecraft asks "is any of this animal in view" ({@code getBoundingBoxForCulling}): the walking box joined
+     * with every bead, and {@code past} blocks more to the sides and {@code up} more above and below (at the animal's
+     * size 1) for what is drawn past the beads (a snout's tip, a swinging tail, a body tilted on a bank). Without it an
+     * animal far longer than its walking box blinks out at the screen's edge with much of it still in view (BUGS 271;
+     * review R4-23). Before the beads are first placed: the walking box and the chain's whole reach round it.
+     */
+    public AABB cullingBox(double past, double up) {
+        AABB box = owner.getBoundingBox();
+        double scale = owner.getScale();
+        if (!placed) {
+            double reach = 0;
+            for (Link link : links) {
+                reach = Math.max(reach, Math.abs(link.ahead()) + link.width() / 2.0);
+            }
+            return box.inflate((reach + past) * scale, up * scale, (reach + past) * scale);
+        }
+        for (BodyPart part : parts) {
+            box = box.minmax(part.getBoundingBox());
+        }
+        return box.inflate(past * scale, up * scale, past * scale);
+    }
+
     /** Sets each bead on the body as it faces now (call after the animal moved, on both sides). */
     public void place() {
+        placed = true;
         float yaw = owner.yBodyRot * Mth.DEG_TO_RAD;
         double fx = -Mth.sin(yaw), fz = Mth.cos(yaw), scale = owner.getScale();
         for (int i = 0; i < parts.length; i++) {

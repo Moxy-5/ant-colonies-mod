@@ -983,6 +983,15 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         return distanceSqr < reach * reach;
     }
 
+    /**
+     * Drawn whenever any of its body is in view (review R4-23): its walking box is 0.7 wide, its body 4.5 blocks long.
+     * Its box with its hit beads, and a little more for the dragged tail's swing and its body on a step.
+     */
+    @Override
+    public net.minecraft.world.phys.AABB getBoundingBoxForCulling() {
+        return chain.cullingBox(0.5, 0.5);
+    }
+
     @Override
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, MobSpawnType spawnType, @Nullable SpawnGroupData data) {
         SpawnGroupData out = super.finalizeSpawn(level, difficulty, spawnType, data);

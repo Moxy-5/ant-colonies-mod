@@ -56,6 +56,7 @@ public final class Strikes {
         private int missed = -1;                // decided at its hit: 1 its place had gone from where it aimed, 0 it grips
         private double gapX, gapZ;              // its aim less its place at the hit (eased away as it grips)
         private int told = -1;                  // a screen: the server's word (-1 not come yet)
+        private int late;                       // a screen: ticks after the hit its grip began (the word came after its own "missed")
 
         private Ride(double x, double z, float yaw, double from) {
             this.x = x;
@@ -71,7 +72,12 @@ public final class Strikes {
          * @param sinceStart ticks since the strike started (its doing's), blend included
          */
         public static Ride from(Entity striker, float yaw, @Nullable Spots.Strike strike, int sinceStart) {
-            return new Ride(striker.getX(), striker.getZ(), yaw, strike == null ? -1.0 : strike.share(sinceStart - 1));
+            return from(striker.getX(), striker.getZ(), yaw, strike, sinceStart);
+        }
+
+        /** As {@link #from(Entity, float, Spots.Strike, int)}, from a place (the unit test's way in). */
+        static Ride from(double x, double z, float yaw, @Nullable Spots.Strike strike, int sinceStart) {
+            return new Ride(x, z, yaw, strike == null ? -1.0 : strike.share(sinceStart - 1));
         }
 
         /**
@@ -100,6 +106,18 @@ public final class Strikes {
          */
         public Vec3 target(@Nullable Spots.Strike strike, int sinceStart, double along, Vec3 place, Vec3 preyStep,
                 double size, int settleTicks) {
+            if (told >= 0 && missed >= 0 && missed != told) {
+                // A screen: the server's word stands over its own guess, whichever of the two came first (review
+                // R4-1: a screen that guessed "missed" before the word came never looked at the word again, and its
+                // lioness stood on the ground while the buffalo carried her off). Told it grips after all, it eases
+                // from the aim it was drawn at onto its place, from now.
+                if (told == 0 && aim != null && strike != null) {
+                    gapX = aim.x - place.x;
+                    gapZ = aim.z - place.z;
+                    late = Math.max(0, sinceStart - strike.lead() - strike.hit());
+                }
+                missed = told;
+            }
             if (missed == 1) {
                 return aim;
             }
@@ -116,18 +134,15 @@ public final class Strikes {
             }
             if (missed < 0 && (sinceHit >= -1 || told >= 0)) {
                 // decided the tick before the hit: the striker's own tick (its grip, its bite) comes before its placing
-                missed = Math.hypot(place.x - aim.x, place.z - aim.z) > GRIP * size ? 1 : 0;
+                missed = told >= 0 ? told : Math.hypot(place.x - aim.x, place.z - aim.z) > GRIP * size ? 1 : 0;
                 gapX = aim.x - place.x;
                 gapZ = aim.z - place.z;
-            }
-            if (told >= 0 && missed >= 0) {
-                missed = told;                          // a screen: the server's word stands over its own guess
             }
             if (sinceHit < 0 || missed == 1) {
                 return aim;
             }
             // gripping: on its place as the prey moves, the gap left at the hit eased away
-            double f = Math.min(1.0, (sinceHit + 1.0) / settleTicks);
+            double f = Math.min(1.0, (sinceHit + 1.0 - late) / settleTicks);
             double left = 1.0 - f * f * (3.0 - 2.0 * f);
             return new Vec3(place.x + gapX * left, place.y, place.z + gapZ * left);
         }

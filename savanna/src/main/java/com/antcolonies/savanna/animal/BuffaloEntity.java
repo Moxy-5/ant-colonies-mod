@@ -970,14 +970,7 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
      */
     @Override
     public AABB getBoundingBoxForCulling() {
-        AABB box = getBoundingBox();
-        if (firstTick) {
-            return box.inflate(2.6 * getScale(), 0.4 * getScale(), 2.6 * getScale());     // its beads not yet placed
-        }
-        for (net.neoforged.neoforge.entity.PartEntity<?> part : chain.parts()) {
-            box = box.minmax(part.getBoundingBox());
-        }
-        return box.inflate(0.4 * getScale(), 0.3 * getScale(), 0.4 * getScale());
+        return chain.cullingBox(0.4, 0.3);
     }
 
     @Override

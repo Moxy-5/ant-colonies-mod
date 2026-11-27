@@ -7,11 +7,11 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**422 findings: 243 left (20 of them wait for your call), 179 done.**
+**422 findings: 236 left (20 of them wait for your call), 186 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
-| A: a player can meet it | 82 | 9 | 1 | 3 | 68 | 1 |
+| A: a player can meet it | 82 | 2 | 1 | 3 | 75 | 1 |
 | B: it will cost us when building on this | 195 | 61 | 17 | 15 | 100 | 2 |
 | C: a tidy-up | 145 | 135 | 0 | 2 | 7 | 1 |
 
@@ -20,9 +20,9 @@ review stay in `docs/BUGS.md`.
 | 1 | the colony brain | 50 | 16 | 34 |
 | 2 | the legs | 43 | 18 | 25 |
 | 3 | the insect body | 45 | 32 | 13 |
-| 4 | how bodies are drawn | 37 | 37 | 0 |
+| 4 | how bodies are drawn | 37 | 32 | 5 |
 | 5 | the termites | not read yet | | |
-| 6 | the Matabele ants (not raids) | 33 | 33 | 0 |
+| 6 | the Matabele ants (not raids) | 33 | 31 | 2 |
 | 7 | the giant trees | 36 | 15 | 21 |
 | 8 | the world | 20 | 14 | 6 |
 | 9 | the river hunters | 44 | 19 | 25 |
@@ -81,7 +81,7 @@ what happens today and my pick. Answer whenever you like: tell Claude the number
 Grade A first. *Open* means looked at and left for a reason (the reason is given); *half fixed* says what
 is left; no word means nobody has started it. The findings that wait for your call are in the part above.
 
-### A: a player can meet it (12 left)
+### A: a player can meet it (5 left)
 
 **Round 3, the insect body** (`docs/reviews/full/round-03-insect-body.md`)
 
@@ -94,17 +94,7 @@ is left; no word means nobody has started it. The findings that wait for your ca
 
 **Round 4, how bodies are drawn** (`docs/reviews/full/round-04-bodies-drawn.md`)
 
-- **R4-1** a screen that guesses "missed" never takes the server's "gripped", so a lioness is drawn standing on the ground while the buffalo carries her off
-- **R4-12** a reed or a hippo grass mat that the server marks "pushed" but the client gives no spring is drawn by nobody: it vanishes
 - **R4-18** every animal is drawn the slow way the insects were moved off, with more boxes and from further away
-- **R4-23** a crocodile, a Nile monitor and an otter vanish at the screen's edge while most of their body is still in view
-- **R4-24** a player or animal held by a crocodile gets a shadow stood on edge (and spun round in the death roll)
-- **R4-25** on a slow or stalling server the crocodile's death roll jumps back, and a held player's view spins back with it
-
-**Round 6, the Matabele ants (not raids)** (`docs/reviews/full/round-06-matabele.md`)
-
-- **R6-1** a second player joining over LAN, or anyone on a server, is thrown out (or crashes) when a Matabele worker comes into view
-- **R6-3** a major with a fresh wound, or badly wounded, is sent out scouting alone
 
 **Round 7, the giant trees** (`docs/reviews/full/round-07-trees.md`)
 
@@ -510,6 +500,19 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R3-35** (B) `RescueGoal` has no claim on the caller, every free nestmate sets off for the same hurt ant
 - **R3-37** (A) a player who keeps walking is almost never stung
 - **R3-39** (B) held cells are never cleared away, so "any held?" stays yes and the old world is kept
+
+**Round 4, how bodies are drawn**
+
+- **R4-1** (A) a screen that guesses "missed" never takes the server's "gripped", so a lioness is drawn standing on the ground while the buffalo carries her off
+- **R4-12** (A) a reed or a hippo grass mat that the server marks "pushed" but the client gives no spring is drawn by nobody: it vanishes
+- **R4-23** (A) a crocodile, a Nile monitor and an otter vanish at the screen's edge while most of their body is still in view
+- **R4-24** (A) a player or animal held by a crocodile gets a shadow stood on edge (and spun round in the death roll)
+- **R4-25** (A) on a slow or stalling server the crocodile's death roll jumps back, and a held player's view spins back with it
+
+**Round 6, the Matabele ants (not raids)**
+
+- **R6-1** (A) a second player joining over LAN, or anyone on a server, is thrown out (or crashes) when a Matabele worker comes into view
+- **R6-3** (A) a major with a fresh wound, or badly wounded, is sent out scouting alone
 
 **Round 7, the giant trees**
 

@@ -36,14 +36,18 @@ import net.neoforged.neoforge.client.model.data.ModelData;
 
 /**
  * The bend of pushed plants, drawn by the client (2026-11-22, {@code docs/plans/papyrus-and-hippo-grass.md} step 3; how
- * and why: {@link PlantPush}). Every tick it looks round each big entity near the camera for reeds and hippo grass mats
- * it touches and gives each a spring: a reed column leans away from the pusher (and a little along its way), up to
+ * and why: {@link PlantPush}). Every tick it looks round each big entity the client knows for reeds and hippo grass
+ * mats it touches and gives each a spring: a reed column leans away from the pusher (and a little along its way), up to
  * {@link #MOST_LEAN}, the top most; a mat is pressed under the surface and aside. When the pusher goes, the spring brings
  * it back with a small overshoot in about a second.
  *
  * <p>While the server marks a plant pushed its plain model is hidden, and this draws the plant's own model bent: a reed
  * column curved from its foot (offset by its height squared, so the stalk bows rather than tips as a stick), a mat
- * moved down and aside. A marked plant with no spring yet (the client joined mid-push) is drawn upright.
+ * moved down and aside. So every marked plant must have a spring, or nobody draws it (review R4-12: the plant at the
+ * corner of a walker's box, and every plant round a pusher more than 64 blocks off, vanished for two seconds). The one
+ * rule is {@link PlantPush#spring}: every plant in a block a pusher's box overlaps has a spring, leaning or upright,
+ * and every marked plant just beside the box too (the server's box is a little ahead of the one drawn here). Only a
+ * plant marked with no pusher the client knows near it has none (the client came mid-push and the pusher is gone).
  */
 @EventBusSubscriber(modid = SavannaMod.MODID, value = Dist.CLIENT)
 public final class PlantPushClient {
@@ -58,9 +62,6 @@ public final class PlantPushClient {
     static final float PULL = 0.3F, DAMP = 0.42F;
     /** How deep a mat is pressed at most, and how far aside (blocks). */
     static final float MOST_DIP = 0.35F, MOST_ASIDE = 0.25F;
-    /** Only entities this near the camera push plants on the client (blocks). */
-    static final double NEAR = 64;
-
     /** A plant's spring: its lean (a reed column: radians toward x and z; a mat: how far pressed, aside and down). */
     static final class Sway {
         final boolean reed;
@@ -106,10 +107,9 @@ public final class PlantPushClient {
             sway.wantX = 0;
             sway.wantZ = 0;
         }
-        Vec3 eye = mc.gameRenderer.getMainCamera().getPosition();
         for (Entity entity : level.entitiesForRendering()) {
-            if (PlantPush.pusher(entity) && entity.position().distanceToSqr(eye) < NEAR * NEAR) {
-                feel(level, entity);
+            if (PlantPush.pusher(entity)) {
+                feel(level, entity);    // (at any distance: the server marks for any pusher, and a marked plant needs its spring)
             }
         }
         for (Iterator<Map.Entry<BlockPos, Sway>> it = SWAYS.entrySet().iterator(); it.hasNext(); ) {
@@ -131,7 +131,9 @@ public final class PlantPushClient {
     /**
      * Adds what {@code entity} does to the plants under its boxes ({@link PlantPush#body}: its own and its body's hit
      * boxes; the same blocks the server marks): each leans away from the middle of the nearest box (and a little along its
-     * way), the more the nearer that middle. A plant under two boxes takes the push of the nearer.
+     * way), the more the nearer that middle. A plant under two boxes takes the push of the nearer. Which plants get a
+     * spring at all is {@link PlantPush#spring}'s rule: one under a box too far from its middle to lean, or marked and
+     * just beside a box, gets a spring that stands upright.
      */
     private static void feel(ClientLevel level, Entity entity) {
         double mx = entity.getX() - entity.xo, mz = entity.getZ() - entity.zo, ml = Math.sqrt(mx * mx + mz * mz);
@@ -145,27 +147,29 @@ public final class PlantPushClient {
         Map<BlockPos, double[]> pushes = new HashMap<>();       // foot -> {lean x, lean z, closeness, reed}
         for (net.minecraft.world.phys.AABB box : PlantPush.body(entity)) {
             Vec3 mid = box.getCenter();
-            double half = box.getXsize() / 2 + REACH, wantX = mx, wantZ = mz;
-            PlantPush.eachBlock(box, at -> {
+            double wantX = mx, wantZ = mz;
+            PlantPush.eachBlock(box.inflate(PlantPush.LEAD, 0, PlantPush.LEAD), at -> {
                 BlockState state = level.getBlockState(at);
                 boolean reed = state.getBlock() instanceof ReedBlock;
                 if (!reed && !(state.getBlock() instanceof HippoGrassBlock)) {
                     return;
                 }
-                BlockPos foot = reed ? ((ReedBlock) state.getBlock()).bottom(level, at) : at.immutable();
                 Vec3 off = state.getOffset(level, at);
-                double dx = at.getX() + 0.5 + off.x - mid.x, dz = at.getZ() + 0.5 + off.z - mid.z;
-                double d = Math.sqrt(dx * dx + dz * dz);
-                double close = Mth.clamp(1 - d / half, 0, 1);
-                double[] had = pushes.get(foot);
-                if (close <= 0 || had != null && had[2] >= close) {
+                double px = at.getX() + 0.5 + off.x, pz = at.getZ() + 0.5 + off.z;
+                double close = PlantPush.spring(box, at.getX(), at.getZ(), px, pz, state.getValue(PlantPush.PUSH) != PlantPush.STILL, REACH);
+                if (close < 0) {
                     return;
                 }
+                BlockPos foot = reed ? ((ReedBlock) state.getBlock()).bottom(level, at) : at.immutable();
+                double[] had = pushes.get(foot);
+                if (had != null && had[2] >= close) {
+                    return;
+                }
+                double dx = px - mid.x, dz = pz - mid.z, d = Math.sqrt(dx * dx + dz * dz);
                 double ux = d > 1.0E-3 ? dx / d : 0, uz = d > 1.0E-3 ? dz / d : 0;
                 double wx = ux + 0.6 * wantX, wz = uz + 0.6 * wantZ, wl = Math.sqrt(wx * wx + wz * wz);
-                if (wl >= 1.0E-3) {
-                    pushes.put(foot, new double[] {wx / wl, wz / wl, close, reed ? 1 : 0});
-                }
+                // (no way to lean, the pusher still and right on it: a spring all the same, upright)
+                pushes.put(foot, wl >= 1.0E-3 ? new double[] {wx / wl, wz / wl, close, reed ? 1 : 0} : new double[] {0, 0, 0, reed ? 1 : 0});
             });
         }
         pushes.forEach((foot, p) -> {

@@ -150,6 +150,8 @@ a screen never decides; until the word comes it keeps flying to the aim (it alre
 the aim one or two ticks more if the word is late. Add a plain unit test of `Ride` (screen guesses miss, then told 0, must
 grip; and the reverse), none exists today.
 
+**Status (2026-11-26, `claude/review-fix-a-4-6`): fixed: `Strikes.Ride.target` takes the server's word before anything else, whichever came first; told it grips after its own "missed", the screen's lioness eases from the aim she was drawn at onto her place from then on (`late`). Unit test `StrikesRideTest` (both ways round, the word before the guess, the server's own rule). Not seen in a game: how often the word comes late is still not known.**
+
 ### R4-2 (B, to measure; the extra drawing proven): every muddy animal near the camera is drawn two or three times over
 (Also found by the thread reader, who counts a pod of six muddy hippos at 2,400 boxes instead of 800.)
 **What is wrong:** the mud coat is drawn by drawing the whole model again with the mask texture (GeckoLib's `reRender`),
@@ -349,6 +351,8 @@ enough to lean, so it stands upright), and drop the `close <= 0` skip for blocks
 small least lean instead). That is the doc's own promise ("drawn upright"), with one rule: every marked plant the client
 can see has a spring. Fix the class comment. A game test cannot see the drawing; a unit test of `feel` with a box on a
 block corner can (every overlapped block gets a spring).
+
+**Status (2026-11-26, `claude/review-fix-a-4-6`): fixed: one rule, `PlantPush.spring`: every plant in a block a pusher's box overlaps gets a spring (upright when its middle is too far to lean), and every marked plant within a block of the box too (the server's box runs a little ahead of the drawn one); the 64-block cut is gone, so plants round far pushers are drawn. A plant on the pusher's very middle with no way to lean gets an upright spring too. Left: a plant marked with no pusher the client knows near it (joined mid-push, the pusher gone) still has none for its last two seconds. Unit test `PlantPushSpringTest` (a player's box on a block corner). Not seen in the game.**
 
 ### R4-13 (B, likely): a fly cloud goes silent for good after the sound system reloads
 (The reader graded it A. The leading session made it B: the link through Minecraft's sound engine was not opened, the trigger is rare in play (a resource reload or a new sound device) and walking away and back mends it.)
@@ -770,6 +774,8 @@ GeckoLib 4.9.3's `GeoEntityRenderer` does not override `shouldRender` (checked w
 tick before the beads are placed. One shared helper on the hit chain (the four copies would become one), e.g.
 `HitChain.cullingBox(box, extra)`.
 
+**Status (2026-11-26, `claude/review-fix-a-4-6`): fixed: `HitChain.cullingBox`: the walking box joined with every hit bead and a little more; the crocodile, the monitor and the otter have it now, and the buffalo's and the lion's own copies are this one helper (the chain's whole reach before the beads are first placed). Not seen in the game.**
+
 ### R4-24 (A, proven): a player or animal held by a crocodile gets a shadow stood on edge (and spun round in the death roll)
 **What is wrong:** `CrocodileRollClient` tips the held one's drawing (laid flat along the snout, leaning back in the tug
 of war, spun round the spine in the roll) by changing the drawing's frame in NeoForge's "before drawing a living thing"
@@ -793,6 +799,8 @@ its own `popPose`. Not filmed.
 handler that pops it for the same entity (keep a flag on the event's entity or test the same condition again). The body
 and its layers are still turned; the shadow, flame and name tag are not. (Or cancel the held one's shadow while held.)
 
+**Status (2026-11-26, `claude/review-fix-a-4-6`): fixed: `CrocodileRollClient.onDraw` saves the frame before it turns the held one (and runs last of all handlers), and it is put back when the held one's name is about to be drawn (`RenderNameTagEvent`, which Minecraft posts right after the body; the drawing's end as a second chance), so the name, the flames, the shadow and the F3+B box are upright. Not filmed.**
+
 ### R4-25 (A, likely): on a slow or stalling server the crocodile's death roll jumps back, and a held player's view spins back with it
 **What is wrong:** the roll's angle is worked out from the world's game time on the player's computer minus the tick the
 roll started on the server (`rollAngle`). As R12-61 proved for block moves, the player's side adds one to that time every
@@ -810,6 +818,8 @@ by `CrocodileModel.java:91-99`, `CrocodileRollClient.java:30-38` and `:48`.
 **Checked by the leading session:** `CrocodileEntity.rollAngle` (lines 600-611) reads `level().getGameTime()` on the screen; the mechanism is R12-61's, fixed there for block moves only. "Likely" as R12-61 was: no slow server was run.
 **Fix proposed:** the roll's drawn time through one never-rewinding clock per crocodile (the framework's `MoveClock`,
 keyed by the roll's start tick), used by the model, the held one's drawing and the camera alike.
+
+**Status (2026-11-26, `claude/review-fix-a-4-6`): fixed: on a screen `CrocodileEntity.rollAngle` reads the roll's own `MoveClock`, keyed by the roll's start tick, so the model, the held one and a held player's view never follow the game time back. As R12-61: no slow server was run.**
 
 ### R4-26 (B, proven): a GeckoLib animal held by a crocodile is never turned with the roll, laid along or made to struggle
 **What is wrong:** the held one's roll, lay-along and struggle are done in NeoForge's `RenderLivingEvent.Pre`, which only

@@ -904,15 +904,7 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
     /** Drawn whenever any of its body is in view: its box with its hit beads, and a little more for the tail. */
     @Override
     public AABB getBoundingBoxForCulling() {
-        AABB box = getBoundingBox();
-        if (firstTick) {
-            return box.inflate(2.4 * getScale(), 0.4 * getScale(), 2.4 * getScale());
-        }
-        for (net.neoforged.neoforge.entity.PartEntity<?> part : chain.parts()) {
-            box = box.minmax(part.getBoundingBox());
-        }
-        double tail = isCub() ? 0.6 : 1.3;
-        return box.inflate(tail * getScale(), 0.3 * getScale(), tail * getScale());
+        return chain.cullingBox(isCub() ? 0.6 : 1.3, 0.3);
     }
 
     @Override

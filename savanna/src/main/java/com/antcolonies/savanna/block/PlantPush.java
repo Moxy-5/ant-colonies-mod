@@ -73,6 +73,34 @@ public final class PlantPush {
         return boxes;
     }
 
+    /**
+     * How far round a pusher's box the client also looks for plants the server has marked (blocks): the server's box is
+     * a tick or two ahead of the one the client draws, and a plant stays marked a while after its pusher has gone on.
+     */
+    public static final double LEAD = 1.0;
+
+    /**
+     * The client's one rule of which plants get a spring from a pusher's box, and so are drawn while the server hides
+     * their plain model (review R4-12: a marked plant with no spring was drawn by nobody, it vanished): every plant in
+     * a block the box overlaps (the blocks the server marks, {@link #eachBlock}), and every marked plant beside it,
+     * within {@link #LEAD}.
+     *
+     * @param x      the plant's block
+     * @param midX   the plant's own middle (its block's, with its random offset)
+     * @param marked whether the server marks it pushed or settling now
+     * @param reach  how far past the box's side a plant's middle may lie and still lean (blocks)
+     * @return how much it leans from this box, 0 (it stands upright) to 1; below 0: no spring from this box
+     */
+    public static double spring(AABB box, int x, int z, double midX, double midZ, boolean marked, double reach) {
+        boolean under = x >= net.minecraft.util.Mth.floor(box.minX) && x <= net.minecraft.util.Mth.floor(box.maxX - 1.0E-7)
+                && z >= net.minecraft.util.Mth.floor(box.minZ) && z <= net.minecraft.util.Mth.floor(box.maxZ - 1.0E-7);
+        if (!under) {
+            return marked ? 0.0 : -1.0;
+        }
+        double dx = midX - (box.minX + box.maxX) / 2, dz = midZ - (box.minZ + box.maxZ) / 2;
+        return net.minecraft.util.Mth.clamp(1 - Math.sqrt(dx * dx + dz * dz) / (box.getXsize() / 2 + reach), 0, 1);
+    }
+
     /** Calls {@code each} for every block position {@code box} overlaps. */
     public static void eachBlock(AABB box, java.util.function.Consumer<BlockPos.MutableBlockPos> each) {
         BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos();

@@ -294,8 +294,14 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
      */
     @Override
     protected float ownSize() {
+        if (lengthMm <= 0.0F) {
+            // (Review R6-1: no length yet, so no species file is asked. A screen never has a length, and the species
+            // files are the server's alone: asking threw for a guest on a LAN world or a server. Its size comes
+            // from the server, which sends the scale.)
+            return 1.0F;
+        }
         SavannaNumbers.WorkerSizes sizes = sizes();
-        return sizes != null && lengthMm > 0.0F ? lengthMm / (hasMajorBody() ? sizes.majorModelMm() : sizes.minorModelMm()) : 1.0F;
+        return sizes != null ? lengthMm / (hasMajorBody() ? sizes.majorModelMm() : sizes.minorModelMm()) : 1.0F;
     }
 
     @Override

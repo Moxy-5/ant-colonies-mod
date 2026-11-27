@@ -2,6 +2,7 @@ package com.antcolonies.savanna.client;
 
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.animal.CrocodileEntity;
+import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 
 import net.minecraft.client.Minecraft;
@@ -10,9 +11,11 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLivingEvent;
+import net.neoforged.neoforge.client.event.RenderNameTagEvent;
 import net.neoforged.neoforge.client.event.ViewportEvent;
 import org.joml.Vector3f;
 
@@ -37,8 +40,21 @@ public final class CrocodileRollClient {
         }
     }
 
-    /** The held animal (or another player) is drawn turned round the crocodile's spine, the same way as its body. */
-    @SubscribeEvent
+    /**
+     * The held one whose drawing frame is turned now, and that frame: saved before the turn in {@link #onDraw} and
+     * put back in {@link #putBack} once its body is drawn (review R4-24).
+     */
+    private static LivingEntity turned;
+    private static PoseStack turnedFrame;
+
+    /**
+     * The held animal (or another player) is drawn turned round the crocodile's spine, the same way as its body.
+     * Only its body and what it wears: the frame is saved here first and put back before its name, and so before its
+     * shadow and its flames (review R4-24: Minecraft draws those after the body with the same frame, and nothing put
+     * the frame back, so a held player's shadow stood on edge in the air and spun round in the roll). Last of all
+     * handlers, so none after it can call the drawing off with the frame still saved.
+     */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onDraw(RenderLivingEvent.Pre<?, ?> event) {
         LivingEntity held = event.getEntity();
         if (!(held.getVehicle() instanceof CrocodileEntity croc)) {
@@ -46,6 +62,12 @@ public final class CrocodileRollClient {
         }
         float pt = event.getPartialTick();
         float roll = croc.rollAngle(pt);
+        if (roll == 0.0F && !(held instanceof Player) && croc.jaws() != CrocodileEntity.JAWS_DRAG) {
+            return; // (not turned at all)
+        }
+        turned = held;
+        turnedFrame = event.getPoseStack();
+        turnedFrame.pushPose();
         if (roll == 0.0F) {
             if (held instanceof Player) {
                 layAlong(event, croc, held, pt);
@@ -71,6 +93,26 @@ public final class CrocodileRollClient {
         pose.translate(-dx, -dy, -dz);
         if (held instanceof Player) {
             layAlong(event, croc, held, pt);
+        }
+    }
+
+    /** The name is drawn after the body, and the shadow and the flames after the name: all three upright. */
+    @SubscribeEvent
+    public static void onName(RenderNameTagEvent event) {
+        putBack(event.getEntity());
+    }
+
+    /** Should the name's turn never have come: the frame is put back when the drawing ends. */
+    @SubscribeEvent
+    public static void onDrawn(RenderLivingEvent.Post<?, ?> event) {
+        putBack(event.getEntity());
+    }
+
+    private static void putBack(Entity drawn) {
+        if (drawn == turned && turnedFrame != null) {
+            turnedFrame.popPose();
+            turned = null;
+            turnedFrame = null;
         }
     }
 

@@ -1035,8 +1035,12 @@ public class Raids {
         return column;
     }
 
-    /** Whether this ant may go raiding: a worker, whole, not clamped, not downed or fighting, carrying nothing (finding 3). */
-    private static boolean raiderFit(MatabeleEntity ant) {
+    /**
+     * Whether this ant may leave the nest on a colony errand, a raid or a scouting trip: a worker, whole, not clamped,
+     * not downed or fighting, carrying nothing (finding 3), no open wound. The one judge of it (review R6-3: the
+     * scouts had their own, which forgot the wound).
+     */
+    static boolean raiderFit(MatabeleEntity ant) {
         return ant.isAlive() && ant.isColonyWorker() && !ant.isCrippled() && !ant.clamp().isOn() && !ant.isDowned()
                 && !ant.fightsNoMore() && ant.getFightSpot() == null && !ant.hasFullMandibles()
                 && !ant.wounds().isOpen() && !ant.needsRescue(); // (M8 step 5: the hurt rest until the wound closes)

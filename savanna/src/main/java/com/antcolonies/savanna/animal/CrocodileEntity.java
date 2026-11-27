@@ -588,6 +588,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         return entityData.get(DATA_JAWS);
     }
 
+    /** Drawing only: the time its death roll is drawn at ({@link #rollAngle}); one roll is told from the next by its start tick. */
+    private final com.antcolonies.entity.body.MoveClock rollClock = new com.antcolonies.entity.body.MoveClock();
+
     void setJaws(byte jaws) {
         entityData.set(DATA_JAWS, jaws);
     }
@@ -595,14 +598,20 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     /**
      * How far round its spine it has turned in the death roll now (degrees; 0 when not rolling): three full turns in
      * two seconds, gathering speed and slowing to a stop, so it always ends the right way up. Read where it is drawn
-     * (the model, its prey, and a held player's camera all turn by it).
+     * (the model, its prey, and a held player's camera all turn by it). On a screen the time is the roll's own
+     * clock, which never follows the game time back (review R4-25: with the server slow or stalled the screen's time
+     * runs ahead and is set back once a second, and the roll, with a held player's view, jumped back with it).
      */
     public float rollAngle(float partialTick) {
         int start = entityData.get(DATA_ROLL);
         if (start == NO_ROLL) {
             return 0.0F;
         }
-        float t = ((int) level().getGameTime() - start + partialTick) / ROLL_TICKS;
+        double now = level().getGameTime() + (double) partialTick;
+        if (level().isClientSide) {
+            now = rollClock.at(start, now);
+        }
+        float t = (float) ((now - start) / ROLL_TICKS);
         if (t <= 0.0F || t >= 1.0F) {
             return 0.0F;
         }
@@ -1149,6 +1158,16 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     public boolean shouldRenderAtSqrDistance(double distanceSqr) {
         double reach = 96.0 * getViewScale();
         return distanceSqr < reach * reach;
+    }
+
+    /**
+     * Drawn whenever any of its body is in view (review R4-23): its walking box is 0.9 wide, its body 7.5 blocks long,
+     * so with Minecraft's own box the whole crocodile blinked out when its middle left the screen. Its box with its hit
+     * beads, and a little more for the snout's tip, the swinging tail and the roll.
+     */
+    @Override
+    public net.minecraft.world.phys.AABB getBoundingBoxForCulling() {
+        return chain.cullingBox(0.6, 0.5);
     }
 
     /**

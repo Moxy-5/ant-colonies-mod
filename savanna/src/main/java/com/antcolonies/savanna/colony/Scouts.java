@@ -309,11 +309,11 @@ public class Scouts {
     /**
      * Whether this ant is fit to scout: a major (the scouts in Longhurst and Howse 1979; my reading), whole, not busy
      * fighting, carrying nothing. A hungry one may scout (the raid code review, finding 3: a hungry colony's ants are
-     * hungry, and kept in they could never find it food; my pick).
+     * hungry, and kept in they could never find it food; my pick). Whole is the raid's own rule (review R6-3: one
+     * with an open wound, or badly hurt, rests in the nest until it is tended, and another major goes).
      */
     private static boolean fit(MatabeleEntity ant) {
-        return ant.isAlive() && ant.hasMajorBody() && !ant.isCrippled() && !ant.clamp().isOn() && !ant.isDowned()
-                && ant.getFightSpot() == null && !ant.hasFullMandibles();
+        return ant.hasMajorBody() && Raids.raiderFit(ant);
     }
 
     /**
