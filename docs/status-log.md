@@ -1457,3 +1457,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - 2026-11-27 (`claude/motion-phase1`): the user's call made: in the picture strips every other animal is drawn see-through (one even layer of glass), so none hides the animal checked.
 
 - 2026-11-27: `claude/raid-prove` (the raid soaks, BUGS 202, 450 and 451) merged with `claude/motion-glue` on the user's word ("Yes, merge it"), so the game folder `C:\Ant Mod` holds the raid fixes beside the Motion Studio's phase 2 work; no clash.
+- 2026-11-27: the merged code's `raids` run on 4 servers (the user's ask): 35 of 36, the one failure a flake (passed alone 3 of 3; BUGS 465).

@@ -15,7 +15,7 @@ for the number there).
 | Waiting for your call | 19 |
 | Behind the scenes (code review) | 168 |
 | Tool faults | 6 |
-| *Test flakes, in `docs/TEST-FLAKES.md`* | *50* |
+| *Test flakes, in `docs/TEST-FLAKES.md`* | *51* |
 
 ## A: it breaks play (1)
 
