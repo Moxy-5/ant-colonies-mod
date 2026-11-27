@@ -1,0 +1,213 @@
+Soak run: 6 servers, 4 game day(s) each, Fri Nov 27 11:09:23 PST 2026
+
+=== server 1 (seed 8675309) ===
+Soak report, seed 8675309
+Game days: 4.00 of 4 asked; restarts: 3
+Place: 2048, 2048
+Watched at the start:
+  megaponera_analis dbd96995 at 2108, 80, 2106, 40 members
+  macrotermes 335648f1 at 2051, 72, 2140, 218 members
+Watched now:
+  megaponera_analis dbd96995 at 2108, 80, 2106, 34 members
+  macrotermes 335648f1 at 2051, 72, 2140, 221 members
+Raids started: 4
+Raids ended, by the farthest stage reached: MARCH_HOME 3
+Pokes: trail-dig 1, save-and-load 6, trail-block 3, dig-nest 1, unload 8, raid 7,
+Rules broken: 0
+Ms a tick (one line a game minute, in soak-ticks.txt): lowest 0.08, middle 7.65, highest 31.48; first [day 0.05, 13:52] 8.25 ms a tick, 114 ticks a second, 84 insects; last [day 3.99, 12:28] 6.31 ms a tick, 146 ticks a second, 96 insects
+Slow things (B5; one line a game day in soak-trend.txt):
+  ms a tick: 10.41 the first 1 day(s), 7.22 the last 1
+  saves: 1404 kB on day 1, 1294 kB halfway, 1243 kB on the last day (-3.9 percent a day in the last half)
+  real insects in the world: 0 on day 1, 99 on the last day
+  strays folded in (stuck 3 minutes out of sight): 0
+  colony dbd96995: 40 members on day 1, 34 on the last day
+  colony 335648f1: 221 members on day 1, 221 on the last day
+Sizes by day (soak-sizes.txt):
+  [day 0.00, 12:40] megaponera_analis dbd96995 at 2108, 80, 2106, 40 members, save 36 kB; biggest: insideNest 13 kB, mealsInside 6 kB, nestReadyRooms 5 kB, field 1 kB, away 0 kB
+  [day 0.00, 12:40] macrotermes 335648f1 at 2051, 72, 2140, 218 members, save 137 kB; biggest: insideNest 69 kB, field 18 kB, mealsInside 13 kB, knownFood 9 kB, galleries 9 kB
+  [day 1.00, 12:40] megaponera_analis dbd96995 at 2108, 80, 2106, 40 members, save 60 kB; biggest: away 42 kB, nestReadyRooms 5 kB, raidTrails 1 kB, raidFinds 1 kB, field 1 kB
+  [day 1.00, 12:40] macrotermes 335648f1 at 2051, 72, 2140, 221 members, save 316 kB; biggest: galleries 68 kB, away 60 kB, insideNest 57 kB, hiddenTrips 34 kB, newTunnels 27 kB
+  [day 2.00, 12:40] megaponera_analis dbd96995 at 2108, 80, 2106, 34 members, save 31 kB; biggest: insideNest 8 kB, nestReadyRooms 5 kB, raidsAway 3 kB, raidTrails 2 kB, mealsInside 1 kB
+  [day 2.00, 12:40] macrotermes 335648f1 at 2051, 72, 2140, 221 members, save 243 kB; biggest: insideNest 71 kB, galleries 69 kB, newTunnels 27 kB, field 23 kB, knownFood 10 kB
+  [day 3.00, 12:40] megaponera_analis dbd96995 at 2108, 80, 2106, 34 members, save 18 kB; biggest: nestReadyRooms 5 kB, raidTrails 1 kB, field 1 kB, raidFinds 0 kB, nestLife 0 kB
+  [day 3.00, 12:40] macrotermes 335648f1 at 2051, 72, 2140, 221 members, save 229 kB; biggest: galleries 69 kB, insideNest 58 kB, newTunnels 27 kB, field 24 kB, knownFood 10 kB
+  [day 4.00, 12:39] megaponera_analis dbd96995 at 2108, 80, 2106, 34 members, save 18 kB; biggest: nestReadyRooms 5 kB, raidTrails 1 kB, raidFinds 1 kB, field 1 kB, away 0 kB
+  [day 4.00, 12:39] macrotermes 335648f1 at 2051, 72, 2140, 221 members, save 259 kB; biggest: galleries 69 kB, insideNest 58 kB, newTunnels 27 kB, field 25 kB, hiddenTrips 25 kB
+
+=== server 2 (seed 20261105) ===
+Soak report, seed 20261105
+Game days: 4.00 of 4 asked; restarts: 4
+Place: 18656, 2240
+Watched at the start:
+  megaponera_analis 7827d7ba at 18634, 80, 2291, 92 members
+  macrotermes 9f3a286f at 18696, 72, 2294, 134 members
+Watched now:
+  megaponera_analis 7827d7ba at 18634, 80, 2291, 87 members
+  macrotermes 9f3a286f at 18696, 72, 2294, 145 members
+Raids started: 12
+Raids ended, by the farthest stage reached: MARCH_HOME 6, DONE 3
+Pokes: trail-dig 3, save-and-load 3, dig-nest 6, trail-block 2, unload 3, raid 9,
+Rules broken: 0
+Ms a tick (one line a game minute, in soak-ticks.txt): lowest 0.64, middle 8.79, highest 47.72; first [day 0.05, 07:43] 9.91 ms a tick, 79 ticks a second, 131 insects; last [day 3.98, 06:02] 47.72 ms a tick, 102 ticks a second, 133 insects
+Slow things (B5; one line a game day in soak-trend.txt):
+  ms a tick: 10.27 the first 1 day(s), 7.58 the last 1
+  LOOK: saves: 2239 kB on day 1, 2284 kB halfway, 2414 kB on the last day (5.7 percent a day in the last half)
+  LOOK: real insects in the world: 136 on day 1, 2 on the last day
+  strays folded in (stuck 3 minutes out of sight): 0
+  colony 7827d7ba: 92 members on day 1, 90 on the last day
+  colony 9f3a286f: 155 members on day 1, 147 on the last day
+Sizes by day (soak-sizes.txt):
+  [day 0.00, 06:31] megaponera_analis 7827d7ba at 18634, 80, 2291, 92 members, save 54 kB; biggest: insideNest 31 kB, mealsInside 6 kB, nestReadyRooms 5 kB, field 1 kB, away 0 kB
+  [day 0.00, 06:31] macrotermes 9f3a286f at 18696, 72, 2294, 134 members, save 104 kB; biggest: insideNest 43 kB, galleries 14 kB, field 13 kB, mealsInside 10 kB, knownFood 4 kB
+  [day 1.00, 06:31] megaponera_analis 7827d7ba at 18634, 80, 2291, 92 members, save 29 kB; biggest: insideNest 5 kB, nestReadyRooms 5 kB, mealsInside 4 kB, raidTrails 1 kB, raidFinds 1 kB
+  [day 1.00, 06:31] macrotermes 9f3a286f at 18696, 72, 2294, 155 members, save 160 kB; biggest: galleries 57 kB, insideNest 33 kB, newTunnels 20 kB, field 15 kB, mealsInside 7 kB
+  [day 2.00, 06:31] megaponera_analis 7827d7ba at 18634, 80, 2291, 92 members, save 31 kB; biggest: insideNest 5 kB, nestReadyRooms 5 kB, raidsAway 4 kB, raidTrails 3 kB, raidFinds 1 kB
+  [day 2.00, 06:31] macrotermes 9f3a286f at 18696, 72, 2294, 149 members, save 207 kB; biggest: galleries 58 kB, hiddenTrips 44 kB, insideNest 31 kB, newTunnels 20 kB, field 16 kB
+  [day 3.00, 06:31] megaponera_analis 7827d7ba at 18634, 80, 2291, 90 members, save 134 kB; biggest: away 79 kB, insideNest 31 kB, nestReadyRooms 5 kB, raidsAway 2 kB, raidTrails 2 kB
+  [day 3.00, 06:31] macrotermes 9f3a286f at 18696, 72, 2294, 147 members, save 254 kB; biggest: away 64 kB, galleries 59 kB, insideNest 48 kB, newTunnels 20 kB, field 17 kB
+  [day 4.00, 06:30] megaponera_analis 7827d7ba at 18634, 80, 2291, 87 members, save 24 kB; biggest: nestReadyRooms 5 kB, insideNest 4 kB, mealsInside 1 kB, raidTrails 1 kB, field 1 kB
+  [day 4.00, 06:30] macrotermes 9f3a286f at 18696, 72, 2294, 145 members, save 207 kB; biggest: galleries 60 kB, hiddenTrips 34 kB, insideNest 31 kB, newTunnels 20 kB, field 16 kB
+
+=== server 3 (seed 424242) ===
+Soak report, seed 424242
+Game days: 4.00 of 4 asked; restarts: 4
+Place: 31264, 1536
+Watched at the start:
+  megaponera_analis 61860bb4 at 31220, 77, 1448, 40 members
+  macrotermes 525786c2 at 31188, 72, 1495, 185 members
+Watched now:
+  megaponera_analis 61860bb4 at 31220, 77, 1448, 11 members
+  macrotermes 525786c2 at 31188, 72, 1495, 211 members
+Raids started: 3 (1 out now)
+Raids ended, by the farthest stage reached:
+Pokes: trail-dig 1, save-and-load 9, unload 6, raid 14,
+Rules broken: 3 (all in soak-breaches.txt, each with its report folder)
+  not-stuck: 1
+    [day 2.63, 11:48] not-stuck at 31205, 69, 1473: 1 insect(s) with a route but not moving for 30 s or more: matabele_minor 39b9c263 at 31205, 69, 1473 (report reports/2026-11-27_11-04-03-not-stuck)
+  raider-stuck: 2
+    [day 2.63, 11:49] raider-stuck at 31194, 70, 1473: 1 raider(s) stuck: 154251d1 told to 31199, 71, 1467 (8 off), still 30 s (report reports/2026-11-27_11-04-04-raider-stuck)
+    [day 2.80, 15:56] raider-stuck at 31195, 71, 1471: 1 raider(s) stuck: 154251d1 going home (the march home's time ran out), still 60 s (report reports/2026-11-27_11-04-45-raider-stuck)
+Ms a tick (one line a game minute, in soak-ticks.txt): lowest 0.14, middle 6.17, highest 25.85; first [day 0.05, 21:56] 8.03 ms a tick, 104 ticks a second, 88 insects; last [day 3.98, 20:16] 0.14 ms a tick, 3732 ticks a second, 0 insects
+Slow things (B5; one line a game day in soak-trend.txt):
+  ms a tick: 8.95 the first 1 day(s), 5.79 the last 1
+  saves: 1948 kB on day 1, 2213 kB halfway, 1909 kB on the last day (-13.7 percent a day in the last half)
+  real insects in the world: 88 on day 1, 74 on the last day
+  LOOK: strays folded in (stuck 3 minutes out of sight): 1
+  colony 61860bb4: 40 members on day 1, 24 on the last day
+  colony 525786c2: 203 members on day 1, 205 on the last day
+Sizes by day (soak-sizes.txt):
+  [day 0.00, 20:44] megaponera_analis 61860bb4 at 31220, 77, 1448, 40 members, save 34 kB; biggest: insideNest 13 kB, mealsInside 6 kB, nestReadyRooms 4 kB, field 1 kB, away 0 kB
+  [day 0.00, 20:44] macrotermes 525786c2 at 31188, 72, 1495, 185 members, save 102 kB; biggest: insideNest 59 kB, mealsInside 12 kB, knownFood 6 kB, galleries 6 kB, field 4 kB
+  [day 1.00, 20:44] megaponera_analis 61860bb4 at 31220, 77, 1448, 40 members, save 14 kB; biggest: nestReadyRooms 4 kB, field 1 kB, nestLife 0 kB, away 0 kB, preyPile 0 kB
+  [day 1.00, 20:44] macrotermes 525786c2 at 31188, 72, 1495, 203 members, save 280 kB; biggest: hiddenTrips 102 kB, galleries 65 kB, insideNest 49 kB, field 14 kB, newTunnels 12 kB
+  [day 2.00, 20:44] megaponera_analis 61860bb4 at 31220, 77, 1448, 40 members, save 15 kB; biggest: nestReadyRooms 4 kB, field 1 kB, raidFinds 0 kB, nestLife 0 kB, away 0 kB
+  [day 2.00, 20:44] macrotermes 525786c2 at 31188, 72, 1495, 213 members, save 553 kB; biggest: hiddenTrips 368 kB, galleries 66 kB, insideNest 52 kB, field 14 kB, newTunnels 12 kB
+  [day 3.00, 20:44] megaponera_analis 61860bb4 at 31220, 77, 1448, 24 members, save 17 kB; biggest: nestReadyRooms 4 kB, raidFinds 1 kB, raidTrails 1 kB, field 1 kB, nestLife 0 kB
+  [day 3.00, 20:44] macrotermes 525786c2 at 31188, 72, 1495, 205 members, save 261 kB; biggest: galleries 71 kB, hiddenTrips 70 kB, insideNest 50 kB, newTunnels 14 kB, field 14 kB
+  [day 4.00, 20:43] megaponera_analis 61860bb4 at 31220, 77, 1448, 11 members, save 20 kB; biggest: nestReadyRooms 4 kB, raidsAway 3 kB, raidTrails 1 kB, field 1 kB, raidFinds 0 kB
+  [day 4.00, 20:43] macrotermes 525786c2 at 31188, 72, 1495, 211 members, save 246 kB; biggest: galleries 76 kB, insideNest 54 kB, hiddenTrips 41 kB, newTunnels 15 kB, field 13 kB
+
+=== server 4 (seed 1300) ===
+Soak report, seed 1300
+Game days: 4.00 of 4 asked; restarts: 3
+Place: 2048, 2048
+Watched at the start:
+  megaponera_analis 169c33fc at 2075, 84, 2044, 54 members
+  macrotermes 44a20e67 at 2117, 71, 1994, 189 members
+Watched now:
+  megaponera_analis 169c33fc at 2075, 84, 2044, 35 members
+  macrotermes 44a20e67 at 2117, 71, 1994, 219 members
+Raids started: 7
+Raids ended, by the farthest stage reached: MARCH_HOME 3, DONE 2
+Pokes: trail-dig 1, save-and-load 6, trail-block 5, dig-nest 2, unload 3, kill-raider 1, raid 10,
+Rules broken: 2 (all in soak-breaches.txt, each with its report folder)
+  raider-stuck: 2
+    [day 2.43, 23:39] raider-stuck at 2116, 71, 1965: 2 raider(s) stuck: 96c40344 told to 2113, 71, 1988 (23 off), still 30 s; d757144c told to 2113, 71, 1988 (23 off), still 30 s (report reports/2026-11-27_11-00-24-raider-stuck)
+    [day 2.46, 00:24] raider-stuck at 2116, 71, 1965: 1 raider(s) stuck: d757144c told to 2113, 71, 1985 (20 off), still 67 s
+Ms a tick (one line a game minute, in soak-ticks.txt): lowest 0.11, middle 9.86, highest 24.27; first [day 0.05, 14:28] 10.74 ms a tick, 81 ticks a second, 105 insects; last [day 3.99, 13:00] 6.98 ms a tick, 154 ticks a second, 100 insects
+Slow things (B5; one line a game day in soak-trend.txt):
+  ms a tick: 11.58 the first 1 day(s), 12.06 the last 1
+  saves: 1463 kB on day 1, 1444 kB halfway, 1439 kB on the last day (-0.3 percent a day in the last half)
+  real insects in the world: 117 on day 1, 117 on the last day
+  strays folded in (stuck 3 minutes out of sight): 0
+  colony 169c33fc: 51 members on day 1, 49 on the last day
+  colony 44a20e67: 209 members on day 1, 218 on the last day
+Sizes by day (soak-sizes.txt):
+  [day 0.00, 13:16] megaponera_analis 169c33fc at 2075, 84, 2044, 54 members, save 41 kB; biggest: insideNest 18 kB, mealsInside 6 kB, nestReadyRooms 6 kB, field 1 kB, away 0 kB
+  [day 0.00, 13:16] macrotermes 44a20e67 at 2117, 71, 1994, 189 members, save 110 kB; biggest: insideNest 60 kB, mealsInside 12 kB, galleries 10 kB, knownFood 9 kB, noRouteUntil 2 kB
+  [day 1.00, 13:16] megaponera_analis 169c33fc at 2075, 84, 2044, 51 members, save 19 kB; biggest: nestReadyRooms 6 kB, away 1 kB, raidTrails 1 kB, field 1 kB, raidFinds 0 kB
+  [day 1.00, 13:16] macrotermes 44a20e67 at 2117, 71, 1994, 209 members, save 247 kB; biggest: galleries 78 kB, insideNest 52 kB, hiddenTrips 33 kB, newTunnels 20 kB, field 19 kB
+  [day 2.00, 13:16] megaponera_analis 169c33fc at 2075, 84, 2044, 51 members, save 23 kB; biggest: nestReadyRooms 6 kB, raidTrails 3 kB, raidFinds 3 kB, field 1 kB, away 0 kB
+  [day 2.00, 13:16] macrotermes 44a20e67 at 2117, 71, 1994, 215 members, save 219 kB; biggest: galleries 79 kB, insideNest 54 kB, newTunnels 20 kB, field 19 kB, knownFood 9 kB
+  [day 3.00, 13:16] megaponera_analis 169c33fc at 2075, 84, 2044, 49 members, save 24 kB; biggest: nestReadyRooms 6 kB, raidsAway 4 kB, raidTrails 2 kB, raidFinds 1 kB, field 1 kB
+  [day 3.00, 13:16] macrotermes 44a20e67 at 2117, 71, 1994, 218 members, save 226 kB; biggest: galleries 82 kB, insideNest 54 kB, newTunnels 21 kB, field 19 kB, knownFood 9 kB
+  [day 4.00, 13:15] megaponera_analis 169c33fc at 2075, 84, 2044, 35 members, save 22 kB; biggest: nestReadyRooms 6 kB, raidTrails 3 kB, raidFinds 2 kB, field 1 kB, nestLife 0 kB
+  [day 4.00, 13:15] macrotermes 44a20e67 at 2117, 71, 1994, 219 members, save 232 kB; biggest: galleries 86 kB, insideNest 55 kB, newTunnels 21 kB, field 20 kB, knownFood 10 kB
+
+=== server 5 (seed 77777) ===
+Soak report, seed 77777
+Game days: 4.00 of 4 asked; restarts: 3
+Place: 2048, 2048
+Watched at the start:
+  megaponera_analis 856cdb55 at 2108, 77, 2089, 66 members
+  macrotermes 6f781f05 at 2058, 70, 2044, 221 members
+Watched now:
+  megaponera_analis 856cdb55 at 2108, 77, 2089, 66 members
+  macrotermes 6f781f05 at 2058, 70, 2044, 221 members
+Raids started: 0
+Raids ended, by the farthest stage reached:
+Pokes: save-and-load 10, dig-nest 11, unload 3,
+Rules broken: 0
+Ms a tick (one line a game minute, in soak-ticks.txt): lowest 0.08, middle 7.10, highest 20.43; first [day 0.05, 12:03] 15.94 ms a tick, 103 ticks a second, 53 insects; last [day 3.98, 10:25] 5.52 ms a tick, 684 ticks a second, 59 insects
+Slow things (B5; one line a game day in soak-trend.txt):
+  ms a tick: 8.39 the first 1 day(s), 5.92 the last 1
+  saves: 726 kB on day 1, 582 kB halfway, 588 kB on the last day (1.0 percent a day in the last half)
+  real insects in the world: 52 on day 1, 57 on the last day
+  strays folded in (stuck 3 minutes out of sight): 0
+  colony 856cdb55: 66 members on day 1, 66 on the last day
+  colony 6f781f05: 221 members on day 1, 221 on the last day
+Sizes by day (soak-sizes.txt):
+  [day 0.00, 10:51] megaponera_analis 856cdb55 at 2108, 77, 2089, 66 members, save 45 kB; biggest: insideNest 23 kB, mealsInside 6 kB, nestReadyRooms 5 kB, field 1 kB, away 0 kB
+  [day 0.00, 10:51] macrotermes 6f781f05 at 2058, 70, 2044, 221 members, save 131 kB; biggest: insideNest 70 kB, galleries 13 kB, mealsInside 13 kB, field 10 kB, knownFood 4 kB
+  [day 1.00, 10:51] megaponera_analis 856cdb55 at 2108, 77, 2089, 66 members, save 45 kB; biggest: insideNest 23 kB, mealsInside 6 kB, nestReadyRooms 5 kB, field 1 kB, away 0 kB
+  [day 1.00, 10:51] macrotermes 6f781f05 at 2058, 70, 2044, 221 members, save 361 kB; biggest: hiddenTrips 148 kB, galleries 75 kB, insideNest 57 kB, newTunnels 26 kB, field 15 kB
+  [day 2.00, 10:51] megaponera_analis 856cdb55 at 2108, 77, 2089, 66 members, save 46 kB; biggest: insideNest 23 kB, mealsInside 7 kB, nestReadyRooms 5 kB, field 1 kB, nestLife 0 kB
+  [day 2.00, 10:51] macrotermes 6f781f05 at 2058, 70, 2044, 221 members, save 216 kB; biggest: galleries 76 kB, insideNest 57 kB, newTunnels 26 kB, field 15 kB, mealsInside 9 kB
+  [day 3.00, 10:51] megaponera_analis 856cdb55 at 2108, 77, 2089, 66 members, save 47 kB; biggest: insideNest 23 kB, mealsInside 7 kB, nestReadyRooms 5 kB, field 1 kB, raidFinds 0 kB
+  [day 3.00, 10:51] macrotermes 6f781f05 at 2058, 70, 2044, 221 members, save 222 kB; biggest: galleries 76 kB, insideNest 57 kB, newTunnels 26 kB, field 15 kB, mealsInside 10 kB
+  [day 4.00, 10:50] megaponera_analis 856cdb55 at 2108, 77, 2089, 66 members, save 47 kB; biggest: insideNest 23 kB, mealsInside 7 kB, nestReadyRooms 5 kB, field 1 kB, raidFinds 0 kB
+  [day 4.00, 10:50] macrotermes 6f781f05 at 2058, 70, 2044, 221 members, save 278 kB; biggest: galleries 77 kB, insideNest 57 kB, hiddenTrips 57 kB, newTunnels 26 kB, field 15 kB
+
+=== server 6 (seed 31415926) ===
+Soak report, seed 31415926
+Game days: 4.00 of 4 asked; restarts: 3
+Place: 32, 32
+Watched at the start:
+  megaponera_analis f89643fd at -25, 74, 75, 35 members
+  macrotermes b0d21286 at 9, 71, 116, 180 members
+Watched now:
+  megaponera_analis f89643fd at -25, 74, 75, 30 members
+  macrotermes b0d21286 at 9, 71, 116, 203 members
+Raids started: 6
+Raids ended, by the farthest stage reached: MARCH_HOME 4
+Pokes: trail-dig 3, save-and-load 4, dig-nest 4, unload 5, raid 9,
+Rules broken: 0
+Ms a tick (one line a game minute, in soak-ticks.txt): lowest 0.06, middle 8.21, highest 21.68; first [day 0.05, 09:50] 10.74 ms a tick, 72 ticks a second, 84 insects; last [day 3.97, 07:55] 7.00 ms a tick, 138 ticks a second, 88 insects
+Slow things (B5; one line a game day in soak-trend.txt):
+  ms a tick: 9.81 the first 1 day(s), 8.36 the last 1
+  saves: 728 kB on day 1, 570 kB halfway, 572 kB on the last day (0.4 percent a day in the last half)
+  real insects in the world: 87 on day 1, 90 on the last day
+  strays folded in (stuck 3 minutes out of sight): 0
+  colony f89643fd: 35 members on day 1, 31 on the last day
+  colony b0d21286: 196 members on day 1, 196 on the last day
+Sizes by day (soak-sizes.txt):
+  [day 0.00, 08:38] megaponera_analis f89643fd at -25, 74, 75, 35 members, save 33 kB; biggest: insideNest 11 kB, mealsInside 6 kB, nestReadyRooms 5 kB, field 1 kB, away 0 kB
+  [day 0.00, 08:38] macrotermes b0d21286 at 9, 71, 116, 180 members, save 124 kB; biggest: insideNest 57 kB, galleries 15 kB, knownFood 14 kB, mealsInside 12 kB, field 5 kB
+  [day 1.00, 08:38] megaponera_analis f89643fd at -25, 74, 75, 35 members, save 15 kB; biggest: nestReadyRooms 5 kB, field 1 kB, nestLife 0 kB, away 0 kB, preyPile 0 kB
+  [day 1.00, 08:38] macrotermes b0d21286 at 9, 71, 116, 196 members, save 368 kB; biggest: hiddenTrips 176 kB, galleries 61 kB, insideNest 47 kB, field 25 kB, newTunnels 13 kB
+  [day 2.00, 08:38] megaponera_analis f89643fd at -25, 74, 75, 31 members, save 22 kB; biggest: nestReadyRooms 5 kB, raidsAway 3 kB, raidTrails 2 kB, raidFinds 1 kB, field 1 kB
+  [day 2.00, 08:38] macrotermes b0d21286 at 9, 71, 116, 195 members, save 204 kB; biggest: galleries 65 kB, insideNest 47 kB, field 28 kB, newTunnels 14 kB, knownFood 14 kB
+  [day 3.00, 08:38] megaponera_analis f89643fd at -25, 74, 75, 31 members, save 18 kB; biggest: nestReadyRooms 5 kB, raidTrails 1 kB, raidFinds 1 kB, field 1 kB, nestLife 0 kB
+  [day 3.00, 08:38] macrotermes b0d21286 at 9, 71, 116, 196 members, save 211 kB; biggest: galleries 68 kB, insideNest 47 kB, field 28 kB, newTunnels 15 kB, knownFood 14 kB
+  [day 4.00, 08:37] megaponera_analis f89643fd at -25, 74, 75, 30 members, save 18 kB; biggest: nestReadyRooms 5 kB, raidTrails 1 kB, field 1 kB, raidFinds 1 kB, away 0 kB
+  [day 4.00, 08:37] macrotermes b0d21286 at 9, 71, 116, 203 members, save 347 kB; biggest: hiddenTrips 133 kB, galleries 69 kB, insideNest 51 kB, field 28 kB, newTunnels 15 kB

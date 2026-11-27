@@ -649,6 +649,24 @@ in where things are, not in size: `Raids` lost a third.
 **Left for step 6:** the soaks and the full run; BUGS 93/212 and 171 want about 20 runs alone each; whether a watched
 raid should also take termites under the mud (BUGS 202's open half).
 
+## Step 6 as run (2026-11-27): the soaks
+
+Two runs of `tools/soak.sh 6 4` on `claude/raid-prove` (reports `docs/soaks/2026-11-27-raid-prove-6x4.txt` and
+`-after.txt`). Against "Done when":
+
+- **Every raid ends in Done within its deadlines:** yes, in both runs; no hang, no crash, no exception.
+- **No raid marches to a spot with no termites:** the first run had 13 of 27 watched attacks sting nothing (BUGS 202:
+  no way in, and the termites under the mud only numbers). Fixed between the runs; the second had 4 of 11 (BUGS 452).
+- **The start crash is gone:** yes.
+- **Near and away bring home the same catch:** nearer: a watched attack at an under-cover spot now finds as many
+  termites in the gallery as the numbers' rule would have taken (`Raid.bringOutFeeders`).
+- **The colonies eat:** not yet. Watched colonies shrank in both runs; BUGS 450 (the tail left behind at the halt)
+  and 451 (the march out's time is up) cost about half the raids their ants or their attack.
+- **The user watches raids:** left.
+
+The guard film `r_crowd_space` and the full run were not run (the change touches no body and no march code; the
+`raids,soldiers,away` categories were run).
+
 ## Rules for the session doing this
 
 - Read `CLAUDE.md` first; ants and termites are strict realism.
