@@ -51,6 +51,9 @@ Rounds 5 and 9 are big enough to split in two sessions each if a session runs sh
 grade A, `docs/reviews/full/round-02-legs.md`; fixes not started), 7, 8, 9, 10 (fixed and merged) and 11. Not read
 yet: 3, 4, 5, 6.
 
+**Round 6 (2026-11-26):** read, the Matabele ants all but the raids: 33 findings, 3 of grade A, 8 waiting for the
+user's call (`docs/reviews/full/round-06-matabele.md`, branch `claude/review-round-6`); fixes not started.
+
 ## What every round looks for (the user's order, 2026-11-23: lag first, then behaviours that fight, then bugs)
 
 ### 1. Lag (high tick times)
