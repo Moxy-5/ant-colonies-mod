@@ -13,17 +13,19 @@ the game drew them, its clips and its mind's facts) and reports, for each hunter
     python tools/pair_report.py <scene folder> [--prey <name>]      (default prey: film-calf)
     e.g. python tools/pair_report.py run-film/screenshots/lion_hunt
 
-The game is the one truth: this only reads what the game drew. Moments of two animals are matched by the game tick
-the recorder wrote beside each ("ft") and the in-between time; an animal is in the files only while it was drawn.
+The game is the one truth: this only reads what the game drew. Moments of two animals are matched by the client's tick
+count the recorder wrote beside each ("ct", 2026-11-27 on; the game tick "ft" in older files) and the in-between time,
+and timed by them (tools/recording.py); an animal is in the files only while it was drawn.
 Writes the report to pair_report.txt in the folder too.
 """
 import glob
-import gzip
 import json
 import math
 import os
 import statistics
 import sys
+
+import recording
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -39,11 +41,12 @@ def plan_of(entity):
 
 class Animal:
     def __init__(self, path):
-        with gzip.open(path, 'rt', encoding='utf-8') as f:
-            lines = [json.loads(line) for line in f if line.strip()]
+        header, moments, blocks, _, trouble = recording.read(path)
+        if trouble:
+            print(f'{os.path.basename(path)}: {trouble}', file=sys.stderr)
         self.file = os.path.basename(path)
-        self.header = lines[0]
-        self.frames = [f for f in lines[1:] if 'ft' in f]
+        self.header = header
+        self.frames = [f for f in moments if 'ft' in f]
         self.name = self.header.get('name', self.file)
         self.entity = self.header['entity']
         self.plan = plan_of(self.entity)
@@ -54,14 +57,20 @@ class Animal:
         self.cubes = [[tuple(c[i:i + 3] for i in range(0, 24, 3)) for c in b['cubes']] for b in bones]
         self.tops = {}                     # each column's block tops (the ground and anything on it)
         # (the first line's blocks, and those of each "more" line written as the animal went on: R12-48)
-        for line in [self.header] + [line for line in lines[1:] if 'blocks' in line]:
-            for entry in line['blocks']:
-                x, y, z = entry[:3]
-                for box in entry[3:]:
-                    self.tops.setdefault((x, z), []).append(y + box[4])
+        for entry in blocks:
+            x, y, z = entry[:3]
+            for box in entry[3:]:
+                self.tops.setdefault((x, z), []).append(y + box[4])
         self.by_time = {}
         for f in self.frames:
             self.by_time.setdefault(f['ft'], []).append(f)
+        # (the replay page's review, 2026-11-27: two animals' moments drawn in one frame share the client's tick
+        # count "ct" and the in-between time; the game tick is read live, so through a frozen step of k ticks all k
+        # moments read its end, and a sprinting server reads a few ticks apart within one frame)
+        self.by_clock = {}
+        for f in self.frames:
+            if 'ct' in f:
+                self.by_clock.setdefault(f['ct'], []).append(f)
 
     def ground_under(self, p):
         """The highest block top under this point and at most half a block above it (flat ground: the grass top), or
@@ -100,12 +109,13 @@ class Animal:
     def clip(self, f):
         return f['clips'].get('body', '-').split(' ')[0]
 
-    def at(self, ft, pt):
-        """Its moment nearest this game tick and in-between time, or None."""
-        frames = self.by_time.get(ft)
+    def at(self, other):
+        """Its moment drawn with another animal's moment: the same client tick when both have one (the nearest
+        in-between time in it), else the same game tick, or None."""
+        frames = self.by_clock.get(other['ct']) if 'ct' in other and self.by_clock else self.by_time.get(other['ft'])
         if not frames:
             return None
-        return min(frames, key=lambda f: abs(f['pt'] - pt))
+        return min(frames, key=lambda f: abs(f['pt'] - other['pt']))
 
 
 def sub(a, b):
@@ -220,7 +230,7 @@ def report(folder, prey_name):
         rows = []
         for f in holds:
             jaw = a.point(f, carry)
-            pm = prey.at(f['ft'], f['pt'])
+            pm = prey.at(f)
             if jaw is None or pm is None:
                 continue
             g = min(box_gap(jaw, box) for box in prey.boxes(pm))
@@ -249,7 +259,7 @@ def report(folder, prey_name):
                 key = foot
                 # a tick's worth: the drawn places are in-between ones, so by the real time between the two moments
                 # (review R12-17: neighbouring ticks' moments lie anywhere from near 0 to near 2 ticks apart)
-                now = f['ft'] + f.get('pt', 0.0)
+                now = recording.clock(f)
                 if planted and key in prev and prev[key][0] is not None and 0.25 <= now - prev[key][0] <= 2.0:
                     slides.append(math.hypot(low[0] - prev[key][1][0], low[2] - prev[key][1][2]) / (now - prev[key][0]))
                 prev[key] = (now, low) if planted else (None, None)
@@ -259,7 +269,7 @@ def report(folder, prey_name):
         elif unknown:
             say(f'feet while holding: NO GROUND KNOWN under its feet at {unknown} foot moments (no blocks recorded '
                 'there): sliding not judged')
-        apart = lambda f1, f2: f2['ft'] + f2.get('pt', 0.0) - f1['ft'] - f1.get('pt', 0.0)
+        apart = lambda f1, f2: recording.clock(f2) - recording.clock(f1)
         moved = [math.hypot(f2['pos'][0] - f1['pos'][0], f2['pos'][2] - f1['pos'][2]) / apart(f1, f2)
                  for f1, f2 in zip(holds, holds[1:]) if 0.25 <= apart(f1, f2) <= 2.0]
         if moved:

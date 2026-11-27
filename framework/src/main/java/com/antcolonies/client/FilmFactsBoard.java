@@ -31,10 +31,16 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 final class FilmFactsBoard {
     private static final Logger LOG = LogUtils.getLogger();
 
-    /** Each animal's facts at the last game tick (made new each tick: never changed once out). */
-    private static volatile Map<UUID, Map<String, Object>> board = Map.of();
-    /** The game tick the board is from. */
-    private static volatile long boardTick;
+    /**
+     * Each animal's facts at the last game tick (made new each tick: never changed once out) and that tick, the
+     * overworld's game time, which goes on only on ticks that run (not while the game is frozen, but on each tick a
+     * frozen step runs): one object, so a reader never pairs one tick's facts with another tick (the Motion Studio,
+     * phase 1, 2026-11-27; it was the server's tick count, which goes on while frozen, written beside the facts).
+     */
+    record Board(Map<UUID, Map<String, Object>> facts, long tick) {
+    }
+
+    private static volatile Board board = new Board(Map.of(), 0);
     /** The filmed scene's job, run each game tick (null when none). */
     private static volatile Runnable stageJob;
 
@@ -73,17 +79,21 @@ final class FilmFactsBoard {
                 now.put(entity.getUUID(), java.util.Collections.unmodifiableMap(out));   // its own order kept
             }
         }
-        board = now;
-        boardTick = event.getServer().getTickCount();
+        board = new Board(now, event.getServer().overworld().getGameTime());
     }
 
     /** This animal's facts at the last game tick, or an empty map. */
     static Map<String, Object> of(UUID id) {
-        return board.getOrDefault(id, Map.of());
+        return board.facts().getOrDefault(id, Map.of());
+    }
+
+    /** The last game tick's facts and the tick, together. */
+    static Board snapshot() {
+        return board;
     }
 
     static long tick() {
-        return boardTick;
+        return board.tick();
     }
 
     /**
@@ -93,7 +103,7 @@ final class FilmFactsBoard {
     @Nullable
     static UUID find(String key, String value) {
         UUID best = null;
-        for (Map.Entry<UUID, Map<String, Object>> e : board.entrySet()) {
+        for (Map.Entry<UUID, Map<String, Object>> e : board.facts().entrySet()) {
             Object v = e.getValue().get(key);
             if (v != null && String.valueOf(v).toLowerCase(Locale.ROOT).equals(value.toLowerCase(Locale.ROOT))
                     && (best == null || e.getKey().compareTo(best) < 0)) {

@@ -50,12 +50,13 @@ each its summon id, its summon data (its size fixed, so every run is the same an
 (as its goals send it), "bpt" (blocks a tick it goes at speed 1.0, measured on the course) and optional "setup"
 (camera commands before the scene).
 """
-import gzip, json, math, os, statistics, subprocess, sys
+import json, math, os, statistics, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT = os.path.normpath(os.path.join(HERE, '..'))
 sys.path.insert(0, HERE)
 import body_plan  # noqa: E402
+import recording  # noqa: E402
 
 COURSE = os.path.join(PROJECT, 'tools', 'film', 'course')
 SHOTS = os.path.join(PROJECT, 'run-film', 'screenshots')
@@ -281,11 +282,10 @@ def scenes_of(animal, scare=True):
 # --- reading a recording ----------------------------------------------------------------------------------------------
 class Recording:
     def __init__(self, path):
-        with gzip.open(path, 'rt', encoding='utf-8') as f:
-            lines = [json.loads(line) for line in f if line.strip()]
-        self.header = lines[0]
-        # (a "more" line holds the blocks round a place the animal went on to: code review R12-48)
-        self.frames = [line for line in lines[1:] if 'b' in line]
+        # (one reader of the format for every tool: tools/recording.py; a "more" line's blocks, R12-48, come with it)
+        self.header, self.frames, blocks, water, trouble = recording.read(path)
+        if trouble:
+            print(f'{path}: {trouble}', file=sys.stderr)
         self.names = [b['name'] for b in self.header['bones']]
         self.index = {n: i for i, n in enumerate(self.names)}
         self.parent = {b['name']: b.get('parent') for b in self.header['bones']}
@@ -295,11 +295,8 @@ class Recording:
         for cubes in self.cubes:
             pts = [p for c in cubes for p in c]
             self.center.append(tuple(sum(p[k] for p in pts) / len(pts) for k in range(3)) if pts else (0.0, 0.0, 0.0))
-        self.blocks, self.water = {}, {}
-        for line in [self.header] + [line for line in lines[1:] if 'blocks' in line]:
-            for entry in line['blocks']:
-                self.blocks[tuple(entry[:3])] = [tuple(b) for b in entry[3:]]
-            self.water.update({tuple(w[:3]): w[3] for w in line['water']})
+        self.blocks = {tuple(entry[:3]): [tuple(b) for b in entry[3:]] for entry in blocks}
+        self.water = {tuple(w[:3]): w[3] for w in water}
         self._lips = {}
         # one model pixel in blocks: the root bone's scale over 16
         first = next(f for f in self.frames if f['b'][0] != 0)

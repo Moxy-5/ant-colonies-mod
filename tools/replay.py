@@ -15,27 +15,28 @@ wrote, through the matrix the game drew its bone with; nothing is blended betwee
 not draw (an animal out of the camera's view) is not shown.
 
 --from and --to are game ticks ("ft", the tick the facts and tools/pair_report.py speak). The page's clock is the
-client's own tick count ("ct", one a tick the animals moved, frozen ticks left out), which every animal drawn in one
-frame shares; recordings made before 2026-11-27 have none and fall back on the game tick, where a frozen burst stepped
-several ticks a picture keeps only its last moment a tick.
+client's own tick count ("ct", one a tick the animals moved, frozen ticks left out) plus how far into the tick the
+picture was drawn, which every animal drawn in one frame shares (a film recording n moments a tick keeps all n).
+Recordings made before 2026-11-27 have no "ct": then every file is laid on the game tick, where a frozen burst stepped
+several ticks a picture keeps only its last moment a tick (the page says so).
 
 How the numbers travel (all in the page, packed): each bone's 3x4 matrix as twelve 16-bit whole numbers (the turning
-part and the moving part each scaled to the animal's largest value: a ten-thousandth of a block or finer), written as
-the change from the moment before, bone by bone, and squeezed with zlib (the browser unsqueezes it with its own
-DecompressionStream); the clips, facts and places as squeezed JSON.
+part and the moving part each scaled to that bone's largest value; checked on the lion hunt: every box corner within
+0.0002 blocks of the game's), written as the change from the moment before, bone by bone, and squeezed with zlib (the
+browser unsqueezes it with its own DecompressionStream); the clips, facts and places as squeezed JSON.
 """
 import argparse
 import base64
 import glob
-import gzip
 import json
 import math
-import os
 import sys
 import zlib
 from array import array
 from pathlib import Path
 
+import body_plan
+import recording
 import viewer_page
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -45,59 +46,28 @@ LIMIT = 32000                                  # the largest whole number a valu
 
 
 def plan_of(entity):
-    """The body plan of an entity id (antcolonies:lioness -> lioness.json), or {}."""
-    name = entity.split(':')[-1]
-    for path in glob.glob(str(ROOT / '*' / 'src' / 'main' / 'resources' / 'assets' / '*' / 'body_plans' / (name + '.json'))):
-        with open(path, encoding='utf-8') as f:
+    """The body plan of an entity id (antcolonies:lioness -> lioness.json, found through tools/mod_paths.py), or {}."""
+    try:
+        with open(body_plan.plan_path(entity.split(':')[-1]), encoding='utf-8') as f:
             return json.load(f)
-    return {}
-
-
-def read(path):
-    """(header, moments, blocks, water) of one animal's file; "more" lines' blocks added to the header's."""
-    header, moments, blocks, water = None, [], [], []
-    with gzip.open(path, 'rt', encoding='utf-8') as f:
-        for line in f:
-            if not line.strip():
-                continue
-            d = json.loads(line)
-            if header is None:
-                header = d
-            elif 'more' in d:
-                pass
-            else:
-                moments.append(d)
-                continue
-            blocks += d.get('blocks', [])
-            water += d.get('water', [])
-    return header, moments, blocks, water
-
-
-def clock_of(moments):
-    """Which clock the file has: "ct" (the client's ticks, 2026-11-27 on), else "ft" (the game tick), else None."""
-    if moments and all('ct' in m for m in moments):
-        return 'ct'
-    if moments and all('ft' in m for m in moments):
-        return 'ft'
-    return None
+    except (OSError, ValueError):                   # no plan (a carcass), or no mod holds the model
+        return {}
 
 
 def pack(moments, bones):
     """The bone matrices of these moments as 16-bit changes, bone by bone and value by value (a value's moments
-    together, so the squeezing finds the smooth runs), and the two scales back to blocks."""
-    big_turn = big_move = 1e-9
-    for m in moments:
-        for mat in m['b']:
-            if mat == 0:
-                continue
-            for i in ROT:
-                big_turn = max(big_turn, abs(mat[i]))
-            for i in MOVE:
-                big_move = max(big_move, abs(mat[i]))
-    s_turn, s_move = LIMIT / big_turn, LIMIT / big_move
-    out = array('h')
+    together, so the squeezing finds the smooth runs), and each bone's two scales back to blocks (each bone its own,
+    so one far bone, a held fish, coarsens no other). A matrix with a number that is not a number is left out (drawn
+    as hidden)."""
+    out, turn, move = array('h'), [], []
     for b in range(bones):
         column = [m['b'][b] for m in moments]
+        column = [0 if mat == 0 or not all(math.isfinite(v) for v in mat) else mat for mat in column]
+        big_turn = max([abs(mat[i]) for mat in column if mat != 0 for i in ROT] or [1.0])
+        big_move = max([abs(mat[i]) for mat in column if mat != 0 for i in MOVE] or [1.0])
+        s_turn, s_move = LIMIT / max(big_turn, 1e-9), LIMIT / max(big_move, 1e-9)
+        turn.append(1 / s_turn)
+        move.append(1 / s_move)
         for i in range(12):
             scale = s_move if i in MOVE else s_turn
             prev = 0
@@ -106,7 +76,7 @@ def pack(moments, bones):
                 d = v - prev
                 out.append(d - 65536 if d > 32767 else d + 65536 if d < -32768 else d)
                 prev = v
-    return out, 1 / s_turn, 1 / s_move
+    return out, turn, move
 
 
 def colour(entity, n):
@@ -133,26 +103,53 @@ def build(folder, start=None, end=None, only=None, out=None):
     animals, blocks, water, skipped, notes = [], {}, {}, [], []
     blob = array('h')
     origin = None
-    clocks = set()
+    # each file's name (its custom name; the file's own when two share one) and whether it has the client's clock
+    files, names = [], set()
     for path in paths:
-        header, moments, bl, wa = read(path)
-        name = header.get('name') or Path(path).name[len('body_'):-len('.jsonl.gz')] or 'walker'
+        header, has_ct = recording.peek(path)
+        label = Path(path).name[len('body_'):-len('.jsonl.gz')] if Path(path).name.startswith('body_') else 'walker'
+        if header is None:
+            skipped.append(f'{label}: an empty file (nothing was recorded)')
+            continue
+        name = header.get('name') or label
+        if name in names:
+            name = label
+        names.add(name)
         if only and name not in only:
             continue
-        clock = clock_of(moments)
-        if clock is None:
-            skipped.append(f'{name}: no shared clock in its file (recorded before 2026-11-27 with no mind\'s facts)')
+        files.append((path, name, has_ct))
+    # one clock for every file: the client's when all have it, else the game tick for all (two clocks counted from
+    # different starts cannot share one line)
+    clock = 'ct' if files and all(has for _, _, has in files) else 'ft'
+    if clock == 'ft' and any(has for _, _, has in files):
+        notes.append('Some files have the client\'s clock and some not, so all are laid on the game tick: through a '
+                     'frozen burst stepped several ticks a picture only the last moment of each tick is shown.')
+    elif clock == 'ft':
+        notes.append('Recorded without the client\'s clock (made before 2026-11-27), on the game tick alone: through a '
+                     'frozen burst stepped several ticks a picture only the last moment of each tick is shown.')
+    for path, name, _ in files:
+        header, moments, bl, wa, trouble = recording.read(path)
+        if trouble:
+            notes.append(f'{name}: {trouble}.')
+        if not moments:
+            skipped.append(f'{name}: no moments recorded (never drawn while recording)')
+            continue
+        if any(m.get('ft') is None for m in moments):
+            skipped.append(f'{name}: no game tick in its file (recorded before 2026-11-27 with no mind\'s facts)')
             continue
         if start is not None or end is not None:
             moments = [m for m in moments if (start is None or m['ft'] >= start) and (end is None or m['ft'] <= end)]
         if not moments:
             skipped.append(f'{name}: not drawn in the ticks asked for')
             continue
-        clocks.add(clock)
+        # each moment's place on the clock: the client's tick and how far into it the picture was drawn (a film
+        # recording n moments a tick has n a tick; every animal drawn in one frame shares both); on the game tick
+        # alone, the last moment of each tick
         by_key = {}
-        for m in moments:                     # one moment a tick of the clock (the last drawn)
-            by_key[m[clock]] = m
-        moments = [by_key[k] for k in sorted(by_key)]
+        for m in moments:
+            by_key[round(m['ct'] + m.get('pt', 0), 4) if clock == 'ct' else m['ft']] = m
+        keys = sorted(by_key)
+        moments = [by_key[k] for k in keys]
         if origin is None:
             origin = [math.floor(moments[0]['pos'][0]), math.floor(moments[0]['pos'][1]), math.floor(moments[0]['pos'][2])]
         for entry in bl:
@@ -181,7 +178,7 @@ def build(folder, start=None, end=None, only=None, out=None):
                        'cubes': [[r(v, 5) for v in c] for c in b['cubes']]} for b in header['bones']],
             'legs': plan.get('legs', {}),
             'n': len(moments), 'B': n_bones, 'offset': offset, 'turn': s_turn, 'move': s_move,
-            'key': [m[clock] for m in moments], 'ft': [m.get('ft') for m in moments], 'pt': [r(m.get('pt', 0), 3) for m in moments],
+            'key': keys, 'ft': [m.get('ft') for m in moments], 'pt': [r(m.get('pt', 0), 3) for m in moments],
             'pos': [[r(m['pos'][0] - origin[0]), r(m['pos'][1] - origin[1]), r(m['pos'][2] - origin[2])] for m in moments],
             'yaw': [r(m.get('yaw', 0), 2) for m in moments],
             'ground': [m.get('ground', 0) for m in moments], 'water': [m.get('water', 0) for m in moments],
@@ -193,17 +190,11 @@ def build(folder, start=None, end=None, only=None, out=None):
         print(f'  {name:18s} {header["entity"]:26s} {len(moments):5d} moments, {n_bones} bones, clock {clock}')
     if not animals:
         raise SystemExit('nothing to show: ' + '; '.join(skipped))
-    if len(clocks) > 1:
-        notes.append('Some files have the client\'s clock and some only the game tick: they may sit a moment or two '
-                     'apart. Film the scene again.')
-    if clocks == {'ft'}:
-        notes.append('Recorded without the client\'s clock (made before 2026-11-27), on the game tick alone: through a '
-                     'frozen burst stepped several ticks a picture only the last moment of each tick is shown.')
     if sys.byteorder != 'little':
         blob.byteswap()
     ground = [[x - origin[0], y - origin[1], z - origin[2], *boxes] for (x, y, z), boxes in blocks.items()]
     wet = [[x - origin[0], y - origin[1], z - origin[2], h] for (x, y, z), h in water.items()]
-    meta = {'animals': animals, 'blocks': ground, 'water': wet, 'origin': origin, 'clock': sorted(clocks)[0] if len(clocks) == 1 else 'mixed'}
+    meta = {'animals': animals, 'blocks': ground, 'water': wet, 'origin': origin, 'clock': clock}
     meta_bytes = zlib.compress(json.dumps(meta, separators=(',', ':')).encode('utf-8'), 9)
     mat_bytes = zlib.compress(blob.tobytes(), 9)
     scene = folder.name

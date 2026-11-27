@@ -14,7 +14,7 @@ for the number there).
 | In the game: C, small or rare | 31 |
 | Waiting for your call | 19 |
 | Behind the scenes (code review) | 168 |
-| Tool faults | 5 |
+| Tool faults | 6 |
 | *Test flakes, in `docs/TEST-FLAKES.md`* | *50* |
 
 ## A: it breaks play (1)
@@ -401,7 +401,7 @@ given; *half fixed* says what is left; no word means nobody has started it.
 - **R12-69** The dragged tail does all its ground reading even when it has no say
 - **R12-73** The hippo's climb-out paths are not one row a tick, and the move writer never checks
 
-## Tool faults (5)
+## Tool faults (6)
 
 Faults in the test and film tools, not in the game.
 
@@ -410,6 +410,7 @@ Faults in the test and film tools, not in the game.
 - **295** Frozen, stepped films draw a clip's clock two ticks a picture while the body moves one
 - **429** On the course the monitor, the bullfrog and the crocodiles stop short of where a scene sends them
 - **435** The six walker guard scenes come out different on every launch
+- **449** The lion hunt film misses the hold; its "hold" burst films the feast instead
 
 ## The code review so far
 

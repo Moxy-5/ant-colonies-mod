@@ -66,7 +66,8 @@ import software.bernie.geckolib.util.RenderUtil;
  * holder's frame, its lines marked {@code "held":1} (R12-45).
  * <p>
  * Every moment carries {@code "ft"}, the game tick shared by every animal of the scene (the Motion Studio, phase 1,
- * 2026-11-27: before, only animals with a mind's facts had it), and {@code "ct"}, the client's own count of the ticks
+ * 2026-11-27: before, only animals with a mind's facts had it; since then the overworld's game time, which stands still
+ * while the game is frozen, read with the facts from one tick), and {@code "ct"}, the client's own count of the ticks
  * the animals moved in ({@link #clientTicks}): {@code tools/replay.py} lays the files on {@code ct}, which goes on a tick
  * at a time through a frozen burst stepped several ticks a picture, where {@code ft} jumps at each step's end.
  */
@@ -115,9 +116,7 @@ public final class BodyRecorder {
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
-        Minecraft mc = Minecraft.getInstance();
-        // runsNormally() is set at the tick's start for the whole tick: true exactly when the animals were ticked
-        if (folder != null && mc.level != null && !mc.isPaused() && mc.level.tickRateManager().runsNormally()) {
+        if (folder != null && FilmStep.animalsTicked(Minecraft.getInstance())) {
             clientTicks++;
         }
     }
@@ -129,6 +128,7 @@ public final class BodyRecorder {
     static void start(Path into, int samplesPerTick, boolean everyAnimal) {
         stop();
         folder = into;
+        clientTicks = 0;                    // counted from each recording's start, so a refilmed scene reads the same
         perTick = Math.max(1, samplesPerTick);
         all = everyAnimal;
         LOG.info("Film: recording {} into {} ({} a tick)", all ? "every animal drawn" : "the walker's body", into, perTick);
@@ -381,13 +381,14 @@ public final class BodyRecorder {
             }
         }
         s.append("},\"play\":{").append(play).append('}');
-        Map<String, Object> facts = FilmFactsBoard.of(entity.getUUID());
+        FilmFactsBoard.Board board = FilmFactsBoard.snapshot();         // the facts and their tick, from one tick
+        Map<String, Object> facts = board.facts().getOrDefault(entity.getUUID(), Map.of());
         if (!facts.isEmpty()) {
             s.append(",\"facts\":").append(FilmFactsBoard.json(facts));
         }
         // the game tick shared by every animal, written for each (the Motion Studio, phase 1, 2026-11-27): an animal
         // with no mind's facts (a carcass) had none, so the replay page could not put it on the scene's clock
-        s.append(",\"ft\":").append(FilmFactsBoard.tick()).append(",\"ct\":").append(clientTicks);
+        s.append(",\"ft\":").append(board.tick()).append(",\"ct\":").append(clientTicks);
         s.append(",\"b\":[");
         for (int i = 0; i < bones.size(); i++) {
             GeoBone bone = bones.get(i);

@@ -31,6 +31,9 @@
   button { font: inherit; padding: 5px 11px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
   button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
   button.off { opacity: 0.5; text-decoration: line-through; }
+  .pair { display: inline-flex; margin: 0 6px 4px 0; }
+  .pair button:first-child { border-radius: 8px 0 0 8px; }
+  .pair button.hide { border-radius: 0 8px 8px 0; border-left: none; font-size: 12px; padding: 5px 8px; color: var(--muted); }
   button .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
   #scrubRow { padding: 0 16px 6px; }
   #scrub { width: 100%; margin: 0; }
@@ -49,8 +52,9 @@
   <h1 id="title">Replay</h1>
   <p>The game's own recording of a film scene, played back: every animal exactly as the game drew it, moment by moment,
      on the ground the game recorded (squares a block wide, so a sliding foot shows). Drag to turn, scroll to zoom,
-     right-drag to slide; click an animal to read its clips and its mind. Keys: space plays, the arrows step a moment
-     (with Shift ten), F follows the picked animal.</p>
+     right-drag to slide; click an animal to read its clips and its mind (click the ground to let it go). Keys: space
+     plays, the arrows step a moment (with Shift ten), F follows the picked animal, Esc lets it go. The page's address
+     always holds the moment, the animal and the camera: copy it to come back to exactly this view.</p>
 </header>
 <div id="wrap"><canvas id="c"></canvas><div id="labels"></div><div id="stamp"></div><div id="loading">Unpacking the recording...</div></div>
 <div class="controls">
@@ -73,11 +77,18 @@ document.getElementById('title').textContent = 'Replay: ' + DATA.title;
 document.title = DATA.title + ' Replay';
 const $ = id => document.getElementById(id);
 const wrap = $('wrap');
-const settings = Viewer.settingsFromHash({m: -1, at: -1, pick: '', follow: 0, cam: '', speed: 1, play: 0, labels: 1, pieces: 0, hide: ''});
-const st = Viewer.stage({canvas: $('c'), wrap, labels: $('labels'), fog: [70, 170], shadow: 12});
-st.camera.far = 600; st.camera.updateProjectionMatrix();
-const sun = st.scene.children.find(o => o.isDirectionalLight);
-st.scene.add(sun.target);
+const settings = Viewer.settingsFromHash({m: 0, at: -1, pick: '', follow: 0, cam: '', speed: 1, play: 0, labels: 1, pieces: 0, hide: ''});
+let st, sun;
+try {
+  st = Viewer.stage({canvas: $('c'), wrap, labels: $('labels'), fog: [70, 170], shadow: 12});
+  st.camera.far = 600; st.camera.updateProjectionMatrix();
+  sun = st.scene.children.find(o => o.isDirectionalLight);
+  st.scene.add(sun.target);
+} catch (e) {                                   // no 3D drawing in this browser (WebGL off): say so, and to tools
+  $('loading').textContent = 'This browser cannot draw 3D here (WebGL is off or missing): ' + e;
+  window.Replay = {error: String(e)};
+  throw e;
+}
 
 // --- unpacking: base64 -> bytes -> the browser's own zlib ----------------------------------------------------------
 function bytesOf(b64) {
@@ -143,12 +154,12 @@ function unpack(a, all) {
   return M;
 }
 
-let animals = [], timeline = [], now = 0, playing = false, clock = 0, speed = 1, picked = null, follow = false;
+let animals = [], timeline = [], now = 0, playing = false, clock = 0, speed = 1, picked = null, follow = false, ready = false;
 // each moment's game tick, and the game ticks that ran unrecorded just before it (a film's "wait" and "until" steps
-// run the game on while the client draws nothing); more than GAP is called a gap
+// run the game on while the client draws nothing, or draws none of these animals); more than GAP is called a gap (a
+// tick or two is the noise of reading the server's tick live while the client draws)
 let tickAt = [], gapBefore = [];
 const GAP = 3;
-const anchorV = new THREE.Vector3();
 
 function buildAnimal(a, i, all) {
   a.index = i;
@@ -170,26 +181,36 @@ function buildAnimal(a, i, all) {
   a.anchor.visible = false;
   st.tag(a.name, a.anchor, () => (a.height || 1) * 1.05);
   a.tag = st.tags[st.tags.length - 1].el;
-  a.at = new Map();                             // clock value -> its moment
-  a.key.forEach((k, j) => a.at.set(k, j));
 }
 
+// each animal's moment at every moment of the scene: its own at that clock value, or its last one less than a client
+// tick before (a film recording several moments a tick, an animal first drawn part way through a tick), else none
+function lineUp(a, slotOf) {
+  a.frameAt = new Int32Array(timeline.length).fill(-1);
+  let j = -1;
+  for (let t = 0; t < timeline.length; t++) {
+    while (j + 1 < a.n && a.key[j + 1] <= timeline[t]) j++;
+    if (j >= 0 && timeline[t] - a.key[j] < 1) a.frameAt[t] = j;
+  }
+  a.slot = a.key.map(k => slotOf.get(k));      // each of its moments' place on the scene's line
+}
+
+// a bone the game did not draw (its matrix written as 0)
+const hidden = (M, o) => !M[o] && !M[o + 1] && !M[o + 2] && !M[o + 4] && !M[o + 5] && !M[o + 6] && !M[o + 8] && !M[o + 9] && !M[o + 10];
 // one animal at the scene's moment t (a timeline index): its moment, or hidden when the game did not draw it then
 function place(a, t) {
-  const j = a.at.has(timeline[t]) ? a.at.get(timeline[t]) : -1;
+  const j = a.frameAt[t];
   a.now = j;
   const shown = j >= 0 && a.on;
   a.group.visible = shown;
-  a.anchor.visible = shown && settings.labels;
+  a.anchor.visible = shown && !!settings.labels;
   if (!shown) return;
-  const M = a.M, B = a.B, base = j * B * 12, s = a.turn, v = a.move, p = a.pos[j];
+  const M = a.M, B = a.B, base = j * B * 12, p = a.pos[j];
   for (let b = 0; b < B; b++) {
     const mesh = a.meshes[b];
     if (!mesh) continue;
-    const o = base + b * 12;
-    if (!M[o] && !M[o + 1] && !M[o + 2] && !M[o + 4] && !M[o + 5] && !M[o + 6] && !M[o + 8] && !M[o + 9] && !M[o + 10]) {
-      mesh.visible = false; continue;            // a bone the game did not draw
-    }
+    const o = base + b * 12, s = a.turn[b], v = a.move[b];
+    if (hidden(M, o)) { mesh.visible = false; continue; }
     mesh.visible = true;
     mesh.matrix.set(M[o] * s, M[o + 1] * s, M[o + 2] * s, M[o + 3] * v + p[0],
                     M[o + 4] * s, M[o + 5] * s, M[o + 6] * s, M[o + 7] * v + p[1],
@@ -205,6 +226,7 @@ function place(a, t) {
 
 // --- the scene's clock -------------------------------------------------------------------------------------------
 function show(t) {
+  const was = picked && picked.now >= 0 ? picked.pos[picked.now] : null;
   now = Math.max(0, Math.min(timeline.length - 1, t));
   animals.forEach(a => place(a, now));
   $('scrub').value = now;
@@ -217,24 +239,42 @@ function show(t) {
   $('when').textContent = text;
   $('when').classList.toggle('gap', gapBefore[now] > GAP);
   $('stamp').textContent = DATA.title + ' · ' + text;
+  // follow: the camera moves with the picked animal's own place (not its drawn box, which bobs with the legs)
+  if (follow && was && picked.now >= 0) {
+    const p = picked.pos[picked.now], d = new THREE.Vector3(p[0] - was[0], p[1] - was[1], p[2] - was[2]);
+    st.camera.position.add(d); st.controls.target.add(d);
+  }
   info();
-  followStep();
   writeState();
+  if (!playing) writeAddress();
 }
 
-// what tools/replay_strips.py and a curious reader can ask the page
+// what tools (tools/replay_strips.py) and a curious reader can ask the page; moments count from 1, as on the page
 function writeState() {
-  const state = {moment: now, of: timeline.length, clock: timeline[now], tick: tickAt[now], gapBefore: gapBefore[now],
-    animals: animals.map(a => ({name: a.name, drawn: a.now >= 0, tick: a.now >= 0 ? a.ft[a.now] : null,
-      clip: a.now >= 0 ? (a.clipTable[a.clips[a.now]].body || '').split(' ')[0] : null}))};
+  const state = {moment: now + 1, index: now, of: timeline.length, clock: timeline[now], tick: tickAt[now],
+    gapBefore: gapBefore[now], pick: picked ? picked.name : null, playing, follow, cam: settings.cam || null, speed,
+    animals: animals.map(a => ({name: a.name, drawn: a.now >= 0, shown: a.now >= 0 && a.on,
+      tick: a.now >= 0 ? a.ft[a.now] : null, clip: a.now >= 0 ? (a.clipTable[a.clips[a.now]].body || '').split(' ')[0] : null}))};
   let el = $('viewer-state');
   if (!el) { el = document.createElement('pre'); el.id = 'viewer-state'; el.hidden = true; document.body.appendChild(el); }
   el.textContent = JSON.stringify(state);
   window.viewerState = state;
 }
+// the page's address says what is shown (the moment, the pick, its camera, follow), so a copied link opens it again
+function writeAddress() {
+  if (!ready) return;
+  const parts = [`m=${now + 1}`];
+  if (picked) parts.push('pick=' + encodeURIComponent(picked.name));
+  if (settings.cam) parts.push('cam=' + settings.cam);
+  if (follow) parts.push('follow=1');
+  if (speed !== 1) parts.push('speed=' + speed);
+  const off = animals.filter(a => !a.on).map(a => a.name);
+  if (off.length) parts.push('hide=' + off.map(encodeURIComponent).join(','));
+  try { history.replaceState(null, '', '#' + parts.join('&')); } catch (e) { /* a page opened from a file may refuse */ }
+}
 
 // --- the picked animal's clips and facts --------------------------------------------------------------------------
-function esc(s) { return String(s).replace(/[&<>]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;'}[c])); }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c])); }
 function info() {
   const a = picked;
   if (!a) { $('info').innerHTML = 'Click an animal (or its button) to read its clips and its mind at this moment.'; return; }
@@ -250,12 +290,12 @@ function info() {
   Object.keys(clips).forEach(k => {
     const [name, state] = clips[k].split(' ');
     const p = play[k] || [];
-    rows.push([`clip (${k})`, `<b>${esc(name)}</b> ${esc(state || '')}` + (p[0] !== undefined ? `, played at ${(+p[0]).toFixed(2)}` : '') +
+    rows.push([`clip (${esc(k)})`, `<b>${esc(name)}</b> ${esc(state || '')}` + (p[0] !== undefined && p[0] !== null ? `, played at ${(+p[0]).toFixed(2)}` : '') +
       (p[1] !== null && p[1] !== undefined ? `, ${(+p[1]).toFixed(1)} clip ticks in` : '')]);
   });
   const v = a.v[j], sp = Math.hypot(v[0], v[2]) * 20;
   rows.push(['moving', `${sp.toFixed(2)} blocks a second` + (Math.abs(v[1]) > 0.09 ? `, ${(v[1] * 20).toFixed(1)} up` : '') +
-    `, facing ${a.yaw[j].toFixed(0)}°`]);
+    `, facing ${(((a.yaw[j] % 360) + 360) % 360).toFixed(0)}°`]);
   rows.push(['standing', a.held[j] ? 'held, drawn by its holder' : a.water[j] ? `in water (${a.fluid[j]} deep)` : a.ground[j] ? 'on the ground' : '<span class="warn">in the air</span>']);
   const facts = a.facts[j] || {};
   Object.keys(facts).forEach(k => rows.push([esc(k), esc(JSON.stringify(facts[k]).replace(/^"|"$/g, ''))]));
@@ -264,103 +304,116 @@ function info() {
   $('info').innerHTML = h + '<div class="grid">' + rows.map(([k, v]) => `<span class="k">${k}</span><span>${v}</span>`).join('') + '</div>';
 }
 
-function pick(a) {
+function pick(a, look) {
   picked = a;
   animals.forEach(x => x.btn && x.btn.classList.toggle('on', x === a));
   show(now);
+  if (look && a && a.now >= 0) camera(settings.cam || 'three-quarter');
 }
 
 // --- cameras -----------------------------------------------------------------------------------------------------
-let lastFollow = null;
+// the picked animal's drawn box, from the parts drawn now (a bone the game hid keeps an old place: left out)
 function centreOf(a) {
-  const box = new THREE.Box3().setFromObject(a.group);
-  return box.isEmpty() ? null : {box, c: box.getCenter(new THREE.Vector3()), size: box.getSize(new THREE.Vector3()).length()};
+  const box = new THREE.Box3();
+  a.group.updateMatrixWorld(true);
+  a.meshes.forEach(m => m && m.visible && box.expandByObject(m));
+  return box.isEmpty() ? null : {c: box.getCenter(new THREE.Vector3()), size: box.getSize(new THREE.Vector3()).length()};
 }
-// the picked animal from one side: its own left (Minecraft: facing (-sin yaw, cos yaw), left (cos yaw, sin yaw))
+// the whole scene: everyone drawn now (or everyone's first place)
+function sceneView() {
+  const box = new THREE.Box3();
+  animals.forEach(a => { if (a.group.visible) { const at = centreOf(a); if (at) box.expandByPoint(at.c); } });
+  if (box.isEmpty()) animals.forEach(a => box.expandByPoint(new THREE.Vector3(...a.pos[0])));
+  const c = box.getCenter(new THREE.Vector3()), s = Math.max(8, box.getSize(new THREE.Vector3()).length() * 1.4);
+  st.camera.position.set(c.x + s * 0.6, c.y + s * 0.55, c.z + s * 0.8);
+  st.controls.target.copy(c); st.controls.update();
+}
+// the picked animal from one side: its own left (Minecraft: facing (-sin yaw, cos yaw), left (cos yaw, sin yaw));
+// with nothing picked, or the pick not drawn now, the whole scene
+const CAMS = [['three-quarter', 'Three quarters'], ['side', 'Side'], ['front', 'Front'], ['behind', 'Behind'], ['above', 'Above'], ['wide', 'Wide']];
 function camera(name) {
-  const a = picked;
+  name = String(name || '').toLowerCase();
+  if (!CAMS.some(([k]) => k === name)) name = 'three-quarter';
+  const a = picked, at = a && a.now >= 0 ? centreOf(a) : null;
+  if (!at) { settings.cam = ''; camBtns(null); sceneView(); writeState(); writeAddress(); return; }
   settings.cam = name;
   camBtns(name);
-  if (!a || a.now < 0) return;
-  const at = centreOf(a);
-  if (!at) return;
   const yaw = a.yaw[a.now] * Math.PI / 180;
   const fwd = new THREE.Vector3(-Math.sin(yaw), 0, Math.cos(yaw)), left = new THREE.Vector3(Math.cos(yaw), 0, Math.sin(yaw));
   const d = Math.max(2.5, at.size * 1.5);
   const dir = {side: left.clone(), front: fwd.clone(), behind: fwd.clone().negate(),
                above: new THREE.Vector3(0.02, 1, 0.02), 'three-quarter': fwd.clone().add(left).normalize().add(new THREE.Vector3(0, 0.45, 0)),
                wide: fwd.clone().add(left).normalize().add(new THREE.Vector3(0, 0.8, 0))}[name];
-  if (!dir) return;
   const dist = name === 'wide' ? d * 3.5 : name === 'above' ? d * 1.2 : d;
   dir.normalize();
   st.camera.position.copy(at.c).addScaledVector(dir, dist);
   if (name === 'side' || name === 'front' || name === 'behind') st.camera.position.y = at.c.y + at.size * 0.12;
   st.controls.target.copy(at.c);
   st.controls.update();
-  lastFollow = at.c.clone();
+  writeState();
+  writeAddress();
 }
-function followStep() {
-  const a = picked;
-  if (a && a.now >= 0) {
-    const at = centreOf(a);
-    if (at) {
-      if (follow && lastFollow) {
-        const d = at.c.clone().sub(lastFollow);
-        st.camera.position.add(d); st.controls.target.add(d);
-      }
-      lastFollow = at.c.clone();
-    }
-  }
+// the sun's shadow box goes with the view, every frame (the shadows show whether the feet touch the ground)
+function sunToView() {
   const t = st.controls.target;
   sun.position.set(t.x + 6, t.y + 18, t.z + 10); sun.target.position.copy(t); sun.target.updateMatrixWorld();
 }
 
-// --- controls ----------------------------------------------------------------------------------------------------
+// --- controls (none answer before the recording is unpacked) ------------------------------------------------------
 const SPEEDS = [[0.1, '1/10'], [0.25, '1/4'], [0.5, '1/2'], [1, '1'], [2, '2']];
-const speedBtns = Viewer.buttons($('speedBtns'), SPEEDS.map(([v, l]) => [v, l + 'x', 'Play at ' + l + ' of the game\'s speed']), v => { speed = v; speedBtns(v); });
-const camBtns = Viewer.buttons($('camBtns'), [['three-quarter', 'Three quarters'], ['side', 'Side'], ['front', 'Front'], ['behind', 'Behind'],
-  ['above', 'Above'], ['wide', 'Wide']].map(([k, l]) => [k, l, 'The picked animal from here']), camera);
+const speedBtns = Viewer.buttons($('speedBtns'), SPEEDS.map(([v, l]) => [v, l + 'x', 'Play at ' + l + ' of the game\'s speed']),
+  v => { speed = v; speedBtns(v); writeState(); writeAddress(); });
+const camBtns = Viewer.buttons($('camBtns'), CAMS.map(([k, l]) => [k, l, 'The picked animal from here (nothing picked: the whole scene)']),
+  k => ready && camera(k));
 function setPlaying(on) {
+  if (!ready) return;
   playing = on;
   if (on && now >= timeline.length - 1) show(0);
   clock = timeline[now];
   lastFrame = performance.now();
   $('play').textContent = on ? 'Pause' : 'Play';
   $('play').classList.toggle('on', on);
+  writeState();
+  if (!on) writeAddress();
 }
-function setFollow(on) { follow = on; $('followBtn').classList.toggle('on', on); if (on) followStep(); }
+function setFollow(on) { follow = on; $('followBtn').classList.toggle('on', on); writeState(); writeAddress(); }
+function step(n) { if (!ready) return; setPlaying(false); show(now + n); }
 $('play').onclick = () => setPlaying(!playing);
-$('back').onclick = e => { setPlaying(false); show(now - (e.shiftKey ? 10 : 1)); };
-$('fwd').onclick = e => { setPlaying(false); show(now + (e.shiftKey ? 10 : 1)); };
-$('scrub').oninput = () => { setPlaying(false); show(+$('scrub').value); };
+$('back').onclick = e => step(e.shiftKey ? -10 : -1);
+$('fwd').onclick = e => step(e.shiftKey ? 10 : 1);
+$('scrub').oninput = () => { if (!ready) return; setPlaying(false); show(+$('scrub').value); };
 $('followBtn').onclick = () => setFollow(!follow);
-$('labelsBtn').onclick = () => { settings.labels = settings.labels ? 0 : 1; $('labelsBtn').classList.toggle('on', !!settings.labels); show(now); };
+$('labelsBtn').onclick = () => { settings.labels = settings.labels ? 0 : 1; $('labelsBtn').classList.toggle('on', !!settings.labels); if (ready) show(now); };
 $('pieces').onclick = () => {
   settings.pieces = settings.pieces ? 0 : 1;
   $('pieces').classList.toggle('on', !!settings.pieces);
   animals.forEach(a => a.meshes.forEach(m => m && (m.material = settings.pieces ? m.userData.tint : m.userData.mat)));
 };
 document.addEventListener('keydown', e => {
+  if (!ready || e.ctrlKey || e.altKey || e.metaKey) return;     // the browser's own keys (Ctrl+F finds, Alt+Left goes back)
   if (e.target.tagName === 'INPUT' && e.target.type !== 'range') return;
-  if (e.code === 'Space') { e.preventDefault(); setPlaying(!playing); }
-  else if (e.code === 'ArrowLeft') { e.preventDefault(); setPlaying(false); show(now - (e.shiftKey ? 10 : 1)); }
-  else if (e.code === 'ArrowRight') { e.preventDefault(); setPlaying(false); show(now + (e.shiftKey ? 10 : 1)); }
-  else if (e.code === 'KeyF') setFollow(!follow);
+  if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) setPlaying(!playing); }
+  else if (e.code === 'ArrowLeft') { e.preventDefault(); step(e.shiftKey ? -10 : -1); }
+  else if (e.code === 'ArrowRight') { e.preventDefault(); step(e.shiftKey ? 10 : 1); }
+  else if (e.code === 'KeyF' && !e.repeat) setFollow(!follow);
+  else if (e.code === 'Escape') pick(null);
 });
-// click (not drag) an animal to pick it
+// a left click (not a drag) on an animal picks it; on the ground, lets the pick go
 const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
 let down = null;
-st.renderer.domElement.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
+st.renderer.domElement.addEventListener('pointerdown', e => { down = e.button === 0 ? [e.clientX, e.clientY] : null; });
 st.renderer.domElement.addEventListener('pointerup', e => {
-  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
+  if (!ready || !down || e.button !== 0 || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
   const r = st.renderer.domElement.getBoundingClientRect();
   mouse.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
   ray.setFromCamera(mouse, st.camera);
   const meshes = [];
   animals.forEach(a => a.group.visible && a.meshes.forEach(m => m && m.visible && meshes.push(m)));
   const hit = ray.intersectObjects(meshes, false)[0];
-  if (hit) pick(hit.object.userData.animal);
+  pick(hit ? hit.object.userData.animal : null);
 });
+// turning the view by hand: no camera button is lit any more
+st.controls.addEventListener('start', () => { if (ready && settings.cam) { settings.cam = ''; camBtns(null); writeAddress(); } });
 // playing: the scene's clock runs at the game's 20 ticks a second times the speed; the moment shown is the last one
 // whose clock value has been reached (never one in between: the game drew none)
 // (its own time between frames, not the stage's: the stage caps a frame at 0.1 s, so a slow computer played slow)
@@ -368,6 +421,7 @@ let lastFrame = performance.now();
 st.onFrame.push(() => {
   const t0 = performance.now(), dt = Math.min(0.5, (t0 - lastFrame) / 1000);
   lastFrame = t0;
+  if (ready) sunToView();
   if (!playing) return;
   clock += dt * 20 * speed;
   let t = now;
@@ -389,60 +443,71 @@ st.onFrame.push(() => {
   animals.forEach(a => a.key.forEach(k => keys.add(k)));
   timeline = [...keys].sort((x, y) => x - y);
   $('scrub').max = timeline.length - 1;
-  // a moment's game tick is the earliest its animals read: the server's tick is read live while the client draws,
-  // so a server sprinting through an "until" can be a few ticks on between the first animal drawn and the last
-  const slot = new Map(timeline.map((k, t) => [k, t]));
+  const slotOf = new Map(timeline.map((k, t) => [k, t]));
+  animals.forEach(a => lineUp(a, slotOf));
+  // a moment's game tick: the earliest its animals read (the server's tick is read live while the client draws, so a
+  // server sprinting through an "until" can be a few ticks on between the first animal drawn and the last), then no
+  // later than the next moment's less the client ticks between (a frozen step of k ticks runs on the server before
+  // the client draws its first tick: all k moments read the step's end)
+  const whole = k => Math.floor(k + 1e-6);
   tickAt = new Array(timeline.length).fill(Infinity);
-  animals.forEach(a => a.key.forEach((k, j) => { const t = slot.get(k); if (a.ft[j] !== null && a.ft[j] < tickAt[t]) tickAt[t] = a.ft[j]; }));
+  animals.forEach(a => a.key.forEach((k, j) => { const t = a.slot[j]; if (a.ft[j] !== null && a.ft[j] < tickAt[t]) tickAt[t] = a.ft[j]; }));
+  for (let t = timeline.length - 2; t >= 0; t--) tickAt[t] = Math.min(tickAt[t], tickAt[t + 1] - (whole(timeline[t + 1]) - whole(timeline[t])));
   tickAt = tickAt.map((v, t) => isFinite(v) ? v : (t ? tickAt[t - 1] : 0));
-  gapBefore = tickAt.map((v, t) => t ? Math.max(0, (v - tickAt[t - 1]) - (timeline[t] - timeline[t - 1])) : 0);
-  // the animal buttons: click to pick, double-click to hide or show
+  // the ticks not recorded before a moment: the game's ticks since the moment before, or the client's (a tick none of
+  // these animals was drawn in), whichever is more, less the one tick between two moments in a row
+  gapBefore = tickAt.map((v, t) => t ? Math.max(0, Math.max(v - tickAt[t - 1], whole(timeline[t]) - whole(timeline[t - 1])) - 1) : 0);
+  // the animal buttons: the name picks it (and looks at it), Hide hides or shows it
   animals.forEach(a => {
     const b = document.createElement('button');
     b.innerHTML = `<span class="dot" style="background:${a.colour}"></span>${esc(a.name)}`;
-    b.title = 'Click: pick it (its clips and mind below, the camera buttons look at it). Double-click: hide or show it.';
-    b.onclick = () => pick(a);
-    b.ondblclick = () => { a.on = !a.on; b.classList.toggle('off', !a.on); show(now); };
-    $('animalBtns').appendChild(b);
-    a.btn = b;
+    b.title = 'Pick it: its clips and mind below, the camera looks at it';
+    b.onclick = () => ready && pick(a, true);
+    const h = document.createElement('button');
+    h.className = 'hide'; h.textContent = 'Hide'; h.title = 'Hide or show ' + a.name;
+    h.onclick = () => { if (!ready) return; a.on = !a.on; h.textContent = a.on ? 'Hide' : 'Show'; b.classList.toggle('off', !a.on); show(now); };
+    const pair = document.createElement('span'); pair.className = 'pair';
+    pair.append(b, h);
+    $('animalBtns').appendChild(pair);
+    a.btn = b; a.hideBtn = h;
   });
-  (settings.hide ? String(settings.hide).split(',') : []).forEach(n => { const a = animals.find(x => x.name === n); if (a) { a.on = false; a.btn.classList.add('off'); } });
+  (settings.hide ? String(settings.hide).split(',') : []).forEach(n => {
+    const a = animals.find(x => x.name === n);
+    if (a) { a.on = false; a.btn.classList.add('off'); a.hideBtn.textContent = 'Show'; }
+  });
   const notes = [...(DATA.notes || []), ...(DATA.skipped || []).map(s => 'Not shown: ' + s)];
   notes.push(`From ${DATA.scene}: ${animals.length} animals, ${timeline.length} moments. The recording has no paint: each kind is one plain colour.`);
   $('notes').innerHTML = notes.map(esc).join('<br>');
-  // where to start: #m=moment, or #at=game tick, else the first moment
+  $('when').title = 'Moment: the recording\'s pictures, counted from 1. Game tick: the game\'s clock then; (+0.2): the ' +
+    'picture was drawn a fifth of the way into that tick. Seconds recorded leave out the ticks not recorded.';
+  // where to start: #m=moment (from 1), or #at=game tick, else the first moment
   let start = 0;
-  if (settings.m >= 0) start = settings.m;
+  if (settings.m >= 1) start = Math.round(settings.m) - 1;
   else if (settings.at >= 0) {                  // the first moment at or after that game tick
     const t = tickAt.findIndex(v => v >= settings.at);
     start = t >= 0 ? t : timeline.length - 1;
   }
   picked = animals.find(a => a.name === settings.pick) || null;
   if (picked) picked.btn.classList.add('on');
-  speed = settings.speed; speedBtns(speed);
+  speed = SPEEDS.some(([v]) => v === settings.speed) ? settings.speed : 1; speedBtns(speed);
+  follow = !!settings.follow; $('followBtn').classList.toggle('on', follow);
   $('labelsBtn').classList.toggle('on', !!settings.labels);
   if (settings.pieces) { settings.pieces = 0; $('pieces').onclick(); }
   st.start();
   show(start);
-  if (picked && picked.now < 0 && settings.m < 0 && settings.at < 0) {
-    show(timeline.indexOf(picked.key[0]));      // picked, no moment asked, not drawn at the start: its first moment
+  if (picked && picked.now < 0 && settings.m < 1 && settings.at < 0) {
+    show(picked.slot[0]);                        // picked, no moment asked, not drawn at the start: its first moment
   }
-  if (picked) camera(settings.cam || 'three-quarter');
-  else {                                        // the whole scene: everyone's places at the start
-    const box = new THREE.Box3();
-    animals.forEach(a => a.group.visible && box.expandByObject(a.group));
-    if (box.isEmpty()) animals.forEach(a => box.expandByPoint(new THREE.Vector3(...a.pos[0])));
-    const c = box.getCenter(new THREE.Vector3()), s = Math.max(6, box.getSize(new THREE.Vector3()).length());
-    st.camera.position.set(c.x + s * 0.6, c.y + s * 0.55, c.z + s * 0.8);
-    st.controls.target.copy(c); st.controls.update();
-    lastFollow = null;
-  }
-  setFollow(!!settings.follow);
+  ready = true;
+  camera(settings.cam || 'three-quarter');      // the picked animal, or the whole scene
+  sunToView();
   if (settings.play) setPlaying(true);
+  writeAddress();
   $('loading').style.display = 'none';
-  window.Replay = {show, pick: n => pick(animals.find(a => a.name === n) || null), camera, follow: setFollow,
-                   play: setPlaying, moments: () => timeline.length, ready: true};
-})().catch(e => { $('loading').textContent = 'Could not unpack the recording: ' + e; console.error(e); });
+  // what tools may call (moments are indexes from 0 here; the page and #m count from 1)
+  window.Replay = {show: t => { setPlaying(false); show(t); }, pick: n => pick(animals.find(a => a.name === n) || null),
+                   camera, follow: setFollow, play: setPlaying, moments: () => timeline.length, ready: true};
+})().catch(e => { $('loading').textContent = 'Could not unpack the recording: ' + e; window.Replay = {error: String(e)}; console.error(e); });
 </script>
 </body>
 </html>
