@@ -113,3 +113,11 @@ full run), the four reviewers, their fixes, the notes, commit, push, `C:\Ant Mod
   `pace_report.py` reports each animal drawn under 0.8 of its model by size: the lion hunt film's calf (0.36) trots at
   1.79 times its clip's speed, its pace needing a trot made for 41.6 px/s against the grown 22.2 (BUGS 378's numbers;
   the play change is not in this step). `body_plan.py check` checks a young clip's name and speed; a self-test.
+- **Step 7.** `clip_check.py <prey> --scene <pose>`: every spot of the prey's pairs on that clip or pose taken by each
+  form the pairs allow there, at their real sizes, every 4 ticks; each against the prey, every two at their spots
+  against each other, and round a carcass the full lions lying by the kill where `LionHunt.lieByKill` lays them (its
+  numbers read from the Java), the carcass turned every 30 degrees. It names both parts (`Boxes.deepest_named`: "mane_chest
+  in hips 2.6"). `buffalo --scene carcass` (both carcass sizes, 3 forms, 4 spots each, the bystanders) takes 3 minutes,
+  what the pair check took for one holder. It found BUGS 467: neighbouring feeders 1 to 3.3 px in each other (mixed forms
+  and the male's mane, never measured by BUGS 377's one-form check), ranks 0 to 2 lying into a feeder up to 2.6 px. A
+  self-test.
