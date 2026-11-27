@@ -143,7 +143,7 @@ is left; no word means nobody has started it. The findings that wait for your ca
 **Round 10, the river's small life** (`docs/reviews/full/round-10-river-small-life.md`)
 
 - **R10-10** the two frog steps before breeding can end with nothing, and a hungry frog searches wide 5 times a second
-  - *Half fixed:* a hungry frog that saw nothing to eat looks again a second later, in a box 3 high (`BullfrogGoals`, `lookAgain`), and a guard told to see nobody off searches for nobody (`GuardPlaceGoal`). Open: a courtship that ends on its timer ...
+  - *Half fixed:* the hungry frog's search box is 3 high, not as high as it is wide, and a guard told to see nobody off searches for nobody (`GuardPlaceGoal`). Tried and taken out again: a one-second wait after a look that found nothing; in the ...
 - **R10-18** small searches that run more often than they need
   - *Half fixed:* a snail looks round for what it fears 4 times a second, not every other tick, and a mother crab counts the crabs round her only once her eggs are due. Open: the crab's three avoid goals as one look (small, not measured).
 
