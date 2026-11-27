@@ -11,6 +11,8 @@ Keep this short. The full story is in `docs/HISTORY.md`; every status bullet is 
 
 **Savanna land animals (2026-11-25, branch `claude/buffalo`):** the Cape buffalo (herds by the pans) and the African lion (prides by one pan in three: the day in a row at the den, the roar chorus, the temper and the chase), step 1 each; the lion's hunt and buffalo calves (lion step 2, 2026-11-25): lionesses stalk, freeze, rush and grip a calf at dusk or dawn, the pride feeds at the carcass. Next: Neon's calf model and feeding clips, then lion step 3 (cubs growing).
 
+**The Motion Studio, phase 1 (2026-11-27, branch `claude/motion-phase1`):** see the game's own recording of a film: `python tools/replay.py run-film/screenshots/lion_hunt`, then open `references/replay/lion_hunt.html` (every animal as the game drew it, any angle, slow motion, a footfall chart that turns red where a planted foot slides). It shows the lions' walk and the stalk-to-freeze switch sliding their feet.
+
 ## Now (2026-11-21): the Animal Maker Engine overnight, steps A to C and the full check
 Branch `claude/engine-every-animal` (not yet in `C:\Ant Mod`, which holds another session's uncommitted notes). One checker and one course for any animal, shared climbing moves in the framework, shared leg maths, game faces automatic, the monitor's S-curve, and `python tools/verify_animal.py <animal> [--quick]` (the one command that checks an animal all the way). Every built animal passed it. Open: BUGS 255 (a monitor can stand at a one-block step without climbing, found by a new test), BUGS 256 (young crocodiles' tails inside blocks at steps).
 

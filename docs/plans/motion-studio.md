@@ -175,6 +175,7 @@ plan"). The clips were the easy part of step 5; nearly every fault came from put
   Then look at the films and the recording before changing anything ("find the cause before fixing jank").
 - **Phase 1, the lab shows the game (Neon's viewer):** 3, 5, 6, 7 on the phase 0 recordings. After this the user can
   study any real motion from any angle.
+  **Built 2026-11-27 by Claude (Neon out of quota), `claude/motion-phase1`: "Phase 1, built" below.**
 - **Phase 2, one source of truth for motion:** 20, 21, 22, 23, 24, 25, 26. Each removes a copy or a hidden difference.
 - **Phase 3, partner moves (the lion and buffalo first):** 31, 32, then 36 and 37 offline, then 33 with 34 or 35 in
   the game (pick after seeing the phase 0 films), then 38, 40, 41. The hunt's oval and fixed ticks go.
@@ -222,6 +223,60 @@ plan"). The clips were the easy part of step 5; nearly every fault came from put
 
 **What phase 0 did not do:** the replay page (phase 1, Neon's viewer); no fix to the hunt itself (373 to 377 are the
 evidence for phase 3's partner moves; 372 is a plain bug for its own session).
+
+## Phase 1, built (2026-11-27, branch `claude/motion-phase1`, Claude covering Neon's lane; the user's go-ahead)
+**What was built (ideas 3, 5, 6, 7; foot paths in the replay in place of idea 8's dots in the game), in three stages,
+each reviewed by three subagents and their findings fixed:**
+- **The replay page (3):** `python tools/replay.py run-film/screenshots/<scene>` writes `references/replay/<scene>.html`,
+  one file that works offline: every animal of a film's recording on the recorded blocks and water, each part where the
+  game drew it (the recorded matrices, nothing re-imagined), any angle, play at 1/10 to 2 times, a moment at a time,
+  the scrub bar, cameras round a picked animal, follow, labels, the pieces, hide an animal. Each camera turns with the
+  animal and stands at one distance for its whole recording: fitted to the space the animal takes up in its own frame
+  over the recording (a fit to one moment's pose made the zoom jump from moment to moment and a turn crop it, the
+  stage 3 review; a strip is fitted to its own moments). Follow keeps a lit camera on the animal, turning with it.
+  Click an animal to read its clips, play speed, how far in, standing, and its mind's facts. The page's address holds
+  the moment, the animal, the camera and the traces: a link brings back the same view. Game ticks run but not drawn show
+  as gaps ("after 61 game ticks not recorded").
+- **One clock:** the recorder now writes the client's own tick count (`ct`, counted only while the game runs: not while
+  frozen or paused) beside the game time (`ft`); animals are lined up on `ct` plus the partial tick. Older recordings
+  fall back to `ft` (the page says so).
+- **One reader:** `tools/recording.py` reads every recording (the page, `tools/pair_report.py`, `tools/body_course.py`;
+  their outputs checked unchanged).
+- **The footfall chart (6):** under the scene, the picked animal's clip and each foot moment by moment (dark on the
+  ground, red sliding, light lifted, a dashed blue line for ticks not recorded), three seconds each side of now or the
+  whole recording; press or drag on it to go to a moment.
+- **Ghosts (7)** (4 or 8, a tenth of a second apart, never across ticks not recorded) and **foot paths** (each foot's
+  middle over the last 1.5 s, coloured the same way).
+- **Picture strips (5):** `python tools/replay_strips.py <scene> --pick <animal> --from <tick> --to <tick> --every N
+  [--cams side,front,above] [--fixed] [--list]` lays the animal at every N-th of its own moments from each camera on
+  sheets of ten rows with its clip, play speed and feet (heights in model pixels, a sliding row framed red), its foot
+  paths in the pictures, the chart under the last sheet, and a text file: a summary (clip changes, ticks not recorded,
+  slide stretches, the body's biggest step) and every moment with clips, feet, the body's drawn step and turn a tick
+  and the mind's facts (`references/replay/strips/`). `--fixed` keeps each camera where its first picture was taken (the
+  animal's own travel shows); `--list` writes only the text, to find the ticks worth a picture. The page is built afresh
+  for each run. For checking a motion before the user sees it.
+- **The feet rule (my picks, set from the lion hunt's numbers):** a foot is the last bone of each leg in the body plan
+  with the bones below it (as the offline checker); every corner is measured against the recorded ground under it, in
+  the animal's own model pixels: on the ground within 1 pixel, touching within 0.25, sliding when its touching corners
+  move more than 0.15 a tick (still feet drift under 0.04); not judged in the 3 ticks after ticks not recorded (the game
+  eases an animal to its new place over 3 ticks).
+
+**What the page shows in the lion hunt film (to look into, nothing fixed here):**
+- Still clips are quiet: graze, rest and feed slide on fewer than 1 standing moment in 100.
+- The walk slides on a fifth to a half of its standing moments, the stalk on about 1 in 10; the buffalo's charge and
+  trot skate.
+- Each switch from `stalk` to `ambush_freeze` slides all four feet 0.2 to 2.7 pixels a tick for about 6 ticks, and early
+  in the freeze all four slide the same 0.19 pixels a tick: the body still gliding while the clip stands still.
+- `rest_down` and `rest_up` slide on about half their standing moments (paws dragged as she lies down or gets up).
+- In `jump_smack` and `stalk_leap_bite` a lioness's front claw reaches 1.5 to 1.7 blocks to either side of her (98 in
+  100 of her moments stay within 0.8): a paw flung wide, or something to look at in the clip.
+- The cow's `mood_alert`: about 1 foot moment in 8 slides (likely turning on the spot on planted hooves).
+- The film itself misses the hold (BUGS 449). Two measuring tools have their own feet rules with faults (BUGS 456,
+  457); later, one Python feet rule in `tools/recording.py` matching the page's.
+
+**What phase 1 did not do:** idea 4 (the clip as made beside the clip as drawn); idea 8 in the game. In the strips an
+animal standing between the camera and the picked one hides it: two tries at judging which animal is in the way failed
+(the prey faded; then crowding pride-mates kept solid), so it is the user's call (drawing every other animal see-through).
 
 ## Watch out for
 - **Never copy the game's rules into Python.** A lab that re-imagines the game drifts from it; the recording is the
