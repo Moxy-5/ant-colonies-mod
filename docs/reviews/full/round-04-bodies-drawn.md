@@ -83,6 +83,7 @@ the aim one or two ticks more if the word is late. Add a plain unit test of `Rid
 grip; and the reverse), none exists today.
 
 ### R4-2 (B, to measure; the extra drawing proven): every muddy animal near the camera is drawn two or three times over
+(Also found by the thread reader, who counts a pod of six muddy hippos at 2,400 boxes instead of 800.)
 **What is wrong:** the mud coat is drawn by drawing the whole model again with the mask texture (GeckoLib's `reRender`),
 once for each of the two masks it shows. Coverage 3 and 4 show both masks, so the animal is drawn three times; 1, 2 and
 5 to 7, twice. Within 56 blocks, always, whatever the box count.
@@ -102,6 +103,7 @@ draw once more, not twice), and a nearer cut-off for the big models (or fade the
 tint over a whole body is all that shows).
 
 ### R4-3 (B, to measure; the extra drawing proven): every young worker is drawn twice at any distance
+(Also found by the thread reader, who rated it C: about 1 worker in 20 is young in a steady colony, more right after a hatching wave.)
 **What is wrong:** young (pale) workers are drawn by drawing the whole model a second time with the pale texture, at
 any distance, while every other extra (the live layer at 32 blocks, the mud coat at 56, the Matabele's far look at 4.5
 and 7) stops further off. Termites have no far look, so a young termite worker's 65 boxes are drawn twice out to the
@@ -155,6 +157,7 @@ known at sign-up) and take the plan by the model resource, so the renderer sets 
   (a monitor's 20 joints, 3 reads each, each up to 8 block and fluid reads). To measure; only within each model's `NEAR`.
 
 ### R4-7 (C, proven): the texture-exists caches are never cleared on a resource reload
+(Also found by the thread reader.)
 **What is wrong:** `YoungPaleLayer.EXISTS` and `MudCoatLook.EXISTS` remember whether a texture exists for the whole sitting.
 A resource pack (or F3+T after editing) that adds or removes a `_young.png` or `_mud_*.png` keeps the old answer:
 removed, the missing-texture squares (the BUGS 74 look) until the game restarts; added, not shown.
@@ -392,3 +395,271 @@ skip the print if not.
   to the right bus (the game starts and the arm mud is drawn, so it does).
 - Shader mods (shadow passes calling `render` twice: the fly wings' "every frame" flap would double).
 - `OtterRenderer`, `CrocodileRollClient`, `MudCoatLayer` (other slices).
+
+---
+
+## Thread: what a frame and a tick cost with 60 insects and a full river in view (a Fable reader, across all the files)
+
+Nothing was measured: every cost below is a count of work (boxes, block reads, objects made, files read), never a time. GeckoLib 4.9.3 was read from its jar with `javap`. Three of this reader's eight findings were the same thing a slice reader found and are merged there: the mud coat's re-draws (R4-2), the young worker drawn twice (R4-3; this reader rated it C: about 1 worker in 20 is young in a steady colony), the picture-exists memories (R4-7).
+
+### The short answer
+
+- **The insects are in good shape.** Their drawing has three savings built in (ready-made faces, a far look with a
+  quarter of the boxes, far insects reusing their last pose every other frame), their layers stop at once when there is
+  nothing to draw, and the server sends almost nothing about them beyond Minecraft's own position packets.
+- **The animals have none of those three savings**, have more boxes each than any insect, and are told to be drawn
+  further away than Minecraft would. A full river is the heaviest thing the mod can put on screen by a wide margin
+  (my count: 10,000 to 20,000 boxes against about 4,000 to 5,000 for a two-colony raid). That is R4-18, the one finding
+  this reader graded A.
+- **The server side is quiet.** I found no value sent every tick for any insect or animal; all synced values send only
+  when they change.
+
+### The paths walked
+
+#### 1. One insect, one frame
+
+`AntRenderer.render` (framework `client/AntRenderer.java:120-140`): picks the far look (`drawnFar`, line 92), sets three
+numbers on the insect, hides lost legs (stops at once when none is lost), then GeckoLib's `defaultRender`:
+
+1. **Clips** (`InsectModel.handleAnimations` -> `PoseMemory`): a far insect reuses its last pose every other frame while
+   frames are quick. Otherwise GeckoLib's `tickAnimation`: for each of the 3 players (body, head, extra) a new queue
+   object for every bone, then for each bone of the clip 9 look-ups that each scan the key list from its start and make
+   two small objects; then a pass over all bones with look-ups by name.
+2. **The live layer** (`BodyLanguage.apply`): skipped past 32 blocks; a handful of bone look-ups; no block reads.
+3. **One pass over the bones** drawing boxes through `BoneMesh.draw` (`AntRenderer.java:82-90`): ready-made faces, no
+   objects made per box.
+4. **Three layers** (`AntRenderer.java:116-118`), each asked once per bone per insect: `CarriedLoadLayer` and
+   `ClampedHeadLayer` stop on the first line when nothing is carried or clamped; `YoungPaleLayer` stops when the insect
+   is not young, otherwise draws the whole model a second time (R4-3).
+
+Per frame vs per tick: turning, slope tilt, the edge pose, naps, the waist are worked out **per tick** in
+`AbstractAntEntity` (about lines 2442-2460) and only blended per frame. Good.
+
+Boxes: termite worker 65, soldiers 67, king 75, queen 86; Matabele major and minor 227 near, **54 far**.
+60 termites = about 4,000 boxes; a 60-ant Matabele column mostly far = about 3,000 to 5,000; near, all 227 = 13,600
+(only when the player stands inside the column).
+
+#### 2. One animal, one frame
+
+Every animal renderer is a plain `GeoEntityRenderer`. Per frame per animal: GeckoLib's full clip pass (as above, with
+1 or 2 players), the model's own code, then GeckoLib's **plain box drawing**: for every box a matrix push and pop,
+three quaternion turns (made even for a box that is not turned), a copied matrix, 6 normal vectors and 24 corner
+vectors, all new objects (about 33 a box a frame; `GeoRenderer.renderCube`, `RenderUtil.rotateMatrixAroundCube`).
+
+Boxes (from the model files, script `boxes.py` in the scratchpad): monitor **665**, bullfrog **393**, bull shark 366,
+lion 322, lioness 280, crab 248-276, lion cub 244, buffalo 229, crocodile 192, catfish 176, hippo 133, tilapia 105,
+otter 103, snail 81, distichodus 67, barb 39, tadpole 29, fly 23 (not GeckoLib-drawn), remains 71-147.
+
+A 20-tilapia school: 2,100 boxes, 20 full clip passes, 20 shadows. A full river by the spawn caps
+(`docs/LIVING-THINGS.md` 17-29: 45 tilapia and catfish, 40 barbs, 24 crabs and snails, 16 tadpoles, 8 grazers, 6
+hippos, 5 crocodiles, 4 bullfrogs, 2 monitors, 2 otters, 2 sharks, 18 fly clouds): **about 10,000 to 20,000 boxes** if
+all of it were in view at once (it rarely all is; the caps are for the land kept within 96 blocks).
+
+Extra per-frame work in the animals' own code: the crocodile and monitor read the ground under every joint of spine and
+tail (`GroundBend.update`), lions and buffalo read the ground under four feet (`StandTilt.place`), three models build
+their file names afresh each call (R4-22).
+
+#### 3. Per client tick
+
+- `PlantPushClient` (`savanna client/PlantPushClient.java:110-112`): loops every entity the client knows, big ones
+  within 64 blocks read the blocks they overlap. Few big animals exist, so small. Its render handler stops when no
+  plant sways.
+- `MudFootprints`: players only. `SavannaMudClient`, `MudPlayerLayer`: one block check a frame. Small.
+- `FrameWatch` (always on): per frame a clock read, a walk over the Java cleaner's counters and a list copy; a helper
+  thread wakes every 5 ms for ever. This is **R12-47 (open)**: part of every frame's cost, to measure.
+- `FilmDirector`, `FilmFrameMeter`, `FilmStep`, `ReportShot`: each stops on its first check in normal play.
+- Every insect's own client tick: the edge search (R4-20).
+- `FlySwarm`: only stepped when its cloud is drawn.
+
+#### 4. What the server sends
+
+Every `entityData.set` in `savanna/animal`, `savanna/entity`, `framework/entity`, `framework/fight`, `framework/coat`
+was listed (script `sets.py`). Each is either inside a setter called when something happens (a load picked up, a
+strike, a clamp, a lost leg, a mood) or sets a state value each tick that Minecraft sends **only when it changed**
+(`AbstractAntEntity` 2446-2448: surface, heading, pose flags; `TermiteSoldierEntity` 422, 426; `TilapiaEntity`
+251-252; `CatfishEntity` 467 once a second). The mud coat sends its own packet only when its packed byte changes.
+No packet of the mod's own goes out every tick.
+
+**Values changed per tick, steady state: about 0 for 60 walking insects on flat ground, about 0 for a resting river.**
+What does travel is Minecraft's own position, speed and head packets (one set per moving entity per tick or two, to
+each player in range), and bursts on events: an insect climbing a wall sends surface and heading as they change.
+One per-tick sound: a drumming termite soldier plays a note every other tick for 12 of each 20 ticks
+(`TermiteSoldierEntity.java:414-420`); with many soldiers alarmed that is a few sound packets a tick per player.
+I mark it "to measure" in the table and leave judging it to the round that reads the alarm.
+
+#### 5. Static caches
+
+`BoneMesh.MESHES` (emptied at 4,096 bones), `DrawClock.FURTHEST`, `FaceLayer.states`, `MudFootprints` (all weak, freed
+with their entity), `PlantPushClient.SWAYS` (emptied on a world change), `BodyPlans` (read once). Two small maps are
+never emptied on a resource reload (R4-7). Nothing grows without limit.
+
+### R4-18 (A, the mechanism proven; the size to measure): every animal is drawn the slow way the insects were moved off, with more boxes and from further away
+**What is wrong:** The insects were given three savings because drawing a crowd was too slow: their boxes are turned
+into ready-made faces once (`BoneMesh`), far ones use a model with a quarter of the boxes, and far ones reuse their
+last pose every other frame. The animals have none of the three. Each animal box is drawn by GeckoLib's own path: a
+matrix saved and restored, three turns worked out even when the box is not turned, and about 33 small objects made
+and thrown away, per box, per frame. And the animals have more boxes than any insect (monitor 665, bullfrog 393,
+shark 366, lion 322, crab about 250, catfish 176, tilapia 105), and most are told to be drawn further than Minecraft
+would draw something their size (a 105-box tilapia to 64 blocks, a crab to 48, a crocodile to 96, lions, buffalo and
+hippos to 128). A full river in view is 10,000 to 20,000 such boxes a frame, so several hundred thousand short-lived
+objects a frame, against about 4,000 to 5,000 cheap boxes for a whole raid.
+**What the player would see:** Not proven by reading. What the path says to expect: a lower frame rate when looking
+along a busy river than when watching a raid, and short hitches as Java clears the thrown-away objects. The size is
+not known until it is measured.
+**Where:** every renderer in `savanna/src/main/java/com/antcolonies/savanna/client/` that extends `GeoEntityRenderer`
+(`TilapiaRenderer`, `BarbRenderer`, `CatfishRenderer`, `CrabRenderer`, `BullfrogRenderer`, `MonitorRenderer`,
+`CrocodileRenderer`, `HippoRenderer`, `OtterRenderer`, `LionRenderer`, `BuffaloRenderer`, `BullSharkRenderer`,
+`SnailRenderer`, `TadpoleRenderer`, `DistichodusRenderer`); the insect savings they lack:
+`framework/.../client/AntRenderer.java:65, 82-90`, `BoneMesh.java`, `PoseMemory.java`; the draw distances:
+`shouldRenderAtSqrDistance` in each animal (`TilapiaEntity.java:633`, `CrabEntity.java:362`, `CrocodileEntity.java:1126`,
+`LionEntity.java:919`, ...).
+**Proof:** GeckoLib 4.9.3 read with `javap`: `GeoRenderer.renderCube` pushes the pose, calls
+`RenderUtil.translateToPivotPoint` and `rotateMatrixAroundCube` (three `new Quaternionf` and three `mulPose`, no test
+for a zero turn), copies the matrix, then makes a normal vector per face and a `Vector4f` per corner. No animal
+renderer overrides `renderCubesOfBone`; only `AntRenderer` does. `BoneMesh`'s own comment says GeckoLib's box turning
+and corner writing was "about 38%" of the drawing time of an insect crowd, and `InsectModel.farLook`'s comment gives
+"about a millionth of a second a box" for insects: both are the code's notes from insect scenes, not measurements of
+animals. Box counts are from the model files. **Not checked:** whether any animal texture has see-through pixels on a
+box that hides another box's face (`BoneMesh` drops buried faces and its comment says it assumes solid textures; the
+bullfrog's and fly's see-through parts would need care); how many river animals are really in view at once in play.
+**Checked by the leading session:** only `AntRenderer` and `InsectModel` name `renderCubesOfBone`, `BoneMesh` or `PoseMemory` (a search of both mods), and `TilapiaEntity.java:633` sets its own draw distance; the mechanism holds. It stays A as round 3's R3-10 did (a proven mechanism whose size is not measured); if the measurement finds a river cheap, it becomes B.
+**Fix proposed:** Measure first (see the table). Then, in order of gain for the work: (1) a shared base renderer for
+animals that draws through `BoneMesh` as `AntRenderer` does (one method, after checking the textures); (2) the pose
+reuse for far animals (`PoseMemory` is already species-neutral in what it does); (3) far looks or shorter draw
+distances for the small many-boxed kinds (bullfrog, crab, tilapia, catfish), since a 393-box frog 40 blocks off is a
+few pixels. This is reuse of what exists, not a new system.
+
+### R4-19 (B, to measure): each walking insect re-reads its walk clip's speed note as text every frame
+**What is wrong:** To pick which walk clip fits an insect's speed, the code reads a note written inside the clip
+("speeds 0.02 0.05"). It reads it as text, cuts it into words and turns the words into numbers every time it asks,
+and it asks at least once per walking insect per frame (up to three times when near a band's edge). The stride and
+turn notes beside it are remembered; this one is not.
+**What the player would see:** Nothing visible; a steady small cost and thrown-away text for every walking insect in
+view, most of the 60 in a raid.
+**Where:** `framework/.../entity/body/AntAnimationController.java:129-140` (`notesOf`: `trim`, `substring`,
+`split("\\s+")`, `parseDouble`), `201-236` (`gearFor`, `bandOf`); called from
+`framework/.../entity/AbstractAntEntity.java:3105` inside the per-frame `animateBody`.
+**Proof:** `animateBody` is the controller's handler, which GeckoLib calls once per frame per controller
+(`AnimationController.process`); when the clip is the walk it calls `gearFor`, which calls `bandOf` for the current
+gear and, near a band's edge, for a neighbour; `bandOf` calls `notesOf` with no memory. `split` with that pattern
+compiles a pattern each call. **Not checked:** how many notes a walk clip carries (the loop is over all of them).
+**Fix proposed:** Remember the band per clip the way `rate()` remembers the stride (a small map from clip to its two
+numbers, emptied when clips reload).
+
+### R4-20 (B, to measure): every insect the client knows searches for edges and corners every tick, drawn or not
+**What is wrong:** The edge-over pose (an insect folding over a ledge or into a corner) is looked for on the client
+every tick for every insect it has been told about, about 20 to 30 block reads each on flat ground (my count from the
+loops), whether or not the insect is on screen, behind the player, underground or past the 48 blocks it is drawn to.
+The client is told about insects further away than it draws them.
+**What the player would see:** Nothing visible; client tick time that grows with the number of insects nearby, in
+view or not. With two colonies near (100 or more insects known to the client) that is a few thousand block reads a
+tick.
+**Where:** `framework/.../entity/AbstractAntEntity.java:2642, 2740-2753` (`overAnEdge` -> `EdgeOver.find`, then
+`EdgeOver.findCorner`); `framework/.../entity/body/EdgeOver.java` about 60-190; the 48 blocks:
+`AbstractAntEntity.java:316-327`.
+**Proof:** `turnBody` runs in the client tick and calls `overAnEdge`; its early ways out are a very young insect, one
+in a channel, one turning slowly or peeking; a plain walker on a floor goes through `edgeAlong` twice (up to 3 columns,
+up to 4 block reads each) and `findCorner` (9 cells, up to 3 reads each), making small objects. **Not checked:** the
+default distance the client is told about insects (no range is set in `SavannaEntities.java:47-107`; I took
+Minecraft's default without opening its source), and whether a real search is cheaper than my count because most
+reads stop early.
+**Fix proposed:** Skip the search on the client when the insect is past its draw distance from the camera (the pose
+cannot be seen there), and/or set the insects' tracking range to fit the 48 blocks. One check, no new number: reuse
+`DRAW_DISTANCE`.
+
+### R4-21 (B, to measure): the crocodile and the monitor read the ground under every joint every frame
+**What is wrong:** To lay spine and tail along the ground, the crocodile (within 64 blocks) and the monitor (within
+48) ask the world for the ground height three times under every joint, each ask reading water and block shape down
+several blocks, and then again under each foot. That is some hundreds of block reads per animal per **frame**, not per
+tick, so it doubles when the frame rate doubles, though the ground can only change per tick.
+**What the player would see:** Nothing visible; cost that grows with frame rate and with crocodiles near (up to 5 by
+the cap, more round a carcass).
+**Where:** `framework/.../entity/body/GroundBend.java` (`update`, `under`, `support` at 277);
+`savanna/.../client/CrocodileModel.java:101-102, 316`; `MonitorModel.java` (its `NEAR = 48`); also
+`StandTilt.place` for lions and buffalo (4 asks a frame; `LionModel.java:73` makes a new `StandTilt` each frame).
+**Proof:** `setCustomAnimations` is called by GeckoLib once per frame per animal drawn; both models call
+`GroundBend.update` there inside their near limit. **Not checked:** the exact joint count per chain, so "hundreds" is
+an estimate from the chain lengths in the body plans, not a count.
+**Fix proposed:** Read the ground once per tick per animal (keep the heights, blend per frame as the insects do with
+their slope tilt). The shape of the fix already exists in `AbstractAntEntity.tiltOnSlope`.
+
+### R4-22 (C, proven small): three animal models build their file names from text on every call, and the crab re-registers its bones between looks
+**What is wrong:** `CrocodileModel`, `CrabModel` and `LionModel` make a new name object (and the text for it) each time
+GeckoLib asks which model, picture or clip file to use, several times per animal per frame. The crab uses one model
+object for four looks (plain, male, female, with eggs), so whenever two crabs drawn one after the other differ,
+GeckoLib empties and refills its table of 40 bones.
+**What the player would see:** Nothing.
+**Where:** `savanna/.../client/CrocodileModel.java:48, 57-67`; `CrabModel.java` (its `getModelResource`);
+`LionModel.java` (its three `get...Resource` methods).
+**Proof:** GeckoLib's `GeoModel.getBakedModel` calls `AnimationProcessor.setActiveModel` (clear and re-register every
+bone) when the model differs from the last one drawn; it does not restart clips. The fish renderers that switch looks
+(tilapia mouth full, catfish plump) do the same on 11 and 23 bones.
+**Fix proposed:** Static name tables as `RemainsRenderer` already has. Lowest priority.
+
+### Open round 12 findings that are part of the frame's cost (not repeated, only placed)
+
+- **R12-63 (open; proven):** while an otter holds a crab or a bullfrog, that animal's body plan file is opened and read
+  twice every frame, inside a locked method (`savanna/.../animal/HeldCatch.java:52, 79-86`: nothing is remembered for
+  an animal with no "held" part in its plan, and only the barb and tilapia have one). The only place found where a
+  **file is read every frame**. Small in the table only because at most 2 otters exist; it is the cheapest proven fix
+  on this list.
+- **R12-47 (open):** `FrameWatch` always on (above, path 3).
+- **R12-69 (open):** the dragged tail is updated before its weight is checked (monitor only).
+- R12-9, R12-49, R12-51, R12-54, R12-62, R12-65, R12-68: open, checks or tools, not part of the game's frame.
+
+### The costs, biggest first
+
+| # | Cost | Per | Proven or to measure | What to measure, with what scene |
+|---|------|-----|----------------------|----------------------------------|
+| 1 | Animals' plain box drawing, 10-20 thousand boxes, about 33 objects a box (R4-18) | frame | mechanism proven, size to measure | A river at its caps, camera along it; `FrameWatch`'s `[frames]` lines (frame time, ms clearing memory) and the F3 profiler's entity share; the same with fish only, then banks only |
+| 2 | Animals' clip pass with no pose reuse (lion clip 10,934 keys, monitor 9,639, crab 4,235; key lists scanned from the start each frame) | frame | to measure | Same scene; compare a far school with clips frozen (`/tick freeze` does not stop clips; use the film camera's step) |
+| 3 | Mud coat re-draws (R4-2) | frame | to measure | Scene 1 with animals muddy vs clean; one coated monitor near |
+| 4 | Insects' clip pass, near ones (3 players, new queues per bone per frame) | frame | to measure; the code's note says clips are about half of drawing an insect | A raid, two colonies, camera 6 blocks off (inside `PoseMemory`'s near range) vs 30 blocks |
+| 5 | Edge search for every known insect (R4-20) | client tick | to measure | Two colonies within 80 blocks, camera looking away; client tick time in F3 |
+| 6 | Ground reads per frame, crocodile and monitor (R4-21) | frame | to measure | 5 crocodiles on a bank within 64 blocks, at 60 and at 144 fps |
+| 7 | Walk speed note read as text (R4-19) | frame | to measure | Scene 4, a memory profile for `String.split` |
+| 8 | Fly clouds: per fly, name text and small objects per corner (18 clouds, 4-12 flies, 23 boxes) | frame | to measure, bounded by the 24-block limit | A carcass with clouds, camera 5 blocks off |
+| 9 | Shadows: a block read under every animal with a shadow, each frame | frame | to measure (Minecraft's own) | Scene 1 with entity shadows off in the options |
+| 10 | `FrameWatch` always on (R12-47) | frame + a 5 ms thread | to measure | Any scene, on and off |
+| 11 | Otter holding a crab or frog: a file read twice a frame (R12-63) | frame | **proven** (the read), size to measure | An otter with a crab |
+| 12 | Drumming soldiers' notes | server tick, per player | to measure | A mound alarmed, 10 or more soldiers, packet count |
+| 13 | Young workers drawn twice (R4-3); file names built per call (R4-22) | frame | proven small | none needed |
+| 14 | Synced values the mod sends | server tick | **proven** about 0 in steady state | none needed |
+
+**Order to measure:** 1, then 3 on the same scene (one launch, animals muddy and clean), then 4 and 5 on one raid scene
+(camera near, far, and turned away). Those three runs settle which of R4-18 to R4-21 are worth building. Rows 6 to 12 only
+if those leave time unexplained.
+
+### Solid on this thread (do not "fix")
+
+- **The insect drawing path**: `BoneMesh` (no objects per box, buried faces dropped, bounded at 4,096 bones), the far
+  look (227 to 54 boxes), `PoseMemory` (reuse only while frames are quick). It is the model for R4-18's fix.
+- **Per tick, not per frame**: the insect body's turning, slope, edge pose, naps and waist are worked out in the tick
+  and only blended in the frame.
+- **Layers stop early**: carried load, clamped head and young-pale each cost one check per bone or per insect when
+  there is nothing to show.
+- **GeckoLib works out a bone's matrix once per frame**, and tracks matrices only for bones asked to (one bullfrog
+  bone).
+- **The server sends changes only**: every synced value; the mud coat's packet; no per-tick packet of the mod's own.
+- **Film and debug handlers** (`FilmDirector`, `FilmFrameMeter`, `FilmStep`, `ReportShot`) cost one check each in play.
+- **Fly clouds** are simulated only when drawn and flies are culled at 24 blocks, legs at 4.
+- **`PlantPushClient`** empties its sways per world and its render handler stops when none sway.
+- **Body plans** are read once at sign-up; `InsectModel` and `AntRenderer` remember their plan.
+- **Static memories** are bounded or weak (except R4-7's two small maps).
+- **Corpses** (`AntCorpseRenderer`) are 15 plain boxes with no shadow and a once-a-second update.
+- **The termite queen's model code**: about 26 bone look-ups a frame for one animal per colony; nothing to gain.
+
+### What this reader did not check
+
+- Nothing was measured; every size above is a count or the code's own comment.
+- Minecraft's default tracking range for the insects (R4-20 leans on it).
+- Whether animal textures have see-through pixels that would break `BoneMesh`'s buried-face rule (R4-18's fix).
+- How many river animals are in view at once in real play (the caps are per kept land, not per screen).
+- `TailDrag.update`'s inside, `MoveRider.drawnShift`, `Spots`, `OwnBones`, `SwimFold`, `BodyRecorder`, the egg, larva
+  and nymph renderers, `StingPainOverlay`, the doum palm's model, the mod's particles.
+- The animals' own client `tick` bodies (round 9's ground) and `Attention.tick`'s entity search.
+- The cost of Minecraft's shadows and of its own position packets.
+- `StallWatch.gcMillis` was read (`framework/.../debug/StallWatch.java:69-78`: a walk over the cleaner's counters, a
+  few objects a frame); its real cost is part of R12-47's measurement.
+- The joint counts behind R4-21's "hundreds" and the block reads behind R4-20's "20 to 30" are my estimates from the
+  loops, not counts from a run.
