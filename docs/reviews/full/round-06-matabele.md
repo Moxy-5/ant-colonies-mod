@@ -207,6 +207,10 @@ second.
 
 **Your call (2026-11-26):** A Matabele colony has lost every worker (starved, killed in raids, old age). Today its queen lives on alone for ever, the colony never ends, and no other colony can take that dead mound. My pick: she starves on the file's own clock (5 days) once a colony that has had workers has none; a queen put down with a spawn egg, still waiting for her first workers, keeps her grace.
 
+**Call made (2026-11-26):** yes, she starves (the user).
+
+**Status (2026-11-26, `claude/review-fix-a-4-6`): fixed. `QueenCare` remembers whether the colony has ever had a worker (`hadWorkers`, saved; noted by her hunger clock once a second; an older save counts a queen who has laid as having had them). For a species with no founding of its own, `isSpent` is true once such a colony has none left, so `hungerRunsOut` runs her clock (the file's `starve_ticks`, 5 days) here and away alike; she dies, `ColonyManager.queenDied` ends the colony and `MatabeleNest.pick` gives the mound out again. `Colony.isFounding` is unchanged (36 other places read it). A queen still waiting for her first workers keeps her grace. Test: `MatabeleColonyTests` (the queen alone does not starve past her time; her 8 workers killed, she dies at her starve time, her colony ends, her mound is free). Not judged here: a queen holding a carried egg or beside a full nursery is not hungry, as for every queen.**
+
 ### R6-3 (A, the path proven; how often to measure): a major with a fresh wound, or badly wounded, is sent out scouting alone
 
 **Checked again by the lead.** Read `Scouts.fit` (`Scouts.java:314-317`) beside `Raids.raiderFit`

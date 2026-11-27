@@ -41,7 +41,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
 public class MatabeleColonyTests {
-    @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 520, skyAccess = true)
     public static void aMatabeleQueenStartsAColonyThatMajorsAndMinorsJoinEachWithItsOwnSize(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TestScenes.deepGround(helper);
@@ -70,6 +70,9 @@ public class MatabeleColonyTests {
                     .map(c -> c.getSpecies() + "@" + c.getCenter().toShortString() + " queen " + c.getQueen(level)).toList() + " queen at " + queen.blockPosition().toShortString() + " id " + queen.getColonyId());
             helper.assertTrue(colony.getId().equals(queen.getColonyId()), "the queen is not the colony's queen");
             helper.assertTrue(colony.isFounding(), "a queen alone does not count as founding (she could starve alone)");
+            // Still waiting for her first workers she never starves, however long (her grace; review R6-2).
+            colony.queenCare().setQueenLastFed(level.getGameTime() - colony.profile().queen().starveTicks() - 1);
+            helper.assertFalse(colony.queenCare().queenStarves(level), "a queen waiting for her first workers starves");
             // Alone she digs nothing (the user's pick, 2026-10-24): her workers dig the way in.
             helper.assertTrue(colony.nest().findDigTarget(level) == null, "a Matabele queen alone has something to dig");
             for (int i = 0; i < 4; i++) {
@@ -129,6 +132,24 @@ public class MatabeleColonyTests {
             for (Colony colony : List.of(made[0], queenColony(helper, queen))) {
                 helper.assertTrue(MatabeleNest.IN_A_MOUND.equals(colony.nest().site()), "a Matabele colony settled " + colony.nest().site());
             }
+            // A colony that ran down to its queen (review R6-2): every worker dead, she is on her own hunger clock,
+            // like any queen nobody feeds (before, she counted as founding again and lived for ever, her mound taken).
+            Colony own = queenColony(helper, queen);
+            BlockPos home = own.getCenter();
+            MatabeleNest.Site taken = MatabeleNest.pick(level, home);
+            helper.assertTrue(taken == null || !taken.entrance().equals(home), "the queen's own mound counts as free while she lives in it");
+            workers.forEach(MatabeleEntity::kill);
+            helper.assertTrue(own.getCount(Caste.WORKER) == 0 && own.isFounding(), own.getCount(Caste.WORKER) + " workers left after all were killed");
+            helper.assertFalse(own.queenCare().queenStarves(level), "the queen starved the moment her last worker died");
+            own.queenCare().setQueenLastFed(level.getGameTime() - own.profile().queen().starveTicks() + 40); // two seconds from starving
+            made[0] = own;
+        });
+        helper.runAfterDelay(400, () -> {
+            Colony own = made[0];
+            helper.assertFalse(queen.isAlive(), "a Matabele queen whose workers are all dead lives on unfed past her starve time");
+            helper.assertTrue(com.antcolonies.colony.ColonyManager.get(level).getColony(own.getId()) == null, "her colony did not end with her");
+            MatabeleNest.Site free = MatabeleNest.pick(level, own.getCenter());
+            helper.assertTrue(free != null && free.entrance().equals(own.getCenter()), "her dead mound is not free for another queen: " + free);
             helper.succeed();
         });
     }

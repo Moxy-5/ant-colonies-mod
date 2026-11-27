@@ -7,11 +7,11 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**422 findings: 236 left (20 of them wait for your call), 186 done.**
+**422 findings: 235 left (19 of them wait for your call), 187 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
-| A: a player can meet it | 82 | 1 | 1 | 4 | 75 | 1 |
+| A: a player can meet it | 82 | 0 | 1 | 4 | 76 | 1 |
 | B: it will cost us when building on this | 195 | 61 | 17 | 15 | 100 | 2 |
 | C: a tidy-up | 145 | 135 | 0 | 2 | 7 | 1 |
 
@@ -22,7 +22,7 @@ review stay in `docs/BUGS.md`.
 | 3 | the insect body | 45 | 32 | 13 |
 | 4 | how bodies are drawn | 37 | 32 | 5 |
 | 5 | the termites | not read yet | | |
-| 6 | the Matabele ants (not raids) | 33 | 31 | 2 |
+| 6 | the Matabele ants (not raids) | 33 | 30 | 3 |
 | 7 | the giant trees | 36 | 15 | 21 |
 | 8 | the world | 20 | 14 | 6 |
 | 9 | the river hunters | 44 | 19 | 25 |
@@ -30,7 +30,7 @@ review stay in `docs/BUGS.md`.
 | 11 | the new raid code | 22 | 6 | 16 |
 | 12 | the animation engine | 73 | 45 | 28 |
 
-## Waiting for your call (20)
+## Waiting for your call (19)
 
 These change how the game looks or plays, or a balance number, so nothing is built until you say. Each has
 what happens today and my pick. Answer whenever you like: tell Claude the number and what you want.
@@ -53,8 +53,6 @@ what happens today and my pick. Answer whenever you like: tell Claude the number
   - *Your call:* should a crocodile's and monitor's hit boxes follow the body where it lies over a bank (head dipped to the water, chest up on a step)? Today the hit boxes stay level at the animal's own height, so a swing or arrow at a dipped head can pass through it. My pick: yes, but only after it is seen in play to matter; it is server work for every crocodile and monitor every tick.
 - **R4-32** (grade B, how bodies are drawn) a dying buffalo or lion on a step drops its tilt at once and dies with its legs hanging in the air
   - *Your call:* should a buffalo or lion killed on a step fall along the slope it stood on? Today it straightens level in a fifth of a second and its death plays with one end hanging over the lower ground. My pick: yes, keep its tilt through the death.
-- **R6-2** (grade A, the Matabele ants (not raids)) a Matabele colony whose workers all die keeps its queen for ever, and its dead mound stays taken
-  - *Your call:* A Matabele colony has lost every worker (starved, killed in raids, old age). Today its queen lives on alone for ever, the colony never ends, and no other colony can take that dead mound. My pick: she starves on the file's own clock (5 days) once a colony that has had workers has none; a queen put down with a spawn egg, still waiting for her first workers, keeps her grace.
 - **R6-5** (grade B, the Matabele ants (not raids)) a limping ant stops to call for helpers who can never come
   - *Your call:* After a raid that broke up, a limping ant on the way home stops and squeaks for 10 seconds every 40 while healthy nestmates walking home beside it go past: they count as "help is near" but their walk home outranks the rescue. Should an ant walking home by itself stop and carry a calling nestmate? My pick: yes (real Megaponera coming back from a raid do pick up a caller, Frank et al. 2017). The other way is the small fix: the hurt one no longer calls for them and just limps on.
 - **R6-6** (grade B, the Matabele ants (not raids)) the nest's defence calls out the wounded first, and ants carrying a hurt nestmate or carried themselves
@@ -513,6 +511,7 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 **Round 6, the Matabele ants (not raids)**
 
 - **R6-1** (A) a second player joining over LAN, or anyone on a server, is thrown out (or crashes) when a Matabele worker comes into view
+- **R6-2** (A) a Matabele colony whose workers all die keeps its queen for ever, and its dead mound stays taken
 - **R6-3** (A) a major with a fresh wound, or badly wounded, is sent out scouting alone
 
 **Round 7, the giant trees**

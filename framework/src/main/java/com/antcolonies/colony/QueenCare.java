@@ -50,6 +50,11 @@ public class QueenCare {
      */
     private boolean starvedAway;
     /**
+     * Whether the colony has ever had a worker (saved; noted by her hunger clock once a second): what tells a colony
+     * that ran down to its queen from a queen still waiting for her first workers (see {@link #isSpent}).
+     */
+    private boolean hadWorkers;
+    /**
      * The founding batch failed (every first worker died and no young are left) and the queen is laying her second,
      * smaller batch from the fat she has left (the profile's {@code founding.second_batch_eggs}). Saved.
      */
@@ -259,10 +264,18 @@ public class QueenCare {
      * A founding queen with no batch left to raise and nobody to feed her (her first workers, and her second batch, are
      * dead, or an older queen has lost every worker): she gets hungry like any queen, so she starves and the nest is
      * abandoned (most real founding queens that lose their first workers die).
+     *
+     * <p>A species with no founding of its own (its colonies split to found, the queen never lives alone: Megaponera)
+     * has no batch to raise: its queen is spent once a colony that has had workers has none left (code review R6-2:
+     * before, she counted as founding again and lived on alone for ever, her nest never free). A queen still waiting
+     * for her first workers (put down with a spawn egg) keeps her grace.
      */
     public boolean isSpent(Level level) {
         SpeciesProfile.Founding founding = colony.profile().founding().orElse(null);
-        return founding != null && colony.isFounding() && eggsLaid >= founding.eggs() && colony.brood().countBrood(level) == 0
+        if (founding == null) {
+            return hadWorkers && colony.isFounding();
+        }
+        return colony.isFounding() && eggsLaid >= founding.eggs() && colony.brood().countBrood(level) == 0
                 && (eggsLaid >= batchEggs(founding) && (secondBatch || founding.secondBatchEggs() <= 0) || eggsLaid > founding.eggs() && !secondBatch);
     }
 
@@ -441,6 +454,7 @@ public class QueenCare {
     private boolean hungerRunsOut(ServerLevel level) {
         long now = level.getGameTime();
         SpeciesProfile.QueenNumbers numbers = colony.profile().queen();
+        hadWorkers |= colony.getMemberCount() - colony.coFounderCount() > 0;
         boolean satisfied = !(royalsGetHungry(colony) || colony.isHungerOn() && isSpent(level)) || eggDue >= 0 || queenBread >= numbers.meal() || colony.brood().isFull(level);
         if (queenLastFed == Colony.NOT_SET || satisfied) {
             queenLastFed = now;
@@ -471,6 +485,7 @@ public class QueenCare {
         tag.putLong("nextStreamEgg", nextStreamEgg);
         tag.putBoolean("queenStarvedAway", starvedAway);
         tag.putBoolean("secondBatch", secondBatch);
+        tag.putBoolean("hadWorkers", hadWorkers);
     }
 
     void load(CompoundTag tag) {
@@ -484,5 +499,7 @@ public class QueenCare {
         nextStreamEgg = tag.contains("nextStreamEgg") ? tag.getLong("nextStreamEgg") : Colony.NOT_SET;
         starvedAway = tag.getBoolean("queenStarvedAway");
         secondBatch = tag.getBoolean("secondBatch");
+        // (an older save: a queen who has laid was fed by workers; only read for a species with no founding of its own)
+        hadWorkers = tag.contains("hadWorkers") ? tag.getBoolean("hadWorkers") : eggsLaid > 0;
     }
 }
