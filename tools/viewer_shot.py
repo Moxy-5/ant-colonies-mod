@@ -103,11 +103,16 @@ class Browser:
                                       f"--window-size={w},{h}", "about:blank"],
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         port_file = Path(profile) / "DevToolsActivePort"
+        text = ""
         for _ in range(300):
-            if port_file.exists() and port_file.read_text().strip():
+            try:  # (on Windows the browser holds the file shut for a moment while it writes it)
+                text = port_file.read_text().strip() if port_file.exists() else ""
+            except OSError:
+                text = ""
+            if text:
                 break
             time.sleep(0.1)
-        port = int(port_file.read_text().split()[0])
+        port = int(text.split()[0])
         for _ in range(100):
             try:
                 pages = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{port}/json/list", timeout=5).read())

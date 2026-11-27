@@ -341,8 +341,28 @@ function sceneView() {
   st.camera.position.set(c.x + s * 0.6, c.y + s * 0.55, c.z + s * 0.8);
   st.controls.target.copy(c); st.controls.update();
 }
-// the picked animal from one side: its own left (Minecraft: facing (-sin yaw, cos yaw), left (cos yaw, sin yaw));
-// with nothing picked, or the pick not drawn now, the whole scene
+// how far back a camera looking along -dir at target must stand for every drawn part of the animal to fit in the
+// picture with a margin round it (its own shape, not a box round it: a lioness's long tail does not push the camera
+// back in a front view)
+function fitDistance(a, target, dir) {
+  const z = dir.clone().normalize(), x = new THREE.Vector3(0, 1, 0).cross(z).normalize(), y = z.clone().cross(x);
+  const tanV = Math.tan(st.camera.fov * Math.PI / 360), tanH = tanV * st.camera.aspect, MARGIN = 1.15;
+  const p = new THREE.Vector3();
+  let dist = 0.5;
+  a.meshes.forEach(m => {
+    if (!m || !m.visible) return;
+    if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    const b = m.geometry.boundingBox;
+    for (let k = 0; k < 8; k++) {
+      p.set(k & 1 ? b.max.x : b.min.x, k & 2 ? b.max.y : b.min.y, k & 4 ? b.max.z : b.min.z).applyMatrix4(m.matrixWorld).sub(target);
+      const toward = p.dot(z);
+      dist = Math.max(dist, toward + MARGIN * Math.abs(p.dot(x)) / tanH, toward + MARGIN * Math.abs(p.dot(y)) / tanV, toward + 0.3);
+    }
+  });
+  return dist;
+}
+// the picked animal from one side: its own left (Minecraft: facing (-sin yaw, cos yaw), left (cos yaw, sin yaw)),
+// near enough to fill the picture; with nothing picked, or the pick not drawn now, the whole scene
 const CAMS = [['three-quarter', 'Three quarters'], ['side', 'Side'], ['front', 'Front'], ['behind', 'Behind'], ['above', 'Above'], ['wide', 'Wide']];
 function camera(name) {
   name = String(name || '').toLowerCase();
@@ -353,14 +373,12 @@ function camera(name) {
   camBtns(name);
   const yaw = a.yaw[a.now] * Math.PI / 180;
   const fwd = new THREE.Vector3(-Math.sin(yaw), 0, Math.cos(yaw)), left = new THREE.Vector3(Math.cos(yaw), 0, Math.sin(yaw));
-  const d = Math.max(2.5, at.size * 1.5);
-  const dir = {side: left.clone(), front: fwd.clone(), behind: fwd.clone().negate(),
+  const low = new THREE.Vector3(0, 0.15, 0);   // (a little over the ground: the feet and the ground under them show)
+  const dir = {side: left.clone().add(low), front: fwd.clone().add(low), behind: fwd.clone().negate().add(low),
                above: new THREE.Vector3(0.02, 1, 0.02), 'three-quarter': fwd.clone().add(left).normalize().add(new THREE.Vector3(0, 0.45, 0)),
-               wide: fwd.clone().add(left).normalize().add(new THREE.Vector3(0, 0.8, 0))}[name];
-  const dist = name === 'wide' ? d * 3.5 : name === 'above' ? d * 1.2 : d;
-  dir.normalize();
+               wide: fwd.clone().add(left).normalize().add(new THREE.Vector3(0, 0.8, 0))}[name].normalize();
+  const dist = fitDistance(a, at.c, dir) * (name === 'wide' ? 3 : 1);
   st.camera.position.copy(at.c).addScaledVector(dir, dist);
-  if (name === 'side' || name === 'front' || name === 'behind') st.camera.position.y = at.c.y + at.size * 0.12;
   st.controls.target.copy(at.c);
   st.controls.update();
   writeState();
@@ -929,9 +947,52 @@ st.onFrame.push(() => {
   if (settings.play) setPlaying(true);
   writeAddress();
   $('loading').style.display = 'none';
-  // what tools may call (moments are indexes from 0 here; the page and #m count from 1)
-  window.Replay = {show: t => { setPlaying(false); show(t); }, pick: n => pick(animals.find(a => a.name === n) || null),
-                   camera, follow: setFollow, play: setPlaying, moments: () => timeline.length, ready: true};
+  // what tools may call (moments are indexes from 0 here; the page and #m count from 1). tools/replay_strips.py takes
+  // its pictures through these: one page open, the moment and the camera set, the scene drawn, the picture read back.
+  const byName = n => animals.find(a => a.name === n) || null;
+  window.Replay = {
+    show: t => { setPlaying(false); show(t); }, pick: n => pick(byName(n)), camera, follow: setFollow, play: setPlaying,
+    moments: () => timeline.length, ready: true,
+    names: () => animals.map(a => a.name),
+    has: n => !!byName(n),
+    // the moments (indexes) where this animal is drawn between two game ticks (-1: from its first moment; to 40
+    // moments on), or null
+    span: (n, from, to) => {
+      const a = byName(n);
+      if (!a) return null;
+      const drawn = [];
+      for (let t = 0; t < timeline.length; t++) if (a.frameAt[t] >= 0) drawn.push(t);
+      if (!drawn.length) return null;
+      const first = from >= 0 ? drawn.find(t => tickAt[t] >= from) : drawn[0];
+      if (first === undefined) return null;
+      const last = to >= 0 ? [...drawn].reverse().find(t => tickAt[t] <= to) : drawn[Math.min(drawn.length - 1, drawn.indexOf(first) + 40)];
+      return last === undefined || last < first ? null : [first, last];
+    },
+    // one animal at the moment shown: its clip, play speed, how far in, feet and mind
+    about: n => {
+      const a = byName(n);
+      if (!a || a.now < 0) return {name: n, drawn: false, moment: now + 1, index: now, tick: tickAt[now]};
+      const j = a.now, body = (a.clipTable[a.clips[j]].body || '-').split(' '), play = (a.play[j] || {}).body || [];
+      return {name: n, drawn: true, moment: now + 1, index: now, tick: tickAt[now], gapBefore: gapBefore[now],
+              clip: body[0], clipState: body[1] || '', speed: play[0] === undefined || play[0] === null ? 1 : +play[0],
+              clipTicks: play[1] === undefined ? null : play[1], feet: feetNow(a), facts: a.facts[j] || {},
+              place: a.pos[j].map((x, i) => +(x + (DATA.origin || [0, 0, 0])[i]).toFixed(3)), yaw: a.yaw[j]};
+    },
+    // the scene from one of the picked animal's cameras, drawn now and read back as a PNG (no labels: they are not
+    // drawn on the canvas)
+    snap: cam => {
+      camera(cam);
+      sunToView();
+      st.renderer.render(st.scene, st.camera);
+      return st.renderer.domElement.toDataURL('image/png');
+    },
+    // the footfall chart of moments t0..t1 as a PNG, 1200 pixels wide
+    chart: (t0, t1) => {
+      const c = document.createElement('canvas');
+      const d = drawChart(c, Math.max(0, t0), Math.min(timeline.length - 1, t1), 1200, 1);
+      return d ? c.toDataURL('image/png') : null;
+    },
+  };
 })().catch(e => { $('loading').textContent = 'Could not unpack the recording: ' + e; window.Replay = {error: String(e)}; console.error(e); });
 </script>
 </body>
