@@ -355,6 +355,20 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
         return MODEL_SCALE * getScale();
     }
 
+    /**
+     * Whether a lion is on it (both sides: its holders ride it). Held, it is drawn as its clips alone pose it, its head
+     * not turned and its trunk not tilted to the ground ({@code client/BuffaloModel}): that is the body its holders are
+     * set on ({@link #spotAt}) and the offline pair check measures (code review R12-71).
+     */
+    public boolean held() {
+        for (Entity p : getPassengers()) {
+            if (p instanceof LionEntity) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** The lions holding it that have finished their strike (it goes down under two of them). */
     int steadyHolders() {
         int n = 0;

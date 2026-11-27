@@ -20,9 +20,11 @@ Nile monitor's maker (_Poser.leg's reach, _bend_way, _foot_at, _spline, _ease, _
 
 Units are whatever the maker uses (model pixels in every maker so far); points are [x, y, z] lists.
 """
+import atexit
 import hashlib
 import json
 import math
+import sys
 from pathlib import Path
 
 from model_parts import smooth, vsub, vadd, vlen, unit
@@ -119,11 +121,57 @@ def spline(t, keys, start=0.0, end=0.0):
 
 
 # --- limbs ---------------------------------------------------------------------------------------------------------------
+# Review R12-27: every limb solved tells how far its end fell short, and the makers threw that away. The kit keeps the
+# worst itself, under the clip the maker says it is on (clip_now; none said: one line for the whole run), and says so
+# when the maker ends: a hoof left short of the ground is heard of here, not later in the clip check or a film.
+MISS_SAID = 0.05                                     # units; smaller is the reach limit's rounding
+_MISSES = {}                                         # clip -> [the worst miss, how many poses fell short]
+_CLIP_NOW = ['']
+
+
+def clip_now(name):
+    """A maker says which clip it is posing now, so the misses are told by clip."""
+    _CLIP_NOW[0] = name
+
+
+def _missed(miss):
+    if miss > MISS_SAID:
+        row = _MISSES.setdefault(_CLIP_NOW[0], [0.0, 0])
+        row[0], row[1] = max(row[0], miss), row[1] + 1
+    return miss
+
+
+def misses():
+    """The worst miss and the number of poses that fell short, by clip, since the maker began."""
+    return {k: tuple(v) for k, v in _MISSES.items()}
+
+
+def _say_misses():
+    for name, (worst, n) in sorted(_MISSES.items()):
+        print(f'motion_kit: {name or "this run"}: {n} limb pose(s) fell short of their target, the worst by {worst:.2f} units '
+              '(the pose asks the limb for more than it has)')
+
+
+atexit.register(_say_misses)
+
+
 def bend_way(pole, dh):
     """Which way a joint between two pieces bends (a unit direction square to dh, the line from the leg's root to its
     end): pole, less its part along dh."""
     k = sum(x * y for x, y in zip(pole, dh))
-    return unit([x - k * y for x, y in zip(pole, dh)])
+    square = [x - k * y for x, y in zip(pole, dh)]
+    size, whole = vlen(square), vlen(pole)
+    if size >= 0.2 * whole:
+        return unit(square)
+    # Review R12-26: the limb's line runs (nearly) along the pole: its square part is too short to trust (exactly along
+    # it, a division by zero; just off it, a knee flipping sides as the end crosses the line). The way eases over to
+    # a second way square to the line (from the world axis least along it), so it changes smoothly across the line.
+    axis = min(([1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]), key=lambda ax: abs(sum(x * y for x, y in zip(ax, dh))))
+    j = sum(x * y for x, y in zip(axis, dh))
+    second = unit([x - j * y for x, y in zip(axis, dh)])
+    w = size / (0.2 * whole) if whole > 1e-12 else 0.0
+    mixed = [(s / size * w if size > 1e-12 else 0.0) + f * (1.0 - w) for s, f in zip(square, second)]
+    return unit(mixed) if vlen(mixed) > 1e-6 else second
 
 
 def two_bone(root, l1, l2, target, pole, reach=0.985):
@@ -139,12 +187,21 @@ def two_bone(root, l1, l2, target, pole, reach=0.985):
         miss = D - most
         d = [c * most / D for c in d]
         target, D = vadd(root, d), most
-    D = max(D, abs(l1 - l2) * 1.02)
+    least = max(abs(l1 - l2) * 1.02, 1e-6)
+    if D < least:
+        # Review R12-25: nearer than the pieces can fold to: the end goes out to the nearest place they reach (along
+        # the same line, or straight down from the root with no line), and the miss says by how much. Before, the
+        # shorter line was divided by the raised distance: both pieces came out short with the miss at 0, and an end
+        # at the root itself divided by zero.
+        line = [c / D for c in d] if D > 1e-9 else [0.0, -1.0, 0.0]
+        miss = least - D
+        d = [c * least for c in line]
+        target, D = vadd(root, d), least
     dh = [c / D for c in d]
     a = (l1 ** 2 - l2 ** 2 + D * D) / (2 * D)
     h = math.sqrt(max(0.0, l1 ** 2 - a * a))
     way = bend_way(pole, dh)
-    return [root[i] + a * dh[i] + h * way[i] for i in range(3)], target, miss
+    return [root[i] + a * dh[i] + h * way[i] for i in range(3)], target, _missed(miss)
 
 
 def limb(root, lengths, target, pole, ends=None, parallel=False, reach=0.985):
@@ -372,8 +429,13 @@ def fingerprint(*parts, files=()):
     h = hashlib.sha1()
     for p in parts:
         h.update(json.dumps(p, sort_keys=True, default=repr).encode())
-    for f in (*files, __file__, Path(__file__).with_name('model_parts.py')):
-        h.update(Path(f).read_bytes())
+    # (review R12-28: every tools module loaded now counts, the maker and all it imports, not only this kit and
+    # model_parts: a helper changed kept the old clips. A maker names the data files it reads in files.)
+    tools = Path(__file__).resolve().parent
+    loaded = sorted({Path(m.__file__).resolve() for m in list(sys.modules.values())
+                     if getattr(m, '__file__', None) and Path(m.__file__).resolve().parent == tools})
+    for f in sorted({Path(f).resolve() for f in files} | set(loaded) | {Path(__file__).resolve(), tools / 'model_parts.py'}):
+        h.update(f.read_bytes())
     return h.hexdigest()[:16]
 
 
@@ -404,6 +466,15 @@ if __name__ == '__main__':
             assert all(near(vlen(vsub(b, a)), L) for a, b, L in zip(joints, joints[1:], lengths)), (lengths, target)
             assert joints[1][2] <= 1e-9, ('the first joint bends toward its pole', lengths, target)
             assert miss > 0 or near(vlen(vsub(joints[-1], target)), 0.0), (lengths, target, miss)
+    # (review R12-25) an end too near the root: the pieces keep their lengths and the miss says so; at the root itself too
+    for l1, l2, end in ((3.0, 4.0, [0.0, -0.5, 0.0]), (4.0, 4.0, [0.0, 0.0, 0.0]), (3.0, 4.0, [0.0, 0.0, 0.0])):
+        joint, tip, miss = two_bone([0.0, 0.0, 0.0], l1, l2, end, [0.0, 0.0, -1.0])
+        assert near(vlen(joint), l1) and near(vlen(vsub(tip, joint)), l2), ('pieces keep their lengths', l1, l2, end)
+        assert (miss > 0) == (vlen(end) < abs(l1 - l2) * 1.02 or l1 == l2 and vlen(end) < 1e-6), (l1, l2, end, miss)
+    # (review R12-26) an end on the pole's line: no crash, and the joint does not jump sides as the end crosses it
+    two_bone([0.0, 0.0, 0.0], 3.0, 4.0, [0.0, 0.0, -6.0], [0.0, 0.0, -1.0])
+    knees = [two_bone([0.0, 0.0, 0.0], 3.0, 4.0, [0.0, y, -6.0], [0.0, 0.0, -1.0])[0] for y in (0.05, 0.01, -0.01, -0.05)]
+    assert all(vlen(vsub(a, b)) < 0.6 for a, b in zip(knees, knees[1:])), ('the joint jumps as the end crosses the pole', knees)
     pts = curve(lambda s: [2 * math.sin(s / 5), 0.0, s], 0.0, 40.0, 200)
     js = follow_path(pts, [4.0] * 6)
     assert all(near(vlen(vsub(b, a)), 4.0) for a, b in zip(js, js[1:]))

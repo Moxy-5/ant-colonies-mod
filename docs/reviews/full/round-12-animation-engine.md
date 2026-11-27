@@ -120,6 +120,8 @@ main session: the gate at line 513 (`math.dist(track[i - 2][2], track[i + 2][2])
 at the walking speed (within a tolerance) and is low; flag a walk foot that is "never down" or whose planted part sits
 more than `feet_reach_down` over the ground; print FLAGGED on those lines so the summary counts them.
 
+**Status (2026-11-26, `claude/review-fix-12`): fixed: a walk's feet are judged in the walk's own moving frame (a foot going back at the walk's speed is planted): one that hangs over 1 px, or is never down, says FLAGGED (`clip_check.py`, `WALK_PLANTED`, `WALK_HANG`, `WALK_DOWN`; self-test `walk_foot_held_off_the_ground_is_flagged`). A rule for a planted foot sliding sideways was tried and taken out again (it flagged the otter's real walks).**
+
 ### R12-2 (A, proven): most of the checker's findings never say FLAGGED, and a jump (a pop) is never judged at all, so the summary the rule book reads counts none of them
 (Also found by the thread reader.)
 **What is wrong:** `verify_animal.py` (the one command the rule book names) turns clip_check's output into "N clips, K
@@ -158,6 +160,8 @@ check's rule: more than 2 times its usual move and over 3 px; teeth through the 
 moments to `flagged`, print `hidden_at_rest` inside a section (or count it in verify), and end with a count line and
 an exit code (R12-3). Give the death clips a list like `feet_free`.
 
+**Status (2026-11-26, `claude/review-fix-12`): fixed: a foot hanging and teeth through the jaw say FLAGGED; a part's jump inside a clip (over 3 px and 3 times its moves round it) and a loop's open seam (its last pose against its first) are judged and say FLAGGED; the summary line counts the flagged clips and the exit code is 2 when anything is flagged (self-tests `pop_inside_a_clip_is_flagged`, `loop_seam_left_open_is_flagged`). A foot held up on purpose is named in the body plan (`checks.feet_up_ok`, written by the lion and buffalo makers too). The tail line stays unflagged and now says why (rough offline; the course judges it). What it found in today's clips: BUGS 428.**
+
 ### R12-3 (B, proven): clip_check always exits 0, whatever it finds
 **What is wrong:** `main` returns 0 on every path (and `run_pairs` returns 0 even with flags), so a caller can only
 learn the result by searching the printed words. Every check that does not print the exact word FLAGGED is lost to
@@ -167,6 +171,8 @@ any script.
 **Proof:** walked: both return statements are `return 0`; the switch count `bad` is printed, never returned.
 **Fix proposed:** end with "N flagged" for clips like the pairs do, and return 1 when anything is flagged (verify can
 keep treating findings as not hard by reading the count).
+
+**Status (2026-11-26, `claude/review-fix-12`): fixed with R12-2: exit code 2 when any clip, clip change or pair is flagged (0 clean, 1 a call mistake or a crash); `verify_animal.py` reads it.**
 
 ### R12-4 (A, proven): a part spun a whole turn at a clip change passes the blend check on any animal with a blend of 4 ticks or more
 **What is wrong:** BUGS 249's lesson is that one pose written two ways (an angle and the same angle plus 360) spins
@@ -185,6 +191,8 @@ claw, toe +360 not flagged; the paw at +340 (6.3 px) not flagged. Checked again 
 ticks` and `flag = jump > max(2.0 * own, 3.0) or turn > 90` (lines 790-801).
 **Fix proposed:** flag every bone whose angle gap between the two poses is over 180 degrees on any axis (no real blend
 needs the long way round; GeckoLib always takes it), whatever the blend's length; keep the per-tick limit for the rest.
+
+**Status (2026-11-26, `claude/review-fix-12`): fixed: a part whose two poses are over 180 degrees apart at any moment of the blend is flagged whatever the blend's length, named "the long way round" (self-test `spin_a_whole_turn_at_a_clip_change_is_flagged`). It found five real ones on the bullfrog: BUGS 427.**
 
 ### R12-5 (B, proven and measured): the corner of a step or bank can sink into a box unseen, offline and in both game checks
 (Merged: the checker reader for `clip_check.py`, the films reader for the course and the camera's checks.)
@@ -247,6 +255,8 @@ spot, gaps -0.07 to +0.21.
 **Fix proposed:** print and judge the jaw-to-spot distance (and its height difference) at each bite beside the gap to
 the skin; the skin gap only says "in the air" or "buried".
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: each bite's line also says how far the jaw is from the spot itself and how much of that is height, and over 4 px is flagged "jaw off its spot" (`clip_check.SPOT_OFF`, my pick). It found a real fault at once: the lioness's `hold_down` and `hold_sink` on a buffalo lying down or sinking put the jaw 5.5 to 5.9 px above every spot (15 lines); left for the animation rework.**
+
 ### R12-8 (B, measured): the pair check takes 75 s for one holder and prey
 **What is wrong:** `Boxes.depth` tests each of thousands of box points against each box whose bounds hold it, for every
 spot, every second tick and every pair: 6.3 million calls, 78 of 95 profiled seconds.
@@ -306,6 +316,8 @@ from the plan; `switch_strip` (drawn whenever a change is flagged) always leaves
 **Proof:** walked: `switch_poses(animal, a, b, ticks)` with `phase=None` gives `ta = 0.0` for a loop.
 **Fix proposed:** have `check_switch` return the worst phase and pass it to `switch_strip`; write it in the strip's title.
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: `check_switch` keeps the moment it judged (`WORST_PHASE`) and `switch_strip` draws that moment and writes it in the title.**
+
 ### R12-12 (B, proven by reading both): the offline dragged tail is its own simpler rule, never matched against the game's TailDrag
 (Also found by the thread reader.)
 **What is wrong:** on clips with a path the checker drags the tail itself (`Played._drag`, "as TailDrag pulls it"):
@@ -343,6 +355,8 @@ with the build green.
 **Fix proposed:** hash the whole `checks` section, `chain`, and a digest of `clip_check.py` and `anim_lab.py` (as
 anim_lab's own cache does); or build the table and compare it with the file ("would write the same file").
 
+**Status (2026-11-26, `claude/review-fix-b6`): half fixed: the fingerprint now takes the plan's `checks.hinge`, `checks.tail_drag`, `checks.px` and `chain`; the four tables were written again (only their fingerprints changed). Left on purpose: the posing code is still `FORMAT`'s, bumped by hand; hashing `clip_check.py` would put every table behind at each edit of the checker.**
+
 ### R12-14 (B, proven; measured clean today): names in a plan's "checks" are never checked, and a misspelt one silently switches its check off
 **What is wrong:** `body_plan.py check` checks the bones table, legs, spine and chain, but not the bone names and clip
 patterns in `checks`. A misspelt name does not fail; it turns the check off: `body_bones` misspelt makes the knee check
@@ -354,6 +368,8 @@ that match nothing simply do nothing.
 **Proof:** walked; measured: every name and pattern in all 18 animal plans' `checks` exists today.
 **Fix proposed:** add the `checks` names (bones must be roles of the model, clip patterns must match a clip, switch
 patterns must match on both sides) to `problems`, so `body_plan.py check` and the build fail on them.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: `body_plan.checks_problems` checks every bone name and clip pattern in a plan's `checks` (run by `body_plan.py check`); all 18 plans are clean, and a misspelt jaw bone or clip is named.**
 
 ### R12-15 (B, measured): clip_check redoes every clip on every run; the monitor takes about 9 minutes
 **What is wrong:** `anim_lab.py` keeps a cache and skips clips unchanged since their last run (2 s for the worker);
@@ -378,6 +394,8 @@ from the wrong bone, in the film's pair report with no warning.
 **Where:** `tools/pair_report.py:162`, `:205`.
 **Proof:** walked; lioness plan: `strikes.clips` = `stalk_leap_bite`, `jump_smack`; `holds.jaw` = `carry`; no `checks.carry`.
 **Fix proposed:** read `strikes.clips` and `holds.jaw` from the holder's plan.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: `pair_report` reads the strike clips from the holder's `strikes.clips` and the jaw from its `holds.jaw`.**
 
 ### R12-17 (C, proven): pair_report's "a tick" numbers mix in the in-between time
 **What is wrong:** with `record on 1 all` each tick holds one moment drawn at some in-between time, and the place read
@@ -460,6 +478,8 @@ paralysed termite on its back still works: its floor stays at rest). Then run `c
 what it finds (grooming and the fall first). Add one test: a clip with every part lowered 1 unit must give BAD.
 These are ant and termite clips: a fix that changes how they move is checked with the guard films of those scenes.
 
+**Status (2026-11-26, `claude/review-fix-12`): fixed: the lab's floor is where the feet stand at rest (never under 0), not the lowest a foot gets in the clip (`anim_lab.py`, `Gait`; self-test `lab_body_pushed_into_the_floor_is_flagged`). Walks read as before. It now reports sunk parts in several ant and termite clips: BUGS 426 (not mended: the insects are on hold).**
+
 ### R12-21 (B, proven): the loop-seam and snap checks read only rotations; a position or scale jump at the loop passes
 **What is wrong:** `check` samples only each bone's `rotation` for the seam ("jumps N degrees where the loop starts
 again") and for snaps. A bone that moves (position) or swells (scale) and jumps where a looping clip starts again is
@@ -473,6 +493,8 @@ the insects the same scan finds the crab's `crack`, `held_shell` jumping 0.875 p
 units between t=0 and the loop's end gives no BAD.
 **Fix proposed:** run the same seam test over `position` (BAD over about 0.3 units) and `scale` (over about 0.03), and
 add position to the snap note.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: a looping clip's seam is judged for position (over 0.3 units) and scale (over 0.03) too; no insect clip has such a jump today.**
 
 ### R12-22 (B, proven): nothing measures that the offline pose is the game's pose; `match` only puts pictures side by side
 (Merged: the lab reader for the insects' `match`, the thread reader for the animals, who have no match at all.)
@@ -525,6 +547,8 @@ foot skates.
 **Fix proposed:** BAD above a limit (for example the walk's 35% slip as units a second, or over 0.5 units of travel
 while down), NOTE below it. Do it after R12-20, since today's "down" is measured against the wrong floor.
 
+**Status (2026-11-26, `claude/review-fix-b6`): open: tried 2026-11-26 as a fault over half a unit of slide and taken back: it flagged the approved grooming, clamp, head bang and falling clips, whose working or falling feet read as "down". The note now says how far the foot went in all. It needs a way for a clip to name the feet it works with first.**
+
 ### R12-25 (B, proven): `two_bone` gives wrong pieces (and says "no miss") when the target is close, and crashes at the root
 **What is wrong:** when the target is nearer the root than `|l1 - l2|`, the code raises the distance to the minimum but
 keeps dividing the old, shorter one by it. The "unit" direction then is not unit, the joint lands in the wrong place,
@@ -539,6 +563,8 @@ l1=l2=4 with the target at the root gives ZeroDivisionError.
 the minimum distance, set `target` and `miss` from that as the too-far branch does, then work out the rest from the new
 distance. Add both cases to the self-check.
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: an end nearer than the pieces fold to goes out to the nearest place they reach, with the miss saying by how much; an end at the root no longer divides by zero. Both cases are in the kit's self-check. Clips were not made again: a maker run again changes only poses that were wrong.**
+
 ### R12-26 (B, proven): a pole along the leg's line crashes `two_bone` and flips the knee 180 degrees as the target crosses it
 **What is wrong:** `bend_way` takes the pole's part square to the root-target line. When the target lies on the pole's
 line, that part is zero: `unit()` divides by zero and the maker crashes. Near that line, the knee jumps to the other
@@ -551,6 +577,8 @@ passes the pole's line (a leg stretched straight forward or back in a pounce or 
 **Fix proposed:** when the pole's square part is short (under about 0.2 of its length), blend toward a fallback way
 (the last frame's, or a second pole the maker gives) instead of normalising a near-zero vector; return a flag so the
 maker can say which frames were near it.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: when the limb's line runs along the pole (its square part under a fifth of it), the bend eases over to a second way square to the line, so nothing divides by zero and the joint does not flip sides; in the self-check. No flag is returned to the maker.**
 
 ### R12-27 (B, proven): the kit returns a miss but every newer maker throws it away
 **What is wrong:** `two_bone` and `digitigrade_leg` say how far a foot fell short of its target, the cheapest early
@@ -565,6 +593,8 @@ check or a film: slower animation making.
 **Fix proposed:** a small collector in the kit (`Misses()` with `.add(clip, foot, t, miss)` and a printed worst per clip
 over a limit), printed by the shared bake step, as the monitor's `worst` does.
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: the kit tallies every limb miss over 0.05 units itself and says the worst when the maker ends, by clip where the maker calls `clip_now(name)` (no maker calls it yet: one line for the run).**
+
 ### R12-28 (B, proven): the kit's clip cache leaves out the data files a maker reads, so a changed outline keeps old clips
 **What is wrong:** `fingerprint` hashes the kit and `model_parts.py` plus the files the maker passes in. The monitor
 passes only `__file__`, yet its climb and water clips are built from `references/outlines/monitor.json` (read at
@@ -576,6 +606,8 @@ clip check reads the game files and would show the mismatch: a wasted round of p
 **Proof:** walked the import-time read of the outline and the two `cached(...)` calls with `files=[__file__]`.
 **Fix proposed:** have `fingerprint` hash every module from `tools/` in `sys.modules` (the maker and all it imports),
 and let makers name their data files once (`DATA_FILES = [...]`).
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: the clip cache's fingerprint takes every tools module loaded (the maker and all it imports), and the monitor names its outline file.**
 
 ### R12-29 (C, measured): any edit to `termite_models.py` or `body_plan.py` reruns every insect's lab check
 **What is wrong:** the lab's cache key includes the whole of `termite_models.py` (used here only for its font and
@@ -678,6 +710,8 @@ plans read: lion (only `verify.models`), lioness and lion_cub have no course and
 film); otherwise say `passed offline only (no game film: add a course entry or <animal>_*_frames.film)` and return
 non-zero. Never launch with an empty scene list.
 
+**Status (2026-11-26, `claude/review-fix-12`): fixed: an animal with no course scene and no frame film ends `NOT PASSED: ... NO GAME FILM OF ITS MOVES` and the command returns 2; the game is never launched with no scene (`launch` refuses; self-test `verify_stops_at_a_crash_and_never_launches_nothing`). The lion, lioness and cub get that verdict today, which is true: they have no course entry and no frame film named in their plans.**
+
 ### R12-36 (A, proven): a game crash during the films is not a hard failure
 **What is wrong:** `launch()` returns the game's exit code, but `main` only prints "(runFilm ended with exit N ...)"
 after the checks. A frame film counts as filmed when its folder holds at least one picture. So a game that crashed
@@ -689,6 +723,8 @@ the output. The docstring promises the opposite ("stopping an animal at its firs
 **Proof:** walked; checked again by the main session: `code = launch(...)`, then the three steps run whatever `code` is.
 **Fix proposed:** a non-zero exit is a hard failure of the `course` step before anything is read, and each frame film
 must have as many pictures as its shot list asks for (counted from the `.film` file).
+
+**Status (2026-11-26, `claude/review-fix-12`): fixed: a game that ended with an error, or whose camera never finished its shot lists, is a hard failure of a new `game` step before anything is read; a frame film must hold every picture its shot list asks for (bursts times frames a tick times cameras; self-test `verify_film_cut_short_is_a_hard_failure`); a film with no `checks.txt` says so in capitals.**
 
 ### R12-37 (A, proven): a course scene with no recording, or almost none, reads as "nothing found"
 **What is wrong:** `check_scene` returns `"<scene>: no recording"` or `"only N moments recorded"` with an empty findings
@@ -705,6 +741,8 @@ failure, the cleaner the report.
 **Proof:** walked; checked again by the main session (`body_course.py:675-680`, `verify_animal.py:212-214`).
 **Fix proposed:** "no recording" or "under N moments" is a finding of the worst size (a `Hard` in verify), printed
 first; `body_course run` fails on a non-zero exit or any missing folder.
+
+**Status (2026-11-26, `claude/review-fix-12`): fixed: no recording, a recording that cannot be read and one of under 5 moments are the worst finding (`body_course.NOT_RUN`), on top of the report and a hard failure in `verify_animal.py`; `body_course.py run` clears a scene's old recording first, fails on the game's exit code, a camera that never finished or a missing scene, and returns 2 (self-test `course_scene_with_no_recording_is_the_worst_finding`).**
 
 ### R12-38 (A, proven): nothing checks that the animal did what the scene asked, and the game's own warnings are never read
 **What is wrong:** the course sends the walker to places (`go x y z`), but `analyse` never looks at whether it got
@@ -723,6 +761,8 @@ Grepped the tools for `latest.log`: only `guard_films.py:211`.
 distance walked with the straight line; a scene that does not arrive is a finding at the top. One shared log reader
 (in `body_course.py`, used by all three tools) that turns every `Film:` warning of the launch into a finding of its scene.
 
+**Status (2026-11-26, `claude/review-fix-12`): fixed: each scene's report says how far from the last place it was sent the animal ended; over 2.5 blocks is a finding on top (`THE ANIMAL NEVER GOT WHERE IT WAS SENT`) and the verdict is `NOT PASSED` (not a hard failure: what it did walk is still judged). One reader of the camera's warnings (`body_course.camera_warnings`: every WARN or ERROR line and NO ROUTE, by scene) for the course (hard), the frame films (`NOT PASSED`) and the guard films (self-tests `course_animal_that_stood_at_the_foot_of_the_step_is_flagged`, `camera_warnings_are_read_by_scene`). Not done: the distance walked against the straight line. Run on the 48 recordings on disk it found 15 that end short: BUGS 429.**
+
 ### R12-39 (B, proven): the guard films' headline says "ALL CHECKS PASS" with every picture changed
 **What is wrong:** `compare()` only appends to `notes`, never to `problems`. Every picture changed, every approved
 picture missing ("missing (was approved)"), or a film half as long: the report still starts `Guard films: ALL CHECKS
@@ -735,6 +775,8 @@ notes are read by eye.
 **Fix proposed:** keep the list, but count changed and missing pictures in the headline ("N pictures changed: look,
 then approve") and return non-zero, so `approve` is the way past a change on purpose.
 
+**Status (2026-11-26, `claude/review-fix-b6`): half fixed: approved pictures not filmed again are a problem now (a film cut short), and the headline counts the changed pictures ("N PICTURE(S) CHANGED in M scene(s): look, then approve"). Left: changed pictures alone still exit 0, as the tool was written.**
+
 ### R12-40 (A, proven): a finding at an approved picture is let through however much worse it is
 **What is wrong:** in `film_checks`, when every picture where a part is flagged is a picture already in the approved
 findings, the loop `continue`s before the "worse" test. The films are the same moment for moment run to run, so a
@@ -746,6 +788,8 @@ overlap passes as "approved".
 **Proof:** walked; checked again by the main session: `continue` at line 261 comes before the `WORSE_FINDING` test at 267.
 **Fix proposed:** keep the "same moment" shortcut only for the count; always run the "worse" size test (store each
 approved moment's size, not only the part's worst).
+
+**Status (2026-11-26, `claude/review-fix-12`): fixed: a finding at an approved picture is still judged by its size (only how often it shows is left out for the same moments), and another part over the line at an approved picture is judged against what was approved at that picture (self-test `guard_part_much_deeper_at_an_approved_picture_is_flagged`). No guard film run (no insect body changed).**
 
 ### R12-41 (A, proven): the camera's jump check cannot see a pop that repeats
 (Merged: the films reader, and the second half of the thread reader's "the film's jump check is weaker".)
@@ -763,6 +807,8 @@ a 12-picture track the bar is the pop. Checked again by the main session.
 **Fix proposed:** judge "big" from the same part's moves in other bursts, or from moves one cycle away; simplest: drop
 the scene-wide test for moves more than 6 times the local middle.
 
+**Status (2026-11-26, `claude/review-fix-12`): fixed the review's way: a move over 6 times the middle of its neighbours is a jump whatever the part's big moves in the scene are (`FilmChecks.SURE_TIMES`, `FilmChecks.jump`; `FilmChecksTest`: a pop every five pictures, a part out and back in a take of 12, a quick swing still no jump). One more number, the review's pick: to watch for false alarms in the next frame films. **Seen in the first frame film since (the otter's moves, 2026-11-26):** the new rule also flags the first stepped picture of every take that starts mid-walk (the body moves about 0.2 blocks in that tick, the game catching up at the freeze; the old rule let it by). True of the film, not a fault of the animal: a few lines of noise a take, left as it is for now; the guard films' next run will show them as new findings to look at once.**
+
 ### R12-42 (A, proven): the watch mode films old spot tables and old body plans after they change
 **What is wrong:** `tools/film.sh watch` copies a changed file into the build and reloads: for `animations/` and `geo/`
 GeckoLib, for `block_moves/` `BlockMoves.reloadAll()`, for everything else Minecraft's full resource reload. But the
@@ -778,6 +824,8 @@ holds and the old gait changes. The Motion Studio's phase 3 is exactly this loop
 Checked again by the main session.
 **Fix proposed:** a `reloadAll()` on `Spots` and `BodyPlans` (as `BlockMoves` has), called by `FilmWatch` for
 `spots/` and `body_plans/` (and those two never trigger the full reload).
+
+**Status (2026-11-26, `claude/review-fix-12`): fixed: `Spots.reloadAll()` (each table read whole and swapped into the same object) and `BodyPlans.reloadAll()` (a counter tells the two drawers that keep a plan to ask again), called by `FilmWatch` for `spots/` and `body_plans/` with a GeckoLib reload, not the full one. An animal keeps the gaits it was made with (the camera summons its animals new every shoot). Not tried in a watch session.**
 
 ### R12-43 (B, proven): "frames N" does nothing for animals: N identical pictures a tick
 **What is wrong:** only `AntRenderer` draws at the camera's in-between time (`FilmDirector.drawPartial()`); every
@@ -984,6 +1032,8 @@ box is set there and the speed zeroed. The otter's `down` ends at 1.79 px a tick
 moves that end on land; keep going on only for the glide of a move ending afloat. One line in `step` and the same in
 `drawnAt` (or a flag on `along`). Then film the otter's step down from the side.
 
+**Status (2026-11-26, `claude/review-fix-12`): fixed: after its clip a move that ends on land stands where its path ends (`Move.along` goes on at the last speed only for a move ending afloat), the box and the drawing alike (`BlockMovesFileTest.afterItsClipALandMoveStandsAndAWaterMoveGlidesOn`; the game test `anOtterScramblesUpAStepAndHopsBackDown` now fails if the otter moves 0.05 blocks through the stand after a move). **Filmed in the game (2026-11-26):** the otter's quick course (its drawn body reaches the end of its path as the clip ends and stands dead still through the rest, then walks on; before, it slid on) and the frame film `otter_moves_frames` twice, the hop down from three sides: it lands and stands, no slide. One take of three had a jump forward that is not this fix's (BUGS 432, a busy PC).**
+
 ### R12-59 (A, proven; one link named): an animal seen mid-move is first drawn at the move's start, then jumps to where it really is
 **What is wrong:** the place an animal on a block move is drawn at comes from how far its move clip has played
 (`MoveRider.clipTicks`, and the monitor's and hippo's `climbClipTicks` copies). While the clip player is still easing
@@ -1006,6 +1056,8 @@ partialTick)` at least 0 (what `MoveRider.clock` already works out). The two agr
 late blend then only blends the pose, never the place. Same change in the monitor's and hippo's copies (or move them
 onto `MoveRider`, R9-42 and R12-65).
 
+**Status (2026-11-26, `claude/review-fix-12`): fixed: the drawn place comes from the move's own time (`BlockMoves.drawnTicks`), the same number its clip plays at, never from how far the clip player has got; `MoveRider.clipTicks` and the monitor's and hippo's copies of it are gone (`BlockMovesFileTest.aMoveIsDrawnAtItsOwnTime`). The pose still eases in from the clip's start when first looked at mid-move (only the place was wrong by blocks). Not seen in the game (it needs a move started behind the player).**
+
 ### R12-60 (A, proven): a Nile monitor more than 48 blocks away pops a block up or down on every move
 **What is wrong:** `MonitorModel.setCustomAnimations` returns before `place(...)` whenever the camera is farther than
 `NEAR` (48 blocks), on a move or not. The otter's and hippo's models keep drawing on the move's path while a move is on
@@ -1020,6 +1072,8 @@ along the bank top, then drops 0.6 blocks in one tick.
 `&& !onMove`.
 **Fix proposed:** add the same guard as the otter and hippo (`&& climb == null` in the far test), or better, one shared
 drawn-place helper the three models call (R12-65).
+
+**Status (2026-11-26, `claude/review-fix-12`): fixed: the far test has the otter's and hippo's guard (`&& monitor.climb() == null`), so a far monitor on a move is drawn on the move's path. No test (drawing only).**
 
 ### R12-61 (A, likely): when the server runs slow, moves on screen rewind
 **What is wrong:** a move's clip and its drawn place are timed by the world's game time on the player's computer
@@ -1039,6 +1093,8 @@ ticks).
 hence "likely".
 **Fix proposed:** on the player's side let a move's clock never go back (hold the furthest value, as `DrawClock` does
 for the eases), or count a move's time from when its tag arrived. One place if the three clocks are made one (R12-65).
+
+**Status (2026-11-26, `claude/review-fix-12`): fixed: one clock for a move's drawn time (`MoveClock`, used by `MoveRider`, the monitor and the hippo): it follows the game time and a step back within a tick (the film camera's frame order, BUGS 380), but a rewind of over a tick is not followed: the move stands at the furthest moment drawn until the time is there again (`MoveClockTest`). On a slow server a move now pauses a moment instead of jumping back. Not seen in play (no slow server run). **The other half, seen in a film:** a player's side whose time is behind the server's draws a move late and then jumps it forward (BUGS 432); this clock does not mend that.**
 
 ### R12-62 (B, proven): the animals' clip player drops the bit past a loop's end each time round (the insects' player was written to fix exactly this)
 (Merged: the playback reader, and the thread reader's "a looping hold's bites drift behind its drawn bites".)
@@ -1072,6 +1128,8 @@ otter holding a crab (crabs are its favourite prey). Not measured.
 **Where:** `savanna/.../animal/HeldCatch.java:51-63`, `75-86`; `client/OtterRenderer.java:77`, `client/OtterModel.java:74`.
 **Proof:** walked; only `barb.json` and `tilapia.json` have `checks.held`.
 **Fix proposed:** keep "none" too (an `Optional`, or a marker), so each prey kind is read once.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: `HeldCatch` keeps "none" too, so each prey kind's plan is read once (the fix R9-31 already made in batch 5; the same fault found twice).**
 
 ### R12-64 (B, proven): a lioness's throat hold and hold-down bite on a clock the drawn clip does not keep
 **What is wrong:** in a hold the server bites when `hold.bitesAt(l.clipTick())`: `clipTick` counts game ticks since the
@@ -1201,6 +1259,8 @@ load (GeckoLib's baked animation, the first key of each leg bone, both sides as 
 mirroring rule and nothing to keep in step. Until then, store both sides in `FOLD`. Add the rule-1 match: a unit test
 that compares the Java fold table with the swim clip's first keys.
 
+**Status (2026-11-26, `claude/review-fix-12`): fixed: the fold is the swim clip's own first pose, both sides as the clip has them, read from the clip's file when the model is made (`client/SwimFold`); the hand-copied table and its mirror rule are gone (`SwimFoldTest`: the arms are mirror images in the clip, the hind lower leg and foot are not). Not filmed (a wade where no move fits has no film scene yet).**
+
 ### R12-71 (A, proven): the spot tables and the pair check never see what the game draws on top of the clips, so a throat hold bites the air with every check green
 **What is wrong:** `tools/spots.py` poses the buffalo's spots from its clips alone, and `clip_check.py --pair` measures
 the lioness's jaw against that same clip-only body. The game then draws two more things on the buffalo, after the
@@ -1230,6 +1290,8 @@ pick: flat holds are what the pair check measures), or the holder is placed from
 check the same switch, so the offline check and the game agree by construction; add a course scene of a hold on a
 1-block step.
 
+**Status (2026-11-26, `claude/review-fix-12`): fixed, both layers off while held: a buffalo with a lion on it does not turn its head (`BuffaloEntity.held`, both sides) and is drawn level, and a lion on its prey (holding or feeding) is drawn level (`StandTilt.place(..., level)`), so the game draws the same clip-only body the spot tables and the pair check measure; nothing to change offline. Not done: a course scene of a hold on a 1-block step. On a slope a held cow and her holders now stand level about their boxes (my pick; to see in play).**
+
 ### R12-72 (B, proven): the move files have no staleness check (the spot tables do), and their unit test reads only the monitor's
 (Merged: the thread reader, and the playback reader's "the move-file unit test reads only the monitor's file".)
 **What is wrong:** a move file (`block_moves/<animal>.json`) is the game's copy of each move clip's `path` note, written
@@ -1248,6 +1310,8 @@ exact), but for the hippo's row timing (R12-73).
 run by the build beside `checkSpotTables`; one unit test that loads every move file in the folder and checks each move
 (the end level reached, `rise` and `along` rows of one length, one clip a size, and, with R12-58, a land move's end
 speed near zero or its rest 0).
+
+**Status (2026-11-26, `claude/review-fix-b6`): half fixed: `BlockMovesFileTest.everyAnimalsMoveFileLoads` loads all seven move files as the game does and checks each move of each size. Left: the staleness check against the animation files.**
 
 ### R12-73 (C, proven): the hippo's climb-out paths are not one row a tick, and the move writer never checks
 **What is wrong:** the game reads a move's path rows as ticks (row index = tick); `block_moves` drops the rows' own

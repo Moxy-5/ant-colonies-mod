@@ -59,7 +59,9 @@ What it prints for each clip (model pixels; a block is 1 / the plan's "px" of th
                the plan's "feet_reach_down", over the highest ground under any part of it, a foot pressed on a step's
                or bank's face allowed: how a foot place out of its leg's reach shows in the game's files; the old
                monitor checkers asked the maker instead, whose log mixed every clip it built), and on a walk each planted
-               foot's slide (back at the walking speed, none sideways)
+               foot's slide (back at the walking speed, none sideways); flagged: a still foot hanging that the plan's
+               "feet_up_ok" does not name as held up on purpose, and on a walk a foot that moves back at the walking
+               speed over the ground or never comes down (judged in the walk's own moving frame)
   body         knees and elbows (each leg's middle bone's joint) deeper into the body's own boxes than at rest (the
                plan's "body_bones", read from the geo file); parts that must hide inside the body at rest
   surface      in the water, where the plan's marks (snout, back, tail ...) lie against the surface over time; a move's
@@ -67,7 +69,9 @@ What it prints for each clip (model pixels; a block is 1 / the plan's "px" of th
   dug          for digging clips, the plan's marks against the ground
   jaw          the jaw's least opening (under the plan's limit: the teeth through the lower jaw)
   reach        how far a part reaches past a point (the tongue past the snout)
-  jumps        the biggest jump of any part between two frames (1/80 s; a walking foot moves about 1)
+  jumps        the biggest jump of any part between two frames (1/80 s; a walking foot moves about 1); flagged: a pop
+               (over 3 px in one 1/80 s and 3 times the moves round it) and a loop's seam open by over 1 px (its last
+               pose against its first, the step the game plays every round); the dragged tail is left out
   turns        the fastest joint turn between two keys (degrees in 0.05 s; over 90 flagged: an elbow or knee
                flipping barely moves a part's place, so the jumps miss it)
   switches     for each clip change the plan lists: the end pose of one against the first of the next, the biggest
@@ -115,6 +119,15 @@ class Animal:
 
     def matches(self, clip, key):
         return any(fnmatch.fnmatch(clip, p) for p in self.checks.get(key, []))
+
+    def feet_up(self, clip):
+        """The feet this clip holds off the ground on purpose (the plan's "feet_up_ok": clip pattern -> foot keys, or
+        "*" for all: a death on its back, a rear, a hop, a swiping paw). Every other still foot must reach the ground."""
+        out = set()
+        for pattern, feet in self.checks.get('feet_up_ok', {}).items():
+            if fnmatch.fnmatch(clip, pattern):
+                out |= set(self.feet) if feet == '*' else set(feet)
+        return out
 
     def blend_ticks(self):
         """GeckoLib's blend between two clips, as the animal's controller sets it: the plan names the Java file
@@ -386,6 +399,14 @@ def keys_of(chans):
 
 
 # --- the checks of one clip -----------------------------------------------------------------------------------------
+# A walk's planted foot (R12-1): moving back within this share of the walking speed; flagged this far over the ground
+# (px), or a foot never lower than WALK_DOWN.
+WALK_PLANTED, WALK_HANG, WALK_DOWN = 0.25, 1.0, 0.5
+# A pop (R12-2): over POP_MIN px in one 1/80 s (the clip changes' own floor: a quick flick of an ear or a jaw is under
+# it) and POP_TIMES the moves round it; a loop's seam open by over SEAM_MIN px (a model pixel).
+POP_MIN, POP_TIMES, SEAM_MIN = 3.0, 3.0, 1.0
+
+
 def check_clip(animal, name, flagged):
     """Prints the clip's findings; returns its flagged moments (for the strips) and the lines."""
     pl = Played(animal, name)
@@ -420,6 +441,7 @@ def check_clip(animal, name, flagged):
     rest_joint = {k: body_depth(animal.model.world(j, animal.model.by[j]['pivot'], {}), rest_body) for k, j in joints.items()}
 
     hits, tail_hits, jumps, deepest = {}, {}, {}, {}
+    moves = {}                                    # each part's move in every 1/80 s, for judging pops (R12-2)
     feet_high = 0.0
     hang = {}
     planted = {k: [] for k in animal.feet}
@@ -473,6 +495,7 @@ def check_clip(animal, name, flagged):
             for b, cs in now.items():
                 if b in last and len(cs) == len(last[b]):
                     d = max(math.dist(a, c) for a, c in zip(cs, last[b]))
+                    moves.setdefault(b, {})[k] = d
                     if d > jumps.get(b, (0, 0))[0]:
                         jumps[b] = (d, t)
         last = now
@@ -494,7 +517,8 @@ def check_clip(animal, name, flagged):
         else:
             out('  inside the ground, the step or the bank: nothing')
         if tail_hits:
-            out('  the dragged tail inside the ground (bone: px at time): ' + ', '.join(
+            out('  the dragged tail inside the ground (rough: the offline tail is not the game\'s rule, the course '
+                'judges it; bone: px at time): ' + ', '.join(
                 f'{b} {d:.1f} at {t:.2f}' for b, (d, t) in sorted(tail_hits.items(), key=lambda kv: chain_rank(animal, kv[0]))))
         if sc.kind == 'flat' and animal.feet and not animal.matches(name, 'feet_free') and feet_high:
             reach = ck.get('feet_reach_down')
@@ -505,6 +529,7 @@ def check_clip(animal, name, flagged):
     if animal.feet and judge_ground:
         hung = []
         tol = max(1.0, ck.get('feet_reach_down', 0.0))
+        up_ok, excused = animal.feet_up(name), []
         for key, track in planted.items():
             worst = (0.0, 0.0)
             for i in range(2, len(track) - 2):
@@ -523,10 +548,14 @@ def check_clip(animal, name, flagged):
                 over = l1[1] - ground
                 if over > worst[0]:
                     worst = (over, t1)
-            if worst[0] > tol:
+            if worst[0] > tol and key in up_ok:
+                excused.append(key)
+            elif worst[0] > tol:
                 hung.append(f'{key} {worst[0]:.1f} at {worst[1]:.2f}')
+                flagged.add(round(worst[1], 2))
         out(f'  planted feet hanging over the ground (more than {tol:g} px; a foot place out of its leg reach; px at time): '
-            + (', '.join(hung) if hung else 'none'))
+            + (', '.join(hung) + '  FLAGGED' if hung else 'none')
+            + (f'  ({", ".join(excused)} up on purpose: the plan\'s feet_up_ok)' if excused else ''))
     walk_speed = ck.get('walks', {}).get(name)
     if walk_speed is None and pl.clip.stride and animal.matches(name, 'walk_clips'):
         walk_speed = pl.clip.stride / pl.length
@@ -542,11 +571,31 @@ def check_clip(animal, name, flagged):
             for e in track[:-1]:
                 down += e[2][1] < 0.1
             foot = animal.feet[key]
+            # judged in the walk's own moving frame (R12-1): a planted walk foot is never still in the clip (the body
+            # stays put, the foot slides back at the walking speed), so the hanging check above never sees it
+            lowest = min(track, key=lambda e: e[2][1]) if track else None
+            hang = (0.0, 0.0)
+            for i in range(2, len(track) - 2):
+                a, b = track[i - 2], track[i + 2]
+                back = (b[1][2] - a[1][2]) / (b[0] - a[0])
+                if abs(back - walk_speed) <= WALK_PLANTED * walk_speed and abs(b[2][1] - a[2][1]) < 0.15 \
+                        and track[i][2][1] > hang[0]:
+                    hang = (track[i][2][1], track[i][0])
+            faults = []
+            if sc.kind != 'flat':
+                hang, lowest = (0.0, 0.0), None                    # the heights below are over flat ground
+            if hang[0] > WALK_HANG:
+                faults.append(f'planted {hang[0]:.1f} px over the ground at {hang[1]:.2f}')
+                flagged.add(round(hang[1], 2))
+            if not vz and lowest and lowest[2][1] > WALK_DOWN:
+                faults.append(f'lowest {lowest[2][1]:.1f} px over the ground at {lowest[0]:.2f}')
+                flagged.add(round(lowest[0], 2))
+            mark = ('  ' + ', '.join(faults) + '  FLAGGED') if faults else ''
             if vz:
                 out(f'    {foot:16s} down {down / max(1, len(track) - 1):4.0%} of the stride, back {min(vz):5.2f} to '
-                    f'{max(vz):5.2f}, sideways {min(vx):5.2f} to {max(vx):5.2f}')
+                    f'{max(vz):5.2f}, sideways {min(vx):5.2f} to {max(vx):5.2f}' + mark)
             else:
-                out(f'    {foot:16s} never down')
+                out(f'    {foot:16s} never down' + mark)
 
     # the body: knees and elbows into it
     if body_bones and joints:
@@ -599,8 +648,10 @@ def check_clip(animal, name, flagged):
             v = pl.pose(k / 80).get(jaw['bone'], ((0, 0, 0),))[0][0]
             if v < least[0]:
                 least = (v, k / 80)
-        out(f'  jaw least open: {least[0]:.1f} deg at {least[1]:.2f}'
-            + ('  TEETH THROUGH THE JAW' if least[0] < jaw.get('flag_below', -0.5) else ''))
+        through = least[0] < jaw.get('flag_below', -0.5)
+        out(f'  jaw least open: {least[0]:.1f} deg at {least[1]:.2f}' + ('  TEETH THROUGH THE JAW  FLAGGED' if through else ''))
+        if through:
+            flagged.add(round(least[1], 2))
     for r in ck.get('reach', []):
         if name != r['clip']:
             continue
@@ -621,6 +672,48 @@ def check_clip(animal, name, flagged):
     top = sorted(jumps.items(), key=lambda kv: -kv[1][0])[:6]
     out('  biggest jump of a part in 1/80 s (px at time; a walking foot moves about 1): '
         + ', '.join(f'{b} {d:.1f} at {t:.2f}' for b, (d, t) in top))
+    # a pop (R12-2): a part that moves in one 1/80 s far more than in the 1/80 s round it (keys a tick apart give four
+    # like moves in a row, never a pop), and a loop's seam: its last pose against its first, the step the game plays
+    # every round. The dragged tail is left out: offline its rows are held a tick, every tick's move one jump.
+    seam = pl.clip.loop and not pl.clip.path
+    pops = []
+    for b, ds in moves.items():
+        if b in tail_bones:
+            continue
+        for k, d in ds.items():
+            if d <= POP_MIN or (seam and k == steps):
+                continue
+            near = sorted(ds[j] for j in (k - 2, k - 1, k + 1, k + 2) if j in ds)
+            usual = (near[(len(near) - 1) // 2] + near[len(near) // 2]) / 2 if near else 0.0
+            if d > POP_TIMES * usual:
+                pops.append((d, b, k / 80, usual))
+    if pops:
+        pops.sort(reverse=True)
+        out('  pops (a part moving in 1/80 s over ' + f'{POP_TIMES:g} times its moves round it and {POP_MIN:g} px; px at time): '
+            + ', '.join(f'{b} {d:.1f} at {t:.2f} (round it {u:.1f})' for d, b, t, u in pops[:6])
+            + (f' and {len(pops) - 6} more' if len(pops) > 6 else '') + '  FLAGGED')
+        flagged.update(round(t, 2) for _, _, t, _ in pops)
+    if seam:
+        end = {}
+        for b, cs, _ in pl.posed(pl.length - 1e-6):
+            end.setdefault(b, []).extend(cs)
+        start = {}
+        for b, cs, _ in pl.posed(0.0):
+            start.setdefault(b, []).extend(cs)
+        gaps = []
+        for b, cs in end.items():
+            if b in tail_bones or b not in start or len(cs) != len(start[b]):
+                continue
+            gap = max(math.dist(p, q) for p, q in zip(cs, start[b]))
+            ds = sorted(moves.get(b, {}).values())
+            usual = ds[len(ds) // 2] if ds else 0.0
+            if gap > max(SEAM_MIN, POP_TIMES * usual):
+                gaps.append((gap, b))
+        gaps.sort(reverse=True)
+        out('  the loop\'s seam (its last pose against its first; px): '
+            + (', '.join(f'{b} {g:.1f}' for g, b in gaps[:6]) + '  FLAGGED' if gaps else 'closed'))
+        if gaps:
+            flagged.add(0.0)
     turns = fastest_turns(animal.data[name]['bones'])
     leg_bones = {b for chain in animal.legs.values() for b in chain}
     kinds = (('legs', lambda b: b in leg_bones),) if leg_bones else ()
@@ -757,6 +850,9 @@ def switch_poses(animal, a, b, ticks, phase=None):
     return before, blend, after, ca, cb
 
 
+WORST_PHASE = {}             # (animal, a, b) -> the moment of clip a check_switch judged the change at (None: its end)
+
+
 def check_switch(animal, a, b, ticks):
     """One clip change: how far apart the two clips' poses are, and how hard the blend jumps against the clips' own
     moves (a loop left at the worst of four moments; a gait change at its moment from the plan, the one the game
@@ -771,7 +867,7 @@ def check_switch(animal, a, b, ticks):
     elif ca_loop:
         L = float(animal.data[a].get('animation_length', 1.0))
         phases = [L * i / 4 for i in range(4)]
-    worst = None
+    worst, far = None, {}
     for ph in phases:
         before, blend, after, ca, cb = switch_poses(animal, a, b, ticks, ph)
         seq = before + blend + after
@@ -795,15 +891,23 @@ def check_switch(animal, a, b, ticks):
                 turn = (d, bn)
         gap = sorted(((max(abs(x - y) for x, y in zip(before[-1].get(bn, ((0, 0, 0),))[0], blend[-1].get(bn, ((0, 0, 0),))[0])), bn)
                       for bn in set(before[-1]) | set(blend[-1])), reverse=True)
+        for d, bn in gap:
+            if d > 180:
+                far[bn] = max(far.get(bn, 0.0), d)
         if worst is None or blend_jump[0] > worst[1][0]:
             worst = (ph, blend_jump, own, turn, gap)
     ph, (jump, jb, jt), own, (turn, tb), gap = worst
-    flag = jump > max(2.0 * own, 3.0) or turn > 90
+    WORST_PHASE[(animal.name, a, b)] = ph            # (review R12-11: the picture of a flagged change shows this moment)
+    # the long way round (R12-4, BUGS 249's lesson): GeckoLib eases each angle straight to the new clip's, so one pose
+    # written two ways (an angle, and the same plus a turn) spins a whole turn through the blend, however long it is
+    spins = [f'{bn} {d:.0f}' for bn, d in sorted(far.items(), key=lambda kv: -kv[1])]
+    flag = jump > max(2.0 * own, 3.0) or turn > 90 or bool(spins)
     when = (f' (at its gait change moment, {ph:.2f} s)' if moment is not None
             else f' (left at {ph:.2f} s of the loop)' if ph is not None else '')
     big = [f'{bn} {d:.0f}' for d, bn in gap if d > 0.5][:6]
     lines.append(f'  {a} -> {b}{when}: angles apart ' + (', '.join(big) if big else 'the same')
                  + f'; blend jump {jump:.1f} px ({jb}, tick {jt}) against {own:.1f} in the clips; fastest turn {turn:.0f} deg a tick ({tb})'
+                 + ('; the long way round (over 180 apart): ' + ', '.join(spins) if spins else '')
                  + ('  FLAGGED' if flag else ''))
     return lines, flag
 
@@ -1134,6 +1238,9 @@ class Pair:
         return self.holder_point(frame, self.holder.model.world(b, self.holder.model.by[b]['pivot'], pose))
 
 
+SPOT_OFF = 4.0               # px: a jaw farther than this from its spot at a bite is flagged (my pick; today's holds: up to 2.6)
+
+
 def check_pair(holder, prey_name, spec, spots_wanted, step=2):
     """Each prey clip of a pair, each spot: the jaw against the skin at every bite, the holder's parts in the prey and the
     prey's in the holder (deepest; its head apart from the rest: a bite's muzzle goes into the hide), and every holder
@@ -1149,7 +1256,7 @@ def check_pair(holder, prey_name, spec, spots_wanted, step=2):
     for clip, kind in spec['clips'].items():
         n = round(Played(pair.prey, clip).length * 20) if kind == 'once' else 2 * (pair.h_ticks + pair.h_blend)
         lines.append(f'  {prey_name} {clip} ({kind}, {n} ticks):')
-        res = {s: {'gaps': [], 'head': 0.0, 'body': 0.0, 'prey_head': 0.0, 'prey': 0.0} for s in names}
+        res = {s: {'gaps': [], 'off': [], 'head': 0.0, 'body': 0.0, 'prey_head': 0.0, 'prey': 0.0} for s in names}
         for k in range(0, n + 1):
             if k % step and not pair.bites(k):
                 continue
@@ -1163,7 +1270,11 @@ def check_pair(holder, prey_name, spec, spots_wanted, step=2):
                 hposed, pose = pair.holder_posed(frame, k)
                 hb = Boxes(hposed)
                 if pair.bites(k):
-                    r['gaps'].append(prey.gap(pair.jaw(frame, pose)))
+                    jaw = pair.jaw(frame, pose)
+                    r['gaps'].append(prey.gap(jaw))
+                    # (review R12-7: and how far the jaw is from the spot itself, and how much of that is height; the
+                    # gap to the nearest skin read 0 for a jaw well above or below its spot, on the same flank)
+                    r['off'].append((math.dist(jaw, frame[3]), jaw[1] - frame[3][1]))
                 if not hb.overlaps(prey):
                     continue
                 into = prey.near(hb).deepest(with_edges_all(hposed))
@@ -1186,9 +1297,13 @@ def check_pair(holder, prey_name, spec, spots_wanted, step=2):
                 bad.append('jaw buried')
             if r['body'] > 1.0 or r['prey'] > 1.0:
                 bad.append('bodies in each other')      # (its head on the hide is the bite itself)
+            far = max(r['off'], default=(0.0, 0.0))
+            if far[0] > SPOT_OFF:
+                bad.append('jaw off its spot')
             flags += bool(bad)
             gs = f'{min(g):+.1f} to {max(g):+.1f}' if g else 'no bite'
-            lines.append(f'    {s:12s} jaw to the hide at its {len(g)} bites {gs} px (+ in the air); its head and the '
+            off = f', from its spot up to {far[0]:.1f} px ({far[1]:+.1f} in height)' if g else ''
+            lines.append(f'    {s:12s} jaw to the hide at its {len(g)} bites {gs} px (+ in the air){off}; its head and the '
                          f'{prey_name} in each other {max(r["head"], r["prey_head"]):.1f} px (a bite); its body and the {prey_name} '
                          f'{max(r["body"], r["prey"]):.1f}' + (f'  << {", ".join(bad)}' if bad else ''))
         # every holder at once, at a bite: the spots crowding each other
@@ -1374,7 +1489,10 @@ def strip(animal, pl, planted, times, views, flagged, path, title, held=None, an
 
 
 def switch_strip(animal, a, b, ticks, views, path):
-    before, blend, after, ca, cb = switch_poses(animal, a, b, ticks)
+    # (review R12-11: drawn at the moment check_switch judged, the worst of the loop; it always left the loop at 0 s,
+    # so the picture of a flagged change showed a calm one)
+    phase = WORST_PHASE.get((animal.name, a, b))
+    before, blend, after, ca, cb = switch_poses(animal, a, b, ticks, phase)
     seq = [('end of ' + a, p) for p in before[-2:]] + [(f'blend {i + 1}/{ticks}', p) for i, p in enumerate(blend)] + \
           [(b + f' +{i + 1}', p) for i, p in enumerate(after[:2])]
     model = animal.model
@@ -1383,7 +1501,7 @@ def switch_strip(animal, a, b, ticks, views, path):
     cw, ch, lh = 330, 240, 20
     rows_n = (len(seq) + cols - 1) // cols
     cv = lab.Canvas(cw * cols, (ch + lh) * rows_n * len(views) + 30)
-    cv.text(10, 8, f'{a} -> {b}  ({ticks} tick blend)', scale=2)
+    cv.text(10, 8, f'{a} -> {b}  ({ticks} tick blend' + (f', {a} left at {phase:.2f} s' if phase is not None else '') + ')', scale=2)
     last = None
     for vi, vname in enumerate(views):
         view = lab.VIEWS[vname]
@@ -1436,7 +1554,7 @@ def run_pairs(holder, prey_name, holds, spots_wanted, times, views, out_dir):
                     out_dir, f'pair_{holder.name}_{spec["hold"]}_{prey_name}_{clip}_all.png'), others=names[1:])
                 print('  wrote', png)
     print(f'  {flags} flagged')
-    return 0
+    return 2 if flags else 0
 
 
 # --- the command ------------------------------------------------------------------------------------------------------
@@ -1507,10 +1625,13 @@ def main(argv):
     if hid:
         print(hid)
     held = Held(animal, hold) if hold else None
+    bad_clips, bad = [], 0
     for name in chosen:
         flagged = set()
         pl, planted, lines = check_clip(animal, name, flagged)
         print('\n'.join(lines))
+        if any('FLAGGED' in line for line in lines):
+            bad_clips.append(name)
         if held:
             print('\n'.join(check_held(animal, pl, held, angles, times)))
             if times:
@@ -1533,7 +1654,6 @@ def main(argv):
         if names:
             todo = [(a, b) for a, b in todo if a in chosen or b in chosen]
         print(f'== clip changes (GeckoLib\'s blend: {ticks} ticks, from {source}; {len(todo)} changes)')
-        bad = 0
         for a, b in todo:
             lines, flag = check_switch(animal, a, b, ticks)
             bad += flag
@@ -1542,7 +1662,12 @@ def main(argv):
                 png = switch_strip(animal, a, b, ticks, views, os.path.join(out_dir, f'sw_{a}_{b}.png'))
                 print('    drew', png)
         print(f'  {bad} change(s) flagged')
-    return 0
+    # the count every caller reads (R12-3): exit 0 nothing flagged, 2 something flagged (1: a mistake in the call, a crash)
+    hid_bad = bool(hid) and 'FLAGGED' in hid
+    print(f'clip_check: {len(bad_clips)} of {len(chosen)} clip(s) flagged'
+          + (f' ({", ".join(bad_clips[:8])}{"..." if len(bad_clips) > 8 else ""})' if bad_clips else '')
+          + (', parts not hidden at rest' if hid_bad else '') + (f', {bad} clip change(s) flagged' if switches else ''))
+    return 2 if bad_clips or hid_bad or bad else 0
 
 
 if __name__ == '__main__':

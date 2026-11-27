@@ -106,8 +106,10 @@ public final class BodyPlans {
     private static final Set<String> HEAD_PLAYER = new HashSet<>();
     private static final Set<String> HOLD = new HashSet<>();
 
-    /** The folders signed up so far ("/assets/antcolonies/body_plans/"), each read once. */
-    private static final Set<String> FOLDERS = new HashSet<>();
+    /** The folders signed up so far ("/assets/antcolonies/body_plans/"), each read once, and the class each is read through. */
+    private static final Map<String, Class<?>> FOLDERS = new LinkedHashMap<>();
+    /** How many times the plans were read ({@link #reads}). */
+    private static volatile int reads;
 
     /**
      * Reads the plans of a species mod's models (the split, step S6): {@code folder} is the mod's
@@ -115,9 +117,14 @@ public final class BodyPlans {
      * Signing the same folder up again does nothing.
      */
     public static synchronized void signUp(Class<?> anchor, String folder) {
-        if (!FOLDERS.add(folder)) {
+        if (FOLDERS.putIfAbsent(folder, anchor) != null) {
             return;
         }
+        readFolder(anchor, folder);
+        LOG.info("Body plans: read {} from {} ({})", PLANS.size(), folder, PLANS.keySet());
+    }
+
+    private static void readFolder(Class<?> anchor, String folder) {
         for (String model : readIndex(anchor, folder)) {
             Plan plan = read(anchor, folder, model);
             if (plan != null) {
@@ -126,7 +133,24 @@ public final class BodyPlans {
                 HEAD_PLAYER.addAll(plan.headPlayer());
             }
         }
-        LOG.info("Body plans: read {} from {} ({})", PLANS.size(), folder, PLANS.keySet());
+    }
+
+    /**
+     * Reads every plan again from its file (the film camera's watch mode, after a tool rewrote one, a gait's change
+     * moments for one: no relaunch; code review R12-42, the watch mode went on filming the plans of the launch). A
+     * model's drawer asks for its plan again when {@link #reads} has changed; an animal keeps the gaits it was made
+     * with, so only animals summoned after this have the new ones (the camera summons its animals new every shoot).
+     * Development only: the game's own side may read a plan while this runs.
+     */
+    public static synchronized void reloadAll() {
+        FOLDERS.forEach((folder, anchor) -> readFolder(anchor, folder));
+        reads++;
+        LOG.info("Body plans: read again ({})", PLANS.size());
+    }
+
+    /** Goes up each time the plans are read again: who keeps a plan asks for it again when this has changed. */
+    public static int reads() {
+        return reads;
     }
 
     private BodyPlans() {

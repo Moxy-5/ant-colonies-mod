@@ -31,7 +31,8 @@ TEXELS = 1.0          # texture pixels a model pixel (plain colours for now)
 
 # --- the outline's numbers (references/outlines/monitor.json, the approved outline; python tools/workshop.py outline
 # monitor draws it), turned into the model's axes: z = HIPS - outline x, the hips where the tail meets the body --------
-_OUTLINE = json.loads((Path(__file__).resolve().parent.parent / "references/outlines/monitor.json").read_text(encoding="utf-8"))
+_OUTLINE_FILE = Path(__file__).resolve().parent.parent / "references/outlines/monitor.json"
+_OUTLINE = json.loads(_OUTLINE_FILE.read_text(encoding="utf-8"))
 _PART = {p["name"]: p for p in _OUTLINE["parts"]}
 HIPS = _PART["body"]["side"][0]                                     # 48: the tail is outline x 0 to 48
 BODY_Z = (float(HIPS - _PART["body"]["side"][1]), float(HIPS - _PART["body"]["side"][0]))   # the body, front to back
@@ -1809,13 +1810,13 @@ def clips():
     for down in (False, True):
         for size in CLIMB_SIZES:
             name = climb_name(size, down)
-            out[name], worst[name] = cached('monitor', name, fingerprint(name, files=[__file__]),
+            out[name], worst[name] = cached('monitor', name, fingerprint(name, files=[__file__, _OUTLINE_FILE]),
                                             lambda: list(climb(size, down)))
     # Going into and out of the water (see _water_keys), one clip for each size.
     for kind in WATER_KINDS:
         for size in CLIMB_SIZES:
             name = water_name(kind, size)
-            out[name], worst[name] = cached('monitor', name, fingerprint(name, swim_table, files=[__file__]),
+            out[name], worst[name] = cached('monitor', name, fingerprint(name, swim_table, files=[__file__, _OUTLINE_FILE]),
                                             lambda: list(water_move(kind, size, swim_table, swim_leg, flick)[:2]))
     return out, worst
 

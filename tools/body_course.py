@@ -61,6 +61,51 @@ COURSE = os.path.join(PROJECT, 'tools', 'film', 'course')
 SHOTS = os.path.join(PROJECT, 'run-film', 'screenshots')
 # the course's own folder: each run's scenes are moved here from the camera's screenshots (which other films clear)
 KEPT = os.path.join(PROJECT, 'run-film', 'course')
+# A scene that did not run as written (no recording or hardly any, a warning of the camera's: no route, no walker) is
+# the worst finding there is: it goes on top of every list and stops tools/verify_animal.py (code review R12-37 and
+# R12-38: the worse the failure was, the cleaner the report read). Next under it, an animal that ended short of the
+# last place it was sent: what it walked is judged as ever, but the rest of the scene was never tested.
+NOT_RUN = 1000.0
+SHORT = 500.0
+MIN_MOMENTS = 5
+# how far (blocks, level) from the last place it was sent the animal may be when the recording ends (my pick, from the
+# 48 recordings kept on 2026-11-26: the ones that walked to the end stand 1.3 to 2.1 away, the big ones furthest; the
+# ones that stopped on the way 2.9 to 10.3)
+ARRIVE = 2.5
+GAME_LOG = os.path.join(PROJECT, 'run-film', 'logs', 'latest.log')
+
+
+def camera_warnings(log=None):
+    """The film camera's warnings in the game's log of the last launch, by scene: ({scene: [what it said]}, whether
+    the camera finished its shot lists). Every warning counts (a walker with no route, no walker, an "until" never
+    met, an unknown step, a scene that does not exist, a file it could not write): a good launch has none (the last
+    40 logs, 2026-11-26). (None, False) when there is no log. One reader for the course, verify_animal and the guard
+    films."""
+    log = log or GAME_LOG
+    if not os.path.exists(log):
+        return None, False
+    out, scene, done = {}, '?', False
+    for line in open(log, encoding='utf-8', errors='replace'):
+        if 'Film: ' not in line:
+            continue
+        text = line.split('Film: ', 1)[1].strip()
+        if text.startswith('scene ') and ' built at ' not in text:
+            scene = text[len('scene '):]
+        elif text == 'done':
+            done = True
+        elif '/WARN]' in line or '/ERROR]' in line or 'NO ROUTE' in text:
+            out.setdefault(scene, []).append(text)
+    return out, done
+
+
+def not_run(summary):
+    """The findings that say a scene did not run as written."""
+    return [s for size, s in summary if size >= NOT_RUN]
+
+
+def ended_short(summary):
+    """The findings that say the animal never got to the last place a scene sent it."""
+    return [s for size, s in summary if SHORT <= size < NOT_RUN]
 
 def load_animals():
     """The animals on the course, read from the body plans' "course" sections (each entry knows its plan and family)."""
@@ -665,6 +710,15 @@ def graph(rec, res, plan, path, title):
 
 
 # --- the report -------------------------------------------------------------------------------------------------------
+def short_of(scene, pos):
+    """How far (blocks, level) this place is from the last place the scene sends the animal; None for a scene that
+    sends it nowhere (the scare: its own mind)."""
+    if scene not in SCENES:
+        return None
+    x, _, z = SCENES[scene][3][-1]
+    return math.hypot(pos[0] - (x + 0.5), pos[2] - (z + 0.5))
+
+
 def check_scene(job):
     """One scene of the course checked (run side by side, one scene a process): its report lines, its findings
     (size, sentence) and the size of a model pixel."""
@@ -674,15 +728,28 @@ def check_scene(job):
     folder = os.path.join(KEPT, scene_name(animal, scene))
     path = os.path.join(folder, 'body.jsonl.gz')
     if not os.path.exists(path):
-        return [f'{scene}: no recording ({path})'], [], None
-    rec = Recording(path)
-    if len(rec.frames) < 5:
-        return [f'{scene}: only {len(rec.frames)} moments recorded'], [], None
+        text = f'{scene}: NO RECORDING (the scene did not run, or the animal was never summoned or drawn; {path})'
+        return [text, ''], [(NOT_RUN, text)], None
+    try:
+        rec = Recording(path)
+    except (OSError, EOFError, ValueError, IndexError, StopIteration) as e:
+        text = f'{scene}: THE RECORDING CANNOT BE READ (cut short by a crash? {type(e).__name__}: {e})'
+        return [text, ''], [(NOT_RUN, text)], None
+    if len(rec.frames) < MIN_MOMENTS:
+        text = f'{scene}: ONLY {len(rec.frames)} MOMENTS RECORDED (the animal was hardly drawn; nothing to judge)'
+        return [text, ''], [(NOT_RUN, text)], None
     res = analyse(rec, plan)
     px = res['px']
     P = lambda blocks: blocks / px                     # noqa: E731  (blocks in model px)
     about = SCENES[scene][0] if scene in SCENES else 'a real scare into water (its own mind)'
     lines.append(f'== {scene}: {about}  ({res["frames"]} moments over {res["seconds"]:.1f} s)')
+    left = short_of(scene, rec.frames[-1]['pos'])
+    if left is not None:
+        lines.append(f'  where it ended: {left:.1f} blocks from the last place it was sent'
+                     + (f'  <-- NEVER GOT THERE (over {ARRIVE:g})' if left > ARRIVE else ''))
+        if left > ARRIVE:
+            summary.append((SHORT, f'{scene}: THE ANIMAL NEVER GOT WHERE IT WAS SENT ({left:.1f} blocks short when the '
+                                   'recording ends): the rest of the scene was not tested'))
     ins = sorted(res['inside'].items(), key=lambda e: -e[1][0])
     if ins:
         lines.append('  inside blocks (deepest, when, how many moments):')
@@ -743,6 +810,29 @@ def check_scene(job):
     return lines, summary, px
 
 
+# the camera's warnings of the launch just made, by course animal (note_launch fills it; a "check" of old recordings
+# has none: the log is of another launch)
+WARNED = {}
+
+
+def note_launch(animals, code):
+    """After a launch of these animals' course scenes: the camera's warnings of their scenes (kept for the reports),
+    and what is wrong with the launch itself ([] when it ran to its end): the game's exit code, a camera that never
+    finished, a scene that left no folder."""
+    wrong = []
+    if code != 0:
+        wrong.append(f'the game ended with exit code {code} (a crash, or the build failed)')
+    warnings, done = camera_warnings()
+    if warnings is None:
+        wrong.append(f'the game left no log ({GAME_LOG})')
+    elif not done and code == 0:
+        wrong.append('the camera never finished its shot lists (no "Film: done" in the game\'s log)')
+    for a in animals:
+        names = {scene_name(a, s): s for s in scenes_of(a)}
+        WARNED[a] = [f'{s}: THE CAMERA WARNED: {w}' for n, s in names.items() for w in (warnings or {}).get(n, [])]
+    return wrong
+
+
 def report(animal):
     plan = json.load(open(body_plan.plan_path(plan_of(animal)), encoding='utf-8'))
     lines = [f'The measuring course for the {animal} (tools/body_course.py; 1 model px = {{px}} blocks)', '']
@@ -755,6 +845,7 @@ def report(animal):
             summary += scene_summary
             px = scene_px or px
     lines[0] = lines[0].replace('{px}', f'{px:.4f}' if px else '?')
+    summary += [(NOT_RUN, w) for w in WARNED.get(animal, [])]
     summary.sort(key=lambda s: -s[0])
     lines[1:1] = ['Worst first:'] + ['  ' + s for _, s in summary[:25]] + ['']
     out = os.path.join(KEPT, f'course_{animal}.txt')
@@ -798,21 +889,33 @@ def main(args):
         films = [os.path.relpath(p, PROJECT).replace('\\', '/') for a in animals for p in
                  [os.path.join(COURSE, scene_name(a, s) + '.film') for s in scenes_of(a)]]
         gradle = os.path.join(PROJECT, 'gradlew.bat' if os.name == 'nt' else 'gradlew')
-        subprocess.run([gradle, 'runFilm', '-PfilmScene=' + ','.join(films)], cwd=PROJECT, check=False)
+        if not films:
+            print('no scene to film (an empty list would film the insects\' poses instead)')
+            return 1
         import shutil
         os.makedirs(KEPT, exist_ok=True)
+        for film in films:                              # the old recordings go first: a scene that does not run
+            name = os.path.basename(film)[:-len('.film')]   # must not be judged by an earlier run's recording
+            shutil.rmtree(os.path.join(SHOTS, name), ignore_errors=True)
+            shutil.rmtree(os.path.join(KEPT, name), ignore_errors=True)
+        code = subprocess.run([gradle, 'runFilm', '-PfilmScene=' + ','.join(films)], cwd=PROJECT, check=False).returncode
         for film in films:
             name = os.path.basename(film)[:-len('.film')]
             if os.path.isdir(os.path.join(SHOTS, name)):
-                shutil.rmtree(os.path.join(KEPT, name), ignore_errors=True)
                 shutil.move(os.path.join(SHOTS, name), os.path.join(KEPT, name))
+        launch_wrong = note_launch(animals, code)
+        for w in launch_wrong:
+            print('THE LAUNCH FAILED: ' + w)
+    failed = bool(launch_wrong) if args[0] == 'run' else False
     if args[0] in ('run', 'check'):
         for a in animals:
             path, summary = report(a)
-            print(f'{a}: {path}')
-            for _, s in summary[:10]:
+            bad = not_run(summary) + ended_short(summary)
+            failed = failed or bool(bad)
+            print(f'{a}: {path}' + (f'   {len(bad)} SCENE FAULT(S): the course did not run as written' if bad else ''))
+            for _, s in summary[:max(10, len(bad))]:
                 print('  ' + s)
-    return 0
+    return 2 if failed else 0
 
 
 if __name__ == '__main__':

@@ -92,6 +92,24 @@
   "checks": {
     "about": "Offline checks for tools/clip_check.py (adult scale 1.0: 1 px = 0.0625 blocks); the numbers are the game's (OtterEntity.AFLOAT, its 4-tick blend) and the otter maker's.",
     "px": 0.0625,
+    "feet_up_ok": {
+      "death": "*",
+      "hop_turn": "*",
+      "pounce_*": "*",
+      "side_hop_*": "*",
+      "play_rear": [
+        "l1",
+        "r1"
+      ],
+      "forage_feel": [
+        "l1",
+        "r1"
+      ],
+      "stand_wary": [
+        "l1",
+        "r1"
+      ]
+    },
     "blend": 4,
     "water": [
       "swim",

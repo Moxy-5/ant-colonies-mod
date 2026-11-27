@@ -83,17 +83,22 @@ public final class Spots {
     public record Pair(String holder, String hold, double size, java.util.Set<String> clips, List<String> spots) {
     }
 
-    private final List<String> names = new ArrayList<>();
-    private final List<Double> outs = new ArrayList<>();
+    private final Class<?> owner;
+    private final String path;
+    // not final: reloadAll() swaps in the tables read again
+    private volatile List<String> names = new ArrayList<>();
+    private volatile List<Double> outs = new ArrayList<>();
     /** Each clip's rows: one a tick, the x, y, z of every spot in order. */
-    private final Map<String, double[][]> clips = new HashMap<>();
+    private volatile Map<String, double[][]> clips = new HashMap<>();
     /** Each clip's middle row (a loop's: the game cannot know a loop's phase at the speed it is drawn). */
-    private final Map<String, double[]> middles = new HashMap<>();
-    private final Map<String, Hold> holds = new HashMap<>();
-    private final Map<String, Strike> strikes = new HashMap<>();
-    private final List<Pair> pairs = new ArrayList<>();
+    private volatile Map<String, double[]> middles = new HashMap<>();
+    private volatile Map<String, Hold> holds = new HashMap<>();
+    private volatile Map<String, Strike> strikes = new HashMap<>();
+    private volatile List<Pair> pairs = new ArrayList<>();
 
     private Spots(Class<?> owner, String path) {
+        this.owner = owner;
+        this.path = path;
         try (InputStream in = owner.getResourceAsStream(path)) {
             if (in == null) {
                 return;                                 // none: no spots, no holds
@@ -165,6 +170,24 @@ public final class Spots {
     public static Spots of(Class<?> owner, String modId, String animal) {
         String path = "/assets/" + modId + "/spots/" + animal + ".json";
         return LOADED.computeIfAbsent(path, p -> new Spots(owner, p));
+    }
+
+    /**
+     * Reads every spot table again from its file (the film camera's watch mode, after tools/spots.py rewrote one: no
+     * relaunch; code review R12-42, the watch mode went on filming the holds of the launch). Each table is read whole
+     * beside the old one and then takes its place in the same object, so whoever keeps a table has the new one.
+     */
+    public static void reloadAll() {
+        for (Spots old : LOADED.values()) {
+            Spots fresh = new Spots(old.owner, old.path);
+            old.names = fresh.names;
+            old.outs = fresh.outs;
+            old.clips = fresh.clips;
+            old.middles = fresh.middles;
+            old.holds = fresh.holds;
+            old.strikes = fresh.strikes;
+            old.pairs = fresh.pairs;
+        }
     }
 
     // --- a prey's spots ----------------------------------------------------------------------------------------------

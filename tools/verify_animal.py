@@ -10,8 +10,15 @@ animal's model, clips or body code, before showing the user.
   --offline    only the checks that need no game (1 and 2 below): a few seconds to a minute
   --no-films   the course and the compare, but not the frame films
 
-In order, stopping an animal at its first hard failure (a check that could not run or made nothing: a crash, a
-missing recording, a film with no pictures); findings are not hard failures, they are counted in the summary:
+In order, stopping an animal at its first hard failure (a check that could not run or made nothing: a crash, a game
+that did not run to the end of its shot lists, a course scene with no recording or a camera warning, a film cut
+short); findings are not hard failures, they are counted in the summary. The verdict of each animal, and the exit code:
+  passed          (0) every check ran, and the game filmed its moves (a course scene or a frame film)
+  NOT PASSED      (2) the checks ran, but one of them says it did not judge what it should: no game film of the
+                  animal's moves at all, a course scene the animal did not walk to its end, a camera warning in a film
+  STOPPED at ...  (1) a hard failure; the checks after it did not run
+(code review round 12, 2026-11-26: "passed" used to be said for an animal never filmed, after a crash, and for a
+course with no recording.) The checks:
   1. clips      tools/clip_check.py on every clip and every clip change the plan lists (--switches), on the animal's
                 model and on each model of its young (the plan's "verify.models")
   2. boxes      the model's boxes against the box budget (tools/body_plan.py boxes; over it is a warning)
@@ -80,16 +87,18 @@ def check_clips(animal, plan, log):
         # with no clip named and --switches, clip_check checks only the changes: name every clip too
         cmd.insert(3, '*')
         code, out = run(cmd, log)
-        if code != 0 or 'Traceback' in out:
+        # clip_check ends 0 with nothing flagged, 2 with something flagged (R12-3); anything else is a failure
+        if code not in (0, 2) or 'Traceback' in out:
             raise Hard(f'clip_check.py failed on {m} (exit {code}): ' + out.strip().splitlines()[-1][:200])
-        sections = re.split(r'^== ', out, flags=re.M)[1:]
+        head, *sections = re.split(r'^== ', out, flags=re.M)
         clips = [s for s in sections if not s.startswith('clip changes')]
         flagged = sorted({s.split()[0] for s in clips if 'FLAGGED' in s})
         inside = sorted({s.split()[0] for s in clips if 'or the bank (time' in s})
         bad_switches = len(re.findall(r'^\s+\S+ -> \S+ .*FLAGGED', out, re.M))
         parts.append(f'{m}: {len(clips)} clips, {len(flagged)} with a flag'
                      + (f' ({", ".join(flagged[:6])}{"..." if len(flagged) > 6 else ""})' if flagged else '')
-                     + f', {len(inside)} with parts inside a block, {bad_switches} clip changes flagged')
+                     + f', {len(inside)} with parts inside a block, {bad_switches} clip changes flagged'
+                     + (', PARTS NOT HIDDEN AT REST' if 'FLAGGED' in head else ''))
     return '; '.join(parts)
 
 
@@ -128,7 +137,7 @@ def check_pairs(animal, log):
     parts = []
     for holder, prey in pairs:
         code, out = run([PY, 'tools/clip_check.py', holder, '--pair', prey], log)
-        if code != 0 or 'Traceback' in out:
+        if code not in (0, 2) or 'Traceback' in out:
             raise Hard(f'clip_check.py --pair failed on {holder} and {prey} (exit {code}): ' + out.strip().splitlines()[-1][:200])
         m = re.search(r'^\s+(\d+) flagged', out, re.M)
         parts.append(f'{holder} holding {prey}: {m.group(1) if m else "?"} flagged')
@@ -180,7 +189,10 @@ def game_jobs(animals, plans, quick, films_too):
 
 
 def launch(films, log):
-    """One ./gradlew runFilm with every scene; their old picture folders cleared first, so a missing one shows."""
+    """One ./gradlew runFilm with every scene; their old picture folders cleared first, so a missing one shows.
+    Never with no scene: an empty list makes the build film the insects' poses instead (code review R12-35)."""
+    if not films:
+        raise ValueError('launch() with no scene')
     for f in films:
         shutil.rmtree(os.path.join(SHOTS, scene_of(f)), ignore_errors=True)
     gradle = os.path.join(PROJECT, 'gradlew.bat' if os.name == 'nt' else 'gradlew')
@@ -192,28 +204,38 @@ def launch(films, log):
     return p.returncode
 
 
-def check_course(animal, plan, films, log):
+def check_game(animal, plan, code, log):
+    """The launch itself, before anything it made is read (code review R12-36: a game that crashed half way was
+    only a line in the middle of the output, and what it had made till then passed)."""
+    wrong = body_course.note_launch(course_entries(plan), code)
+    if wrong:
+        raise Hard('; '.join(wrong) + ': nothing it made is judged')
+    return 'the game ran to the end of its shot lists'
+
+
+def check_course(animal, plan, films, log, notes=None):
     entries = course_entries(plan)
     if not entries:
         return 'no course entry in its plan'
-    missing = []
     os.makedirs(body_course.KEPT, exist_ok=True)
     for f in films:
         name = scene_of(f)
         src = os.path.join(SHOTS, name)
-        if not os.path.isdir(src):
-            missing.append(name)
-            continue
-        shutil.rmtree(os.path.join(body_course.KEPT, name), ignore_errors=True)
-        shutil.move(src, os.path.join(body_course.KEPT, name))
-    if missing:
-        raise Hard('the course made no recording for ' + ', '.join(missing))
-    out = []
+        shutil.rmtree(os.path.join(body_course.KEPT, name), ignore_errors=True)   # never an earlier run's recording
+        if os.path.isdir(src):
+            shutil.move(src, os.path.join(body_course.KEPT, name))
+    out, bad, short = [], [], []
     for e in entries:
         path, summary = body_course.report(e)
         log.write(open(path, encoding='utf-8').read() + '\n')
+        bad += [f'{e} {s}' for s in body_course.not_run(summary)]
+        short += [f'{e} {s}' for s in body_course.ended_short(summary)]
         worst = summary[0][1] if summary else 'nothing found'
         out.append(f'{e}: {len(summary)} findings, worst: {worst} ({rel(path)})')
+    if bad:
+        raise Hard(f'{len(bad)} course scene(s) did not run as written: ' + '; '.join(bad[:6]))
+    if short and notes is not None:
+        notes.append(f'{len(short)} course scene(s) the animal did not walk to the end')
     return '; '.join(out)
 
 
@@ -226,7 +248,30 @@ def bursts_of(film):
     return names
 
 
-def check_films(animal, films, log):
+def pictures_asked(film):
+    """How many pictures each burst and shot of a shot list makes, as {the pictures' name start: how many}: a burst
+    of n takes n times the frames a tick, from every camera set (client/FilmDirector.java). None for a shot list
+    this cannot count (one that changes its scene's folder, or uses "views")."""
+    asked, frames, cams = {}, 1, 0
+    for line in open(film, encoding='utf-8'):
+        w = line.split('#', 1)[0].split()
+        if not w:
+            continue
+        if w[0] in ('scene', 'views'):
+            return None
+        if w[0] == 'frames':
+            frames = max(1, int(w[1]))
+        elif w[0] == 'cam':
+            cams = 0 if w[1] == 'off' else cams + 1
+        elif w[0] == 'burst':
+            asked[w[1] + '_'] = max(asked.get(w[1] + '_', 0), int(w[2]) * frames * max(1, cams))
+        elif w[0] == 'shot':
+            key = w[1] + ('_' if cams else '.png')
+            asked[key] = max(asked.get(key, 0), max(1, cams))
+    return asked
+
+
+def check_films(animal, films, log, notes=None):
     if not films:
         return 'no frame film'
     out = []
@@ -236,6 +281,12 @@ def check_films(animal, films, log):
         pics = [n for n in os.listdir(folder) if n.endswith('.png')] if os.path.isdir(folder) else []
         if not pics:
             raise Hard(f'the film {name} made no pictures')
+        # every picture its shot list asks for (a game that stopped half way leaves a film cut short)
+        few = [f'{start}* {sum(n.startswith(start) for n in pics)} of {n_asked}'
+               for start, n_asked in (pictures_asked(f) or {}).items()
+               if sum(n.startswith(start) for n in pics) < n_asked]
+        if few:
+            raise Hard(f'the film {name} is cut short (pictures made of pictures asked): ' + ', '.join(few[:8]))
         sheets = os.path.join(PROJECT, 'references', 'anim_lab', animal, 'verify', name)
         os.makedirs(sheets, exist_ok=True)
         made = 0
@@ -244,8 +295,14 @@ def check_films(animal, films, log):
                 code, _ = run([PY, 'tools/film_sheet.py', folder, b + '_', os.path.join(sheets, b + '.png'), '6'], log)
                 made += code == 0
         checks = os.path.join(folder, 'checks.txt')
-        last = open(checks, encoding='utf-8').read().strip().splitlines()[-1] if os.path.exists(checks) else 'no checks'
-        out.append(f'{name}: {len(pics)} pictures, {made} sheets, game checks: {last}')
+        last = (open(checks, encoding='utf-8').read().strip().splitlines()[-1] if os.path.exists(checks)
+                else 'NONE WRITTEN (the camera judged no animal in this film: its parts in blocks and jumps are not checked)')
+        warned = (body_course.camera_warnings()[0] or {}).get(name, [])
+        if warned and notes is not None:
+            notes.append(f'the camera warned in the film {name} (its pictures may not show what its shot list '
+                         'means): ' + '; '.join(warned[:4]))
+        out.append(f'{name}: {len(pics)} pictures, {made} sheets, game checks: {last}'
+                   + (f', {len(warned)} CAMERA WARNING(S)' if warned else ''))
     return '; '.join(out) + f' (sheets in references/anim_lab/{animal}/verify/)'
 
 
@@ -304,25 +361,39 @@ def main(argv):
         step(a, 'boxes', check_boxes, a, plans[a], logs[a])
         step(a, 'pairs', check_pairs, a, logs[a])
     live = [a for a in animals if a not in stopped]
+    # what keeps an animal that was not stopped from a plain "passed": no film of its moves in the game, course
+    # scenes it did not walk to the end (code review R12-35, R12-38)
+    notes = {a: [] for a in animals}
     if live and not offline:
         # one launch an animal, its course first: a single long launch of every animal's scenes (99, 80 minutes,
         # 2026-11-21) recorded the later ones with pops and snaps that a short launch of the same scenes did not show
         for a in live:
             course, frames, compare, every = game_jobs([a], plans, quick, films_too)
+            if not course[a] and not frames[a]:
+                notes[a].append('NO GAME FILM OF ITS MOVES (give its plan a "course" entry, or add '
+                                f'tools/film/{a}_frames.film or name its films in the plan\'s "verify.films")')
+            if not every:
+                continue
             print(f'{a}: one game launch, {len(every)} scenes ({"quick" if quick else "full"}); about a minute a scene')
             code = launch(every, logs[a])
-            step(a, 'course', check_course, a, plans[a], course[a], logs[a])
+            step(a, 'game', check_game, a, plans[a], code, logs[a])
+            step(a, 'course', check_course, a, plans[a], course[a], logs[a], notes[a])
             if films_too:
-                step(a, 'films', check_films, a, frames[a], logs[a])
+                step(a, 'films', check_films, a, frames[a], logs[a], notes[a])
             step(a, 'compare', check_compare, a, plans[a], logs[a])
-            if code != 0:
-                print(f'(runFilm ended with exit {code}; see run-film/verify/verify_{a}.log)')
     for a in animals:
-        verdict = f'STOPPED at {stopped[a]}' if a in stopped else ('passed (offline only)' if offline else 'passed')
+        if a in stopped:
+            verdict = f'STOPPED at {stopped[a]}'
+        elif offline:
+            verdict = 'passed (offline only)'
+        elif notes[a]:
+            verdict = 'NOT PASSED: its checks ran, but ' + '; '.join(notes[a])
+        else:
+            verdict = 'passed'
         print(f'{a}: {verdict}   (full log run-film/verify/verify_{a}.log)')
         print('\n'.join(results[a]))
         logs[a].close()
-    return 1 if stopped else 0
+    return 1 if stopped else 2 if any(notes.values()) else 0
 
 
 if __name__ == '__main__':

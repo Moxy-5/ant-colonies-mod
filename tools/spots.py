@@ -96,7 +96,11 @@ def fingerprint(animal, data):
     spots = {k: v for k, v in data.get('spots', {}).items() if k != 'about'}   # what the table is made from
     spots['pairs'] = game_pairs(spots.get('pairs', []), spots.get('at', {}))
     blend = a.blend_ticks()[0] if 'strikes' in data else None                   # read from the Java: a strike's lead
-    h.update(json.dumps([FORMAT, spots, data.get('holds'), data.get('strikes'), blend, data.get('legs'), data.get('bones')],
+    # (review R12-13: the rows are posed through the plan's hinge, tail drag and chain too; a change there left the
+    # table behind with the check passing. The posing code itself is still FORMAT's, bumped by hand.)
+    checks = data.get('checks') or {}
+    posed_by = [checks.get('hinge'), checks.get('tail_drag'), checks.get('px'), data.get('chain')]
+    h.update(json.dumps([FORMAT, spots, data.get('holds'), data.get('strikes'), blend, data.get('legs'), data.get('bones'), posed_by],
                         sort_keys=True).encode())
     for path in (cc.lab.model_file(a.model_name, 'geo', 'entity', f'{a.model_name}.geo.json'),
                  cc.lab.model_file(a.anim_stem, 'animations', 'entity', f'{a.anim_stem}.animation.json')):

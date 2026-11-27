@@ -239,6 +239,8 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** The move last read from the synced data, and that data (so it is read once per change). */
     @Nullable
     private BlockMoves.Play climb;
+    /** Drawing only: the time its move is drawn at, for its clip and its place. */
+    private final com.antcolonies.entity.body.MoveClock moveClock = new com.antcolonies.entity.body.MoveClock();
     @Nullable
     private CompoundTag climbRead;
     /** How far out from its middle line its feet stand (model pixels; my pick). */
@@ -379,17 +381,12 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     }
 
     /**
-     * Drawing only: how far into its climb clip it is drawn now (ticks of the clip), 0 while the clip eases in, or below
-     * 0 when it is not climbing or the clip is not on yet.
+     * Drawing only: how far into its move's clip it is drawn now (ticks of the clip, 0 while it turns or eases in), or
+     * below 0 when not on a move. From the move's own time, as its clip ({@link BlockMoves#drawnTicks}).
      */
-    public double climbClipTicks() {
+    public double climbClipTicks(float partialTick) {
         BlockMoves.Play c = climb();
-        if (c == null || bodyClips == null || bodyClips.getCurrentAnimation() == null
-                || !bodyClips.getCurrentAnimation().animation().name().equals(MOVES.clip(c))) {
-            return -1.0;
-        }
-        // easing in, nothing played yet; held on its last frame (GeckoLib's "paused"), still its clip time
-        return bodyClips.getAnimationState() == AnimationController.State.TRANSITIONING ? 0.0 : bodyClips.clipTicks();
+        return c == null ? -1.0 : MOVES.drawnTicks(c, moveClock, level().getGameTime(), partialTick);
     }
 
     /** The body clip player's clock: the climb clip plays at the climb's own time since its start ({@link SteadyController.Clock}). */
@@ -398,7 +395,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (c == null || !clip.equals(MOVES.clip(c))) {
             return -1.0;
         }
-        return Math.max(0.0, MOVES.ticks(c, level().getGameTime() + (tick - Math.floor(tick))));
+        return MOVES.drawnTicks(c, moveClock, level().getGameTime(), tick);
     }
 
     /**

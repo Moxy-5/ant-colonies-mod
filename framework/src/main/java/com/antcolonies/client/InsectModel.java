@@ -15,6 +15,8 @@ import software.bernie.geckolib.model.DefaultedEntityGeoModel;
 public class InsectModel<T extends AbstractAntEntity> extends DefaultedEntityGeoModel<T> {
     /** The geo model last drawn and its body plan (the queen draws the worker's model, so she gets the worker's plan). */
     private ResourceLocation planModel;
+    /** {@link BodyPlans#reads} when the plan was taken: read again, it is asked for again. */
+    private int planReads = -1;
     private BodyPlans.Plan plan;
 
     /** The model its body plan is kept under, when that is not the model drawn (a far look: the full model's). */
@@ -65,9 +67,10 @@ public class InsectModel<T extends AbstractAntEntity> extends DefaultedEntityGeo
 
     private BodyPlans.Plan planOf(T insect) {
         ResourceLocation model = planResource(insect);
-        if (!model.equals(planModel)) {
+        if (!model.equals(planModel) || planReads != BodyPlans.reads()) {
             plan = BodyPlans.ofGeo(model);
             planModel = model;
+            planReads = BodyPlans.reads();
         }
         return plan;
     }

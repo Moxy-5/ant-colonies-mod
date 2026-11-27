@@ -236,6 +236,17 @@
    "mood_sleepy",
    "mood_flehmen"
   ],
+  "feet_up_ok": {
+   "groom": [
+    "r1"
+   ],
+   "swipe": [
+    "l1"
+   ],
+   "swipe_quick": [
+    "l1"
+   ]
+  },
   "body_bones": [
    "chest",
    "waist",

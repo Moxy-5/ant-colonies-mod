@@ -39,6 +39,8 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
     private float climbIntoWall;
     /** The geo model last drawn and its body plan (the queen draws the worker's model, so she gets the worker's plan). */
     private ResourceLocation planModel;
+    /** {@link BodyPlans#reads} when the plan was taken: read again, it is asked for again. */
+    private int planReads = -1;
     private BodyPlans.Plan plan;
     /** Whether the last insect drawn had a leg hidden (so the next one shows all its legs again). */
     private boolean anyLegHidden;
@@ -180,9 +182,10 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
     private BodyPlans.Plan planOf(T ant) {
         ResourceLocation model = getGeoModel() instanceof InsectModel<T> insectModel ? insectModel.planResource(ant)
                 : getGeoModel().getModelResource(ant);
-        if (!model.equals(planModel)) {
+        if (!model.equals(planModel) || planReads != BodyPlans.reads()) {
             plan = BodyPlans.ofGeo(model);
             planModel = model;
+            planReads = BodyPlans.reads();
         }
         return plan;
     }

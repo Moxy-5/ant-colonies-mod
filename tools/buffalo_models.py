@@ -1083,6 +1083,8 @@ def build_body_plan(raw_bones, meta):
                 "rest_down", "rest", "rest_up", "death",
                 "step_up_1000", "step_down_1000",
             ],
+            # the feet a clip holds off the ground on purpose (clip_check's hanging-feet check, review R12-2)
+            "feet_up_ok": {"death": "*", "death_down": "*"},
             "body_bones": ["hips", "chest"],
             "walks": meta["walks"],
             "switches": switches,
