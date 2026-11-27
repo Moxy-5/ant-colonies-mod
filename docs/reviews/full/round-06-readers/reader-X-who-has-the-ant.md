@@ -14,7 +14,7 @@ game asks `canUse` in one pass: the order of the `addGoal` lines, not the priori
 
 | Asked | Goal | Number | Flags | Every tick | What starts it (its `canUse` in short) |
 |---|---|---|---|---|---|
-| 1 | `FloatGoal` | 0 | JUMP | no | in water |
+| 1 | `FloatGoal` | 0 | JUMP | yes (Minecraft's own, from memory) | in water |
 | 2 | `MatabeleBiteOutGoal` | -1 | MOVE, LOOK | yes | out of its own nest, under a roof, shut in, two looks 10 ticks apart |
 | 3 | `FightGoal` | 0 | MOVE, LOOK | no | a fight order (`getFightSpot`), or bitten by something within 8 blocks; never while `fightsNoMore` |
 | 4 | `EatGoal` | 1 | MOVE, LOOK | no | hungry, jaws empty, not on a raid errand, 1 chance in 10 |
@@ -265,7 +265,8 @@ down only if the carry had timed out, so the hurt ant stays in the jaws through 
 `AbstractAntEntity.java:1502`, and `needsRescue` is false for it, so it neither calls nor fights). After the fight
 `RescueGoal.canUse` (`:77-79`) is true at once, `start` picks a room again, and the carry goes on. If the rescuer dies,
 `dropLoadOnDeath` runs the HURT row's drop (`FrameworkLoads.java:62-63`, `ejectPassengers`) and `tickRescue`
-(`:1281-1283`) gets the rider off; the hurt one is then found by the raids' sweep within 5 seconds and limps home.
+(`:1281-1283`) gets the rider off; the hurt one then walks in by itself (`GoInsideGoal`) or, more than 16 blocks out,
+is found by the raids' sweep within 5 seconds and limps home.
 **Nothing is lost.** What looks wrong is fighting with a nestmate in the jaws (X-3, point 1), and a rescuer hurt in
 that fight keeps its patient (X-7).
 
@@ -292,7 +293,8 @@ so neither pushes the other out, and `mayHelp` (`RescueGoal.java:53-57`) is fals
 goes to the pile; the caller waits for an ant with empty jaws. In the raid's regroup (`Raid.java:1958-1979`) a raider
 with empty jaws is given a hurt nestmate before any termite, and one that already holds termites is given neither a
 hurt one nor (once full) more prey; an ant carrying a hurt one has "full jaws" and gets no termite (`hasRoom`,
-`:1929-1932`). **The prey is never dropped for a nestmate, and never lost by this meeting.**
+`:1929-1932`). **The prey is never dropped for a nestmate, and never lost by this meeting.** (Hunger cannot take a
+carrier either: `EatGoal` asks for empty jaws, `EatGoal.java:62`.)
 
 **5. A raider drafted while it holds food for the queen or an egg.** It is not drafted: `Raids.raiderFit`
 (`Raids.java:1039-1043`) and `Scouts.fit` (`Scouts.java:314-317`) both ask for empty jaws. An ant only on its way to
@@ -311,8 +313,10 @@ load waiting), so they are false for nearly every idle ant nearly always; the ca
 (every 2 seconds, 1 in 3 and 1 in 2; rescue every second with no dice). In the 2 seconds before an ant counts as idle
 `looksForWork` (`AbstractAntEntity.java:597-599`) makes the chores ask on every pass, so a chore that is waiting wins
 over care in that window; with more than a handful of idle ants (the usual state between raids) care still starts
-within seconds. Round 3's statue (R3-31, food held and no queen) cannot last in a Matabele colony: the colony ends
-with its queen, and `FeedQueenGoal.canUse` (`:62-67`) needs the colony. Two goals of the same number cannot alternate
+within seconds. Round 3's statue (R3-31, food held and no queen) holds for a Matabele colony too, not written
+again here: the colony lives on without its queen until it is empty (`Colony.queenDied`, `Colony.java:675-678`),
+whatever the queen's own header comment says ("her colony ends when she dies", `MatabeleQueenEntity.java`); such a
+statue is also never drafted (full jaws), so it is one of the number 2 goals holding an ant for good. Two goals of the same number cannot alternate
 while one runs; one after the other they can (a lick, then a chore, then a lick), which is as meant: clamp care and
 wound care on one patient have a claim each (BUGS 349). **Sound**, apart from the list not being in priority order
 (X-8).
