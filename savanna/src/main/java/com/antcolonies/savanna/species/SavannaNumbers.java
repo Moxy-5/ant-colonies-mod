@@ -697,8 +697,8 @@ public final class SavannaNumbers {
      * more (a by-day feeding place, or two termites seen), a part for a poorer one, at least {@code leastRaid}, at most
      * {@code raids.catch.most_raid}; at most {@code mostReal} of them walk as real ants, the rest are numbers till step 4. A raider
      * still in the nest {@code formTicks} after the column left stays home. On the march (the stream, 2026-11-08) each raider
-     * keeps {@code spacing} blocks of trail behind the one ahead of it, side by side left to the legs. The column stops {@code stopShort} blocks short of the find and bunches up (at
-     * most {@code gatherTicks}), then attacks all at once, fighting at most {@code fightTicks}; after the fight it
+     * keeps {@code spacing} blocks of trail behind the one ahead of it, side by side left to the legs. The column stops {@code stopShort} blocks short of the find and bunches up (waiting
+     * for its tail till none of it has come nearer in {@code gatherTicks}), then attacks all at once, fighting at most {@code fightTicks}; after the fight it
      * regroups there (at most {@code regroupTicks}) and walks home (a march's own limit is in {@code colony.Raid}).
      * The raid rewrite's stage deadlines: the muster at most {@code musterTicks}, a bunch at least
      * {@code bunchLeastTicks}, the look round an empty spot {@code lookTicks}, a raider fighting farther than

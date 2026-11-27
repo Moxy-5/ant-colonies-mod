@@ -10,20 +10,20 @@ for the number there).
 | Part | Left |
 |---|---|
 | In the game: A, it breaks play | 1 |
-| In the game: B, it looks or plays wrong | 17 |
-| In the game: C, small or rare | 32 |
+| In the game: B, it looks or plays wrong | 15 |
+| In the game: C, small or rare | 34 |
 | Waiting for your call | 19 |
 | Behind the scenes (code review) | 168 |
 | Tool faults | 6 |
-| *Test flakes, in `docs/TEST-FLAKES.md`* | *49* |
+| *Test flakes, in `docs/TEST-FLAKES.md`* | *50* |
 
 ## A: it breaks play (1)
 
 Something a player meets goes wrong in a way that matters: a crash, a freeze, a system that does not do its job.
 
-- **306** The raids were rewritten from scratch (2026-11-24). The long unattended runs are done: every raid ends and none hangs or crashes, but in the last run only 6 watched attacks in 11 brought termites home (8 in 25 before the fix of 2026-11-27); what still goes wrong is in 450, 451 and 452. You watching raids is left.
+- **306** The raids were rewritten from scratch (2026-11-24) and three long unattended runs are done: every raid ends, none hangs or crashes, and since the fix of the tail left behind (BUGS 450) the raiding colonies bring home enough to hold their size (151 termites in the last run, 23 and 57 before). Still to do: you watch raids in-game; the smaller raid bugs left are on this list.
 
-## B: it looks or plays wrong (17)
+## B: it looks or plays wrong (15)
 
 A player will likely see it, and the game goes on.
 
@@ -32,12 +32,10 @@ A player will likely see it, and the game goes on.
 - **237** A Nile monitor diving off a bank 2 blocks high: its tail stands straight up the bank's face for about a second.
 - **253** The bullfrog's feet jump at the start of its hops, its hind feet sink into the ground when it sits, and its walk flickers in between hops.
 - **256** Young crocodiles draw their tails and heads deep inside blocks at steps and banks.
-- **361** Matabele majors that chase termites deep into their tunnels during an attack can still be left with no way back to the column: they stand 30 seconds, then walk home alone (a major walled in by the termites now bites its way out). *(half fixed)* *(half fixed)*
+- **361** Matabele that chase termites into the termites' holes and tunnels during an attack can be left with no way back to the column: in the last long run 13 raiders stood in one termite hole till night, and 8 stood half a minute at one place twice (a major walled in by the termites now bites its way out). *(half fixed)* *(half fixed)*
 - **378** A buffalo calf's feet slide when it runs with the herd.
 - **416** Ants and termites cannot step onto a low flat piece (a lying mud-crust plate, a carpet, a bottom slab) that hangs a block over the ground; raiders told to stand on one stand 30 seconds.
 - **427** The bullfrog's feet and hands whip the long way round when it climbs out of the water or starts to swim.
-- **450** A big raid column often leaves half or more of its ants behind: the front attacks after 15 seconds at the halt while the tail is still coming out of the nest, and the late ones turn round and walk home.
-- **451** About one raid in four gives up on its way out ("the march's time is up") and walks home without reaching the termites; the cause is not found yet.
 - **452** Some raids still reach termites they can smell but not get at (shut in under ground or wood beside an open gallery): the ants search 15 seconds and go home empty.
 - **R3-38** A Matabele that lost a leg has all six again after it goes into the nest out of sight and comes out. *(half fixed)*
 - **R4-18** A busy river costs frames: about 6.5 ms a frame for 103 river animals in view (it was 13.3). *(half fixed)*
@@ -45,7 +43,7 @@ A player will likely see it, and the game goes on.
 - **R6-20** Likely, not proven: one block you put in a Matabele nest's chimney (a torch) makes the colony lose all its rooms.
 - **R8-3** Likely, not proven: with a biome mod that is a data pack (Terralith, say) its biomes may not appear at all.
 
-## C: small or rare (32)
+## C: small or rare (34)
 
 Hard to notice, or it needs an unusual case.
 
@@ -64,6 +62,8 @@ Hard to notice, or it needs an unusual case.
 - **428** A few animal loops jump back at the end of each round (crocodile eating, crab cracking, a barb, a distichodus), and some feet hang in the air (bullfrog, hippo, lion and lioness clips).
 - **432** When the game lags, an otter's block move can show late and then jump forward (it mends itself within a second).
 - **453** After some attacks the raid waits 30 seconds for stung termite soldiers nobody can reach, and a rescuer can chase a hurt ant that is already walking home.
+- **461** A raid that was on its way out when you left the game starts from the nest again when you come back, usually runs out of time and walks home without reaching the termites.
+- **462** Walk away from a raid in the middle of its attack and the attack can last half a minute longer than its limit before the ants turn home.
 - **R3-10** Big fights cost the server more than they need: a fighter with no foe near still looks round once a second. *(half fixed)*
 - **R3-30** Some ants lose one try (a short pause) when they set off to go in, wait at the nest or follow the queen. *(half fixed)*
 - **R4-13** Fly clouds go silent after F3+T or a new sound device, until you walk 48 blocks away and back.

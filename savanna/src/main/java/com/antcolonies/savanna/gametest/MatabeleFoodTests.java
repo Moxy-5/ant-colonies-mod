@@ -129,8 +129,9 @@ public class MatabeleFoodTests {
     }
 
     /**
-     * An empty pile: the hungry workers find nothing to eat, slow down to half speed once they have gone the profile's
-     * {@code slow_after_ticks} without a meal (the shared worker hunger; the red harvester ant's check until 2026-11-23),
+     * An empty pile: the hungry workers find nothing to eat, walk on at their full speed all the same (a hungry
+     * Matabele does not slow down, BUGS 450 and 451, 2026-11-27: the shared worker hunger's half speed, which this test
+     * checked until then, left the slowed half of every raid behind and made columns creep behind a slowed scout),
      * then starve, and the colony counts them gone.
      */
     @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
@@ -150,16 +151,17 @@ public class MatabeleFoodTests {
                     helper.assertTrue(ants.size() == 10, ants.size() + " real workers, not 10");
                     for (MatabeleEntity ant : ants) {
                         normalSpeed.put(ant, ant.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED));
-                        ant.setLastMeal(level.getGameTime() - colony.profile().worker().slowAfterTicks() - 5);
+                        // (three days without a meal, a day short of starving)
+                        ant.setLastMeal(level.getGameTime() - colony.profile().worker().starveAfterTicks() + 24000);
                     }
                 })
                 .thenIdle(60)
                 .thenExecute(() -> {
-                    // Past slow_after_ticks without a meal: every worker at half its speed. Then a few seconds short of starving.
+                    // Three days without a meal: every worker still at its full speed. Then a few seconds short of starving.
                     for (MatabeleEntity ant : ants) {
                         double speed = ant.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED);
-                        helper.assertTrue(Math.abs(speed - normalSpeed.get(ant) * 0.5) < 0.001,
-                                "a starving worker's speed is " + speed + ", expected half of " + normalSpeed.get(ant));
+                        helper.assertTrue(Math.abs(speed - normalSpeed.get(ant)) < 0.001,
+                                "a hungry worker's speed is " + speed + ", not its full " + normalSpeed.get(ant) + " (a hungry Matabele does not slow down)");
                         ant.setLastMeal(level.getGameTime() - colony.profile().worker().starveAfterTicks() + 200);
                     }
                 })

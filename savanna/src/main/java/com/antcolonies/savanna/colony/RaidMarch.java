@@ -374,9 +374,37 @@ final class RaidMarch {
             orders.put(ant.getUUID(), frontOut ? follow(level, route, ant, k, at.get(ant.getUUID()), frontW, frontPlace, spacing, casting, now)
                     : new Raid.Order(lineStart, 1.0, ahead));
         }
-        comeOut(level, route, front, notOut, ahead, now);
+        comeOut(level, route, isOut(level, front), notOut, ahead, now);
         sayMarch(route, front, line, notOut, now);
         return false;
+    }
+
+    /** {@link #comeUp}: no walking front for anyone to be past. */
+    private static final double NO_FRONT = Double.POSITIVE_INFINITY;
+
+    /**
+     * The column's tail once its front stands at the route's end (the halt, BUGS 450): these raiders walk on as on the
+     * march, each to its place in the stream behind a front standing at the end, hurrying while far behind it
+     * ({@link #follow}); one not yet out of the nest comes out as on the march ({@link #comeOut}; {@code leftAt}: when
+     * the column left the nest). Nobody here counts as past the front: one back from a chase beyond the route's end
+     * walks to the end at a walk, not at the crawl of one that overtook a walking front.
+     */
+    void comeUp(ServerLevel level, List<MatabeleEntity> tail, Route route, long leftAt, Map<UUID, Raid.Order> orders, long now) {
+        this.orders = orders;
+        this.stageSince = leftAt < 0 ? now : leftAt;
+        List<MatabeleEntity> line = new ArrayList<>();
+        List<MatabeleEntity> notOut = new ArrayList<>();
+        for (MatabeleEntity ant : tail) {
+            (isOut(level, ant) ? line : notOut).add(ant);
+        }
+        Map<UUID, Double> at = walkedAlong(route, line);
+        line.sort(Comparator.comparingDouble(ant -> -at.get(ant.getUUID())));
+        double end = route.walkedLength();
+        for (int k = 0; k < line.size(); k++) {
+            MatabeleEntity ant = line.get(k);
+            orders.put(ant.getUUID(), follow(level, route, ant, k, at.get(ant.getUUID()), NO_FRONT, end, numbers.spacing(), false, now));
+        }
+        comeOut(level, route, true, notOut, route.point(Math.min(route.length(), 4.0)), now);
     }
 
     /**
@@ -430,9 +458,8 @@ final class RaidMarch {
      * straight through it, 2026-11-08; 0.85 only spread them out). One still in the nest {@code formTicks} after the
      * column left stays home.
      */
-    private void comeOut(ServerLevel level, Route route, MatabeleEntity front, List<MatabeleEntity> notOut, BlockPos ahead, long now) {
+    private void comeOut(ServerLevel level, Route route, boolean frontOut, List<MatabeleEntity> notOut, BlockPos ahead, long now) {
         BlockPos lineStart = route.place(level, 0.0, 0.0);
-        boolean frontOut = isOut(level, front);
         for (MatabeleEntity ant : notOut) {
             if (route == out && now - stageSince > numbers.formTicks() && colony.nest().isInside(level, ant.blockPosition())) {
                 host.say(RaidGround.shortId(ant.getUUID()) + " stays home, still in the nest " + (now - stageSince) / 20 + " s after the column left: " + host.who(ant, out));

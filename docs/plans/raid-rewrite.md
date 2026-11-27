@@ -378,7 +378,7 @@ one rule that ends it and one deadline, and at the deadline it goes on with whoe
 |---|---|---|---|
 | Muster | the scout stands at the trail's start by the entrance and the called ants come out and bunch behind her, as many as there is level ground for; the others wait in the nest | every ant with a place is at it (never before 5 s, so the bunch is seen) | 20 s (`muster_ticks`): the rest run after the column |
 | March out | the kept march (`RaidMarch`) | the front is at the halting place | a second a block and 30 s; time spent casting at a gap in the trail not counted |
-| Halt | a ring round the scout, 4 blocks short of the spot; the judge is asked as the front arrives | the tail is in (never before 5 s) | 15 s (`gather_ticks`): one more than 10 blocks behind is left and walks home |
+| Halt | a ring round the scout, 4 blocks short of the spot; the judge is asked as the front arrives | the tail is in (never before 5 s) | it waits while the tail is still coming (BUGS 450, 2026-11-27; it used to be a flat 15 s): once nobody of the tail has come a block nearer in 15 s (`gather_ticks`), or a march's own time is up, one more than 10 blocks behind is left and walks home |
 | Attack | everyone gets the raid's own fight order; majors bite the mud open, minors sting | no termite stung or gone for in 15 s (`quiet_ticks`, was 30) | 2 minutes (`fight_ticks`) |
 | Regroup | hurt nestmates fetched first, then each ant with room takes the nearest stung termite on the raid's own list, majors first; the rest bunch at the halting place | nothing left to fetch and the ants are back | 30 s (`regroup_ticks`, was 20) |
 | March home | the kept march back, the ant nearest home leading, slower laden; the last 12 blocks each streams in by itself | everyone is home | the march's limit: whoever is still out is let go and walks the trail alone |
@@ -663,6 +663,16 @@ Two runs of `tools/soak.sh 6 4` on `claude/raid-prove` (reports `docs/soaks/2026
 - **The colonies eat:** not yet. Watched colonies shrank in both runs; BUGS 450 (the tail left behind at the halt)
   and 451 (the march out's time is up) cost about half the raids their ants or their attack.
 - **The user watches raids:** left.
+
+**A third run (2026-11-27, after BUGS 450 and 451's fix; `docs/soaks/2026-11-27-raid-prove-6x4-halt.txt`):**
+
+- **The colonies eat:** yes. The watched colonies hold their size over the 4 days (39 to 37, 89 to 88, 40 to 40,
+  51 to 49); 11 of 36 raids came home with termites, 151 in all (57 and 23 in the first two runs). Halts that left
+  ants behind: 5 with 16 ants (15 with 195, 10 with 170). No march crept; 4 of 35 ran out of time after a reload in
+  mid-march (BUGS 461).
+- **Every raid ends in Done within its deadlines:** yes but one attack that went out of sight (BUGS 462).
+- **Left:** raiders with no way back out of the termites' holes (BUGS 361, 13 at once in this run), BUGS 452, 453,
+  and the user watching raids.
 
 The guard film `r_crowd_space` and the full run were not run (the change touches no body and no march code; the
 `raids,soldiers,away` categories were run).

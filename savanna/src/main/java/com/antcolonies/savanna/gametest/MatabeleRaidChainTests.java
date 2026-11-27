@@ -31,7 +31,11 @@ import com.antcolonies.watch.Watch;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -57,8 +61,8 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * {@code turns home:}) and goes on at {@code march home}.
  *
  * <p><b>The rules every scene checks</b> ({@link Book}): the stages come in order, each once; no stage lasts past its
- * deadline (the plan's table: muster 20 s, halt 15 s, attack 2 minutes, regroup 30 s, a march a second a block and
- * half a minute); the halt can be seen (3 s or more) unless the raid turned home; in the attack no raider fights
+ * deadline (the plan's table: muster 20 s, attack 2 minutes, regroup 30 s, a march a second a block and half a
+ * minute, the halt, which waits for a tail still coming, as long as a march at most); the halt can be seen (3 s or more) unless the raid turned home; in the attack no raider fights
  * farther than 16 blocks from the spot (the leash); once the attack is over nobody fights; every termite stung is taken
  * off the ground, and what was taken lies on the prey pile; at the end nobody stands about outside and no watch rule
  * broke.
@@ -81,7 +85,10 @@ public class MatabeleRaidChainTests {
     private static final Pattern BLOCKS_OUT = Pattern.compile("(\\d+) blocks out");
 
     /** What a scene does to its raid on the way (none of them for the plain scenes). */
-    private enum Twist { NONE, EMPTY_AT_MUSTER, NO_WAY_IN, EMPTIES_ON_THE_MARCH, DUSK_AT_THE_SPOT, SCOUT_KILLED_ON_THE_MARCH }
+    private enum Twist { NONE, EMPTY_AT_MUSTER, NO_WAY_IN, EMPTIES_ON_THE_MARCH, DUSK_AT_THE_SPOT, SCOUT_KILLED_ON_THE_MARCH, SLOW_TAIL }
+
+    /** {@link Twist#SLOW_TAIL}: the test's own slowing of a raider (in the game a lost leg slows one). */
+    private static final ResourceLocation SLOW = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "test_slow_tail");
 
     // ------------------------------------------------------------------ the scenes
 
@@ -173,6 +180,21 @@ public class MatabeleRaidChainTests {
     @GameTest(template = "arena", timeoutTicks = 14000, skyAccess = true, batch = "matabele_raid_chain")
     public static void aRaidWhoseScoutIsKilledOnTheMarchOutTurnsHomeAndNobodyIsLeftOut(GameTestHelper helper) {
         chain(helper, 45, (x, z) -> 0, false, 30, 40, 3, true, false, Twist.SCOUT_KILLED_ON_THE_MARCH);
+    }
+
+    /**
+     * BUGS 450 (the raid soaks of 2026-11-27: 41 of 66, 58 of 69, 23 of 24 raiders "left behind" at the halt): the halt
+     * waits for its tail (real: the column bunches up round the scout until all the ants have arrived, Longhurst and
+     * Howse 1979). A raid of 70 from a tall dead mound; every raider but the scout walks at half speed once it is out
+     * of the nest (the test's own slowing; in the soaks it was hunger's, which a Matabele no longer has, but a raider
+     * that has just lost a leg walks slower too, and a tall mound lets its raid out one by one), so the tail is still
+     * coming down the mound and up the trail when the old halt's 15 s were up (on the old code this scene's halt ended
+     * "its time is up", and with a slower tail 13 of the 70 were left behind). The halt lasts till the tail is in,
+     * nobody is left behind, and the raid goes on to bring its prey home.
+     */
+    @GameTest(template = "arena", timeoutTicks = 24000, skyAccess = true, batch = "matabele_raid_chain")
+    public static void theHaltWaitsForASlowTailAndNobodyIsLeftBehind(GameTestHelper helper) {
+        chain(helper, 45, (x, z) -> 0, false, 6, 120, 3, true, true, Twist.SLOW_TAIL);
     }
 
     /**
@@ -357,6 +379,22 @@ public class MatabeleRaidChainTests {
                         twisted[0] = true;
                     }
                 }
+                case SLOW_TAIL -> {
+                    // (slow from leaving the nest till the attack begins; in the nest and after the halt as fast as any)
+                    boolean coming = book.in("march out") || book.in("halt");
+                    for (MatabeleEntity ant : TestIsolation.insectsOf(level, colony, MatabeleEntity.class)) {
+                        AttributeInstance speed = ant.getAttribute(Attributes.MOVEMENT_SPEED);
+                        if (speed == null) {
+                            continue;
+                        }
+                        if (coming && raids.isRaider(ant.getUUID()) && !ant.getUUID().equals(scout[0])
+                                && !colony.nest().isInside(level, ant.blockPosition())) {
+                            speed.addOrUpdateTransientModifier(new AttributeModifier(SLOW, -0.5, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL));
+                        } else {
+                            speed.removeModifier(SLOW);
+                        }
+                    }
+                }
                 case SCOUT_KILLED_ON_THE_MARCH -> {
                     if (book.in("march out") && level.getGameTime() - book.began("march out") >= 100 && scout[0] != null
                             && level.getEntity(scout[0]) instanceof MatabeleEntity leader && leader.isAlive()) {
@@ -418,15 +456,20 @@ public class MatabeleRaidChainTests {
                 // (laying the prey down takes longer from a tall mound: 70 ants up 11 blocks of wall and down the chimney in
                 // single file; a minute at most, well inside the 2 minutes after which a carrier with no way to the pile
                 // has its termites laid there out of sight, so a pass means they were carried in)
-                .thenWaitUntil(() -> helper.assertTrue(twist != Twist.NONE && twist != Twist.DUSK_AT_THE_SPOT
+                .thenWaitUntil(() -> helper.assertTrue(twist != Twist.NONE && twist != Twist.DUSK_AT_THE_SPOT && twist != Twist.SLOW_TAIL
                                 || pile.broughtIn() - pileBefore >= 1 || level.getGameTime() - doneAt[0] >= 1200,
                         "the carriers have not laid their prey down yet; " + raids.describe(level)))
                 .thenExecute(() -> {
                     SavannaMod.LOGGER.info("[raid chain] {}: {}", twist, book.story());
-                    book.judge(twist != Twist.NONE);
+                    book.judge(twist != Twist.NONE && twist != Twist.SLOW_TAIL);
                     int laid = pile.broughtIn() - pileBefore;
                     switch (twist) {
                         case NONE -> helper.assertTrue(laid >= 1, "the raid laid no termite on the prey pile: " + book.story());
+                        case SLOW_TAIL -> {
+                            helper.assertTrue(!book.sawLine("left behind"), "raiders were left behind at the halt though they were coming: " + book.story());
+                            helper.assertTrue(book.reason("halt").contains("the tail is in"), "the halt did not end with its tail in: " + book.story());
+                            helper.assertTrue(laid >= 1, "the raid with the slow tail laid no termite on the prey pile: " + book.story());
+                        }
                         case EMPTIES_ON_THE_MARCH -> {
                             helper.assertTrue(laid == 0, "an empty raid laid " + laid + " termite(s) on the pile");
                             helper.assertTrue(book.began("halt") >= 0 && book.began("march home") >= 0
@@ -585,10 +628,10 @@ public class MatabeleRaidChainTests {
         private long deadline(String stage) {
             return switch (stage) {
                 case "muster" -> 400;
-                case "halt" -> 300;
                 case "attack" -> 2400;
                 case "regroup" -> 600;
-                default -> 20L * blocksOut + 600; // (a march: a second a block and half a minute)
+                // (a march: a second a block and half a minute; the halt, waiting for a tail still coming, as long at most)
+                default -> 20L * blocksOut + 600;
             };
         }
 
@@ -607,6 +650,11 @@ public class MatabeleRaidChainTests {
 
         boolean sawAny() {
             return !order.isEmpty();
+        }
+
+        /** The reason a stage's end line gave ("" while it has none). */
+        String reason(String stage) {
+            return reasons.getOrDefault(stage, "");
         }
 
         boolean sawLine(String part) {

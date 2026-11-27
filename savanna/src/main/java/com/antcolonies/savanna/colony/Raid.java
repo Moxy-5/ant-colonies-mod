@@ -146,6 +146,8 @@ public final class Raid implements FightDiary {
     private static final double TAIL_IN = RaidMarch.NEAR + 2.0;
     /** A raider farther than this (blocks, flat) from the halting place walks the trail up to it, and is left behind at a deadline. */
     private static final double STRAGGLER_FAR = 10.0;
+    /** The halt's wait: a raider of the tail counts as coming when it is this much nearer (blocks along the way out) than it ever was. */
+    private static final double TAIL_STEP = 1.0;
     /**
      * A raider is home this near the entrance (blocks, flat and up or down): there the column breaks up and each ant goes
      * in by itself (BUGS 85: a dead mound's chimney mouth is an open hole, no cell to stand in).
@@ -263,6 +265,14 @@ public final class Raid implements FightDiary {
     private int wentToNumbers;
     /** Since when each member is held by another fight order (drafted by the nest's defence). */
     private final Map<UUID, Long> draftedSince = new HashMap<>();
+    /**
+     * The halt's wait for its tail (BUGS 450; not saved, a loaded raid's halt waits afresh): the least each raider not
+     * yet at the bunch has had left to walk (blocks along the way out), when one of them last came nearer, and when the
+     * wait was last told in the diary.
+     */
+    private final Map<UUID, Double> tailLeft = new HashMap<>();
+    private long tailCameAt = Long.MIN_VALUE / 2;
+    private long tailSaidAt = Long.MIN_VALUE / 2;
     /** Whether the raid reached its spot and brought nothing back from it. */
     private boolean foundNothing;
     /** A turn home asked for from outside (dusk, rain), taken at the next update; and why the raid turned home, null if it did not. */
@@ -590,7 +600,7 @@ public final class Raid implements FightDiary {
         long most = switch (stage) {
             case MUSTER -> numbers.musterTicks();
             case MARCH_OUT -> marchLimit() + (lastLevel == null ? 0 : march.castTime(lastLevel.getGameTime()));
-            case HALT -> numbers.gatherTicks();
+            case HALT -> marchLimit();
             case ATTACK -> numbers.fightTicks();
             case REGROUP -> numbers.regroupTicks();
             case MARCH_HOME -> marchLimit();
@@ -1363,6 +1373,7 @@ public final class Raid implements FightDiary {
             lastActionAt += by;
         }
         march.holdClocks(by);
+        tailCameAt += by;
         draftedSince.replaceAll((id, since) -> since + by);
         if (stage == Stage.ATTACK) {
             sentIn.clear(); // (sent in again at the spot, with fresh orders)
@@ -1627,7 +1638,8 @@ public final class Raid implements FightDiary {
      * the hump, {@link #MARCH_CLIMB}), else as it will.
      */
     public double climbPace() {
-        return stage == Stage.MUSTER || stage == Stage.MARCH_OUT ? MARCH_CLIMB : 1.0;
+        // (the halt too: its tail is still coming down the hump, as the column did)
+        return stage == Stage.MUSTER || stage == Stage.MARCH_OUT || stage == Stage.HALT ? MARCH_CLIMB : 1.0;
     }
 
     /** One walk's step ({@link RaidMarch#step}): true at the route's end. */
@@ -1673,14 +1685,20 @@ public final class Raid implements FightDiary {
 
     /**
      * Halt (real: 20 to 50 cm short of the termites the column stops and bunches up in a circle round the scout until
-     * all the ants have arrived, Longhurst and Howse 1979): everyone to a place round the halting place. It ends once the
-     * column's tail is in, never before {@code bunch_least_ticks} and never after {@code gather_ticks}: then an ant far
-     * behind is left behind and walks home. With no termite at the spot (the judge, asked as the front arrived) the
-     * front few walk on to it and look round for {@code look_ticks}, then the raid turns home and the find is forgotten.
+     * all the ants have arrived, Longhurst and Howse 1979): everyone to a place round the halting place, the tail
+     * walking on up the trail as on the march ({@link #bunch}). It ends once the column's tail is in, never before
+     * {@code bunch_least_ticks}. <b>It waits for every raider still coming</b> (BUGS 450: it used to last
+     * {@code gather_ticks}, 15 s, at most, and in the soaks of 2026-11-27 raiders walking at half speed, two days
+     * without a meal, were still far back on the trail by then: 41 of 66, 58 of 69, 23 of 24 "left behind"): only once
+     * no raider of the tail has come a block nearer in {@code gather_ticks} (one stuck, or busy with something else)
+     * does it end without them, and never later than a march may take ({@link #marchLimit}); then one far behind is
+     * left behind and walks home. With no termite at the spot (the judge, asked as the front arrived) the front few
+     * walk on to it and look round for {@code look_ticks}, then the raid turns home and the find is forgotten.
      */
     private void halt(ServerLevel level, List<MatabeleEntity> ants, long now) {
         long spent = now - stageSince;
-        bunch(level, ants);
+        bunch(level, ants, now);
+        ants.removeIf(ant -> !memberSet.contains(ant.getUUID())); // (one still in the nest long after the column left stays home)
         if (atHalt != null && !atHalt.any()) {
             int looking = 0;
             for (MatabeleEntity ant : ants) {
@@ -1703,8 +1721,34 @@ public final class Raid implements FightDiary {
             return;
         }
         BlockPos middle = haltMiddle();
-        boolean tailIn = ants.stream().allMatch(ant -> draftedSince.containsKey(ant.getUUID()) || flat(ant.blockPosition(), middle) <= TAIL_IN);
-        if (!(tailIn && spent >= numbers.bunchLeastTicks()) && spent < numbers.gatherTicks()) {
+        if (tailCameAt < stageSince) {
+            tailLeft.clear(); // (this halt's wait begins)
+            tailCameAt = stageSince;
+            tailSaidAt = stageSince;
+        }
+        List<MatabeleEntity> tail = new ArrayList<>();
+        for (MatabeleEntity ant : ants) {
+            UUID id = ant.getUUID();
+            if (draftedSince.containsKey(id) || flat(ant.blockPosition(), middle) <= TAIL_IN) {
+                continue;
+            }
+            tail.add(ant);
+            double left = out.length() - march.alongOf(out, ant);
+            Double least = tailLeft.get(id);
+            if (least == null || left <= least - TAIL_STEP) {
+                tailLeft.put(id, left);
+                tailCameAt = now; // (it is coming)
+            }
+        }
+        boolean tailIn = tail.isEmpty();
+        boolean coming = now - tailCameAt < numbers.gatherTicks();
+        if (!(tailIn && spent >= numbers.bunchLeastTicks()) && coming && spent < marchLimit()) {
+            if (!tailIn && now - tailSaidAt >= RaidMarch.WAIT_SAY_EVERY) {
+                tailSaidAt = now;
+                MatabeleEntity hindmost = tail.stream().min(Comparator.comparingDouble(ant -> march.alongOf(out, ant))).orElseThrow();
+                say("waiting for the tail " + spent / 20 + " s: " + (ants.size() - tail.size()) + " at the bunch, " + tail.size()
+                        + " still coming; the hindmost " + who(hindmost, out));
+            }
             return;
         }
         int behind = 0;
@@ -1723,7 +1767,9 @@ public final class Raid implements FightDiary {
             }
         }
         gatheredAtAttack = (int) ants.stream().filter(ant -> flat(ant.blockPosition(), middle) <= RaidMarch.NEAR).count();
-        next(Stage.ATTACK, now, tailIn ? "the tail is in" : "its time is up" + (behind > 0 ? ": " + behind + " not here are left behind" : ""));
+        next(Stage.ATTACK, now, tailIn ? "the tail is in"
+                : (coming ? "its time is up" : "nobody of the tail has come nearer in " + numbers.gatherTicks() / 20 + " s")
+                        + (behind > 0 ? ": " + behind + " not here are left behind" : ""));
         attackedAt = now;
         lastActionAt = now;
         takeHidden(level);
@@ -1812,17 +1858,23 @@ public final class Raid implements FightDiary {
         return out.point(Math.max(0.0, out.length() - 1.5));
     }
 
-    /** Everyone to its own place round the halting place, the scout in the middle; one far behind walks the trail up to it. */
-    private void bunch(ServerLevel level, List<MatabeleEntity> ants) {
+    /**
+     * Everyone to its own place round the halting place, the scout in the middle; one far behind walks on up the trail
+     * as on the march, by the march's own rule ({@link RaidMarch#comeUp}; it used to get a rule of its own here, a
+     * place 6 blocks on at a slower hurry than the march's).
+     */
+    private void bunch(ServerLevel level, List<MatabeleEntity> ants, long now) {
         BlockPos middle = haltMiddle();
+        List<MatabeleEntity> tail = new ArrayList<>();
         for (MatabeleEntity ant : ants) {
-            UUID id = ant.getUUID();
             if (flat(ant.blockPosition(), middle) > STRAGGLER_FAR) {
-                double along = march.alongOf(out, ant);
-                orders.put(id, new Order(out.place(level, Math.min(out.length(), along + RaidMarch.LEAD_STEP), 0.0), HURRY_PACE, find.at()));
+                tail.add(ant);
                 continue;
             }
-            orders.put(id, new Order(bunchPlace(level, middle, id, null), 1.0, find.at()));
+            orders.put(ant.getUUID(), new Order(bunchPlace(level, middle, ant.getUUID(), null), 1.0, find.at()));
+        }
+        if (!tail.isEmpty()) {
+            march.comeUp(level, tail, out, leftAt, orders, now);
         }
     }
 
@@ -1972,7 +2024,7 @@ public final class Raid implements FightDiary {
      */
     private void attack(ServerLevel level, List<MatabeleEntity> ants, long now) {
         noteStung(level, now);
-        bunch(level, ants); // (the places of those not fighting: one whose own fight is over waits where the column halted)
+        bunch(level, ants, now); // (the places of those not fighting: one whose own fight is over waits where the column halted)
         BlockPos spot = find.at();
         BlockPos middle = haltMiddle();
         double leash = numbers.leash();
@@ -2052,7 +2104,7 @@ public final class Raid implements FightDiary {
         }
         taking.entrySet().removeIf(entry -> !left.containsKey(entry.getValue())); // (taken, dead, or no way: free again)
         Set<UUID> taken = new HashSet<>(taking.values());
-        bunch(level, ants); // (the places of those with nothing to fetch)
+        bunch(level, ants, now); // (the places of those with nothing to fetch)
         List<MatabeleEntity> byJaws = new ArrayList<>(ants);
         byJaws.sort(Comparator.comparing(ant -> !ant.hasMajorBody())); // (the majors take their bundles first)
         boolean anyFetching = false;
