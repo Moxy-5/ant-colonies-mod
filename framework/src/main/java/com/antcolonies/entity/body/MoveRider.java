@@ -95,6 +95,8 @@ public final class MoveRider {
     private final Setup s;
     @Nullable
     private BlockMoves.Play play;
+    /** Drawing only: the time its move is drawn at, for its clip and its place ({@link MoveClock}). */
+    private final MoveClock drawClock = new MoveClock();
     @Nullable
     private CompoundTag read;
     private int movedTick = -100;
@@ -174,23 +176,13 @@ public final class MoveRider {
         return p == null ? null : s.moves.clip(p);
     }
 
-    /** Drawing only: how far into its move's clip it is drawn now (ticks of the clip), 0 while easing in, below 0 when not on one. */
-    public double clipTicks(@Nullable SteadyController<?> clips) {
-        BlockMoves.Play p = play();
-        if (p == null || clips == null || clips.getCurrentAnimation() == null
-                || !clips.getCurrentAnimation().animation().name().equals(s.moves.clip(p))) {
-            return -1.0;
-        }
-        return clips.getAnimationState() == AnimationController.State.TRANSITIONING ? 0.0 : clips.clipTicks();
-    }
-
     /** The body clip player's clock ({@link SteadyController.Clock}): a move's clip plays at the move's own time since its start. */
     public double clock(String clip, double tick) {
         BlockMoves.Play p = play();
         if (p == null || !clip.equals(s.moves.clip(p))) {
             return -1.0;
         }
-        return Math.max(0.0, s.moves.ticks(p, mob.level().getGameTime() + (tick - Math.floor(tick))));
+        return s.moves.drawnTicks(p, drawClock, mob.level().getGameTime(), tick);
     }
 
     /** Its eased step (blocks a tick), noted each tick on both sides ({@link #noteMoved}). */
@@ -650,14 +642,14 @@ public final class MoveRider {
      * it is drawn on its move's path (where the move started and how far into the clip it is), not at its box (which
      * steps up all at once at the face), sliding over ({@link #HAND_OVER}) where the drawing hands over between the two.
      *
-     * @param x, y, z where its box is drawn this frame; {@code clipTicks} from {@link #clipTicks}
+     * @param x, y, z where its box is drawn this frame
      */
-    public Vector3d drawnShift(double x, double y, double z, float yaw, double clipTicks, float pt) {
+    public Vector3d drawnShift(double x, double y, double z, float yaw, float pt) {
         double scale = s.modelScale * mob.getScale();
         BlockMoves.Play p = play();
         double wx = x, wy = y, wz = z;
         if (p != null) {
-            Vec3 at = s.moves.drawnAt(p, Math.max(0.0, clipTicks), scale / 16.0);
+            Vec3 at = s.moves.drawnAt(p, s.moves.drawnTicks(p, drawClock, mob.level().getGameTime(), pt), scale / 16.0);
             wx = at.x;
             wy = at.y;
             wz = at.z;

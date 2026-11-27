@@ -90,7 +90,7 @@ public class HippoModel extends DefaultedEntityGeoModel<HippoEntity> {
     private void place(HippoEntity hippo, BlockMoves.Play climb, double scale, double x, double y, double z, float yaw, float pt) {
         double wx = x, wy = y, wz = z;
         if (climb != null) {
-            Vec3 at = HippoEntity.MOVES.drawnAt(climb, Math.max(0.0, hippo.climbClipTicks()), scale / 16.0);
+            Vec3 at = HippoEntity.MOVES.drawnAt(climb, Math.max(0.0, hippo.climbClipTicks(pt)), scale / 16.0);
             wx = at.x;
             wy = at.y;
             wz = at.z;

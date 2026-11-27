@@ -52,6 +52,41 @@ class BlockMovesFileTest {
         assertEquals(-1.0, MOVES.move(1).endLevel);
     }
 
+    /**
+     * Code review R12-58: after its clip a move that ends on land stands where its path ends (through its rest the box
+     * and the drawing slid on at the move's end speed, the otter about 0.9 blocks after a step down, its legs still);
+     * a move that ends afloat glides on at its last speed into the swim, as before.
+     */
+    @Test
+    void afterItsClipALandMoveStandsAndAWaterMoveGlidesOn() {
+        BlockMoves otter = BlockMoves.of(com.antcolonies.savanna.SavannaMod.class, "antcolonies", "otter");
+        BlockMoves.Move down = otter.move(otter.index("down"));
+        assertTrue(!down.endsAfloat && down.endSpeed(0) > 1.0, "the otter's step down ends on land, still going");
+        int end = down.ticks(0);
+        assertEquals(down.reach(0), down.along(0, end + otter.rest()), 1.0E-6, "it stands through its rest");
+        BlockMoves.Play play = new BlockMoves.Play(0.5, 64.0, 0.5, 0.0F, 0.0F, 1000L, 0, otter.index("down"), 0);
+        assertEquals(otter.drawnAt(play, end, 1 / 16.0), otter.drawnAt(play, end + otter.rest(), 1 / 16.0), "and is drawn standing");
+        BlockMoves.Move in = MOVES.move(MOVES.index("in"));
+        assertTrue(in.endsAfloat);
+        assertEquals(in.reach(0) + 8 * in.endSpeed(0), in.along(0, in.ticks(0) + 8), 1.0E-4, "the walk into the water glides on");
+    }
+
+    /**
+     * Code review R12-59: where a move is drawn comes from the move's own time since it started, whatever its clip
+     * player is doing (an animal first looked at mid-move was drawn back at the move's start while its clip eased in).
+     */
+    @Test
+    void aMoveIsDrawnAtItsOwnTime() {
+        BlockMoves.Play play = new BlockMoves.Play(0.5, 64.0, 0.5, 0.0F, 0.0F, 1000L, 0, MOVES.index("up"), 0);
+        com.antcolonies.entity.body.MoveClock clock = new com.antcolonies.entity.body.MoveClock();
+        assertEquals(0.0, MOVES.drawnTicks(play, clock, 1000L, 0.5), "easing in: at its start");
+        assertEquals(30.5, MOVES.drawnTicks(play, clock, 1030L + MOVES.lead(), 0.5), 1.0E-9);
+        // a frozen game draws with a whole tick: the tick's start, as the clip's own clock reads it
+        assertEquals(31.0, MOVES.drawnTicks(play, clock, 1031L + MOVES.lead(), 1.0), 1.0E-9);
+        // the clip player's tick (the animal's age and the part of a tick): only the part of a tick is read
+        assertEquals(32.25, MOVES.drawnTicks(play, clock, 1032L + MOVES.lead(), 8041.25), 1.0E-9);
+    }
+
     @Test
     void itTurnsSquareFirstOnlyWhenFarOff() {
         assertEquals(0, BlockMoves.turnFor(10.0F, 0.0F));

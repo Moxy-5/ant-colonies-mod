@@ -7,12 +7,12 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**307 findings: 218 left (11 of them wait for your call), 89 done.**
+**307 findings: 200 left (11 of them wait for your call), 107 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
-| A: a player can meet it | 67 | 17 | 1 | 0 | 48 | 1 |
-| B: it will cost us when building on this | 143 | 104 | 3 | 4 | 31 | 1 |
+| A: a player can meet it | 67 | 0 | 1 | 0 | 65 | 1 |
+| B: it will cost us when building on this | 143 | 103 | 3 | 4 | 32 | 1 |
 | C: a tidy-up | 97 | 87 | 0 | 2 | 7 | 1 |
 
 | Round | System | Found | Left | Done |
@@ -28,7 +28,7 @@ review stay in `docs/BUGS.md`.
 | 9 | the river hunters | 44 | 34 | 10 |
 | 10 | the river's small life | 19 | 13 | 6 |
 | 11 | the new raid code | 22 | 6 | 16 |
-| 12 | the animation engine | 73 | 73 | 0 |
+| 12 | the animation engine | 73 | 55 | 18 |
 
 ## Waiting for your call (11)
 
@@ -63,34 +63,14 @@ what happens today and my pick. Answer whenever you like: tell Claude the number
 Grade A first. *Open* means looked at and left for a reason (the reason is given); *half fixed* says what
 is left; no word means nobody has started it. The findings that wait for your call are in the part above.
 
-### A: a player can meet it (18 left)
+### A: a player can meet it (1 left)
 
 **Round 7, the giant trees** (`docs/reviews/full/round-07-trees.md`)
 
 - **R7-33** A palm's crown can blink out at the screen's edge
   - *Open:* waits to be seen (2026-11-24). Read from how Minecraft hides parts of the world, never seen in the game; the fix is large (sharing a crown's faces out over its blocks) and is built only if the user sees fronds blink out.
 
-**Round 12, the animation engine** (`docs/reviews/full/round-12-animation-engine.md`)
-
-- **R12-1** a walk's planted feet are never judged for hanging, and a walk foot that never touches the ground raises no flag
-- **R12-2** most of the checker's findings never say FLAGGED, and a jump (a pop) is never judged at all, so the summary the rule book reads counts none of them
-- **R12-4** a part spun a whole turn at a clip change passes the blend check on any animal with a blend of 4 ticks or more
-- **R12-20** the lab's floor sinks with the lowest foot, so feet pushed into the ground are never reported
-- **R12-35** verify_animal says "passed" for an animal it never filmed in the game
-- **R12-36** a game crash during the films is not a hard failure
-- **R12-37** a course scene with no recording, or almost none, reads as "nothing found"
-- **R12-38** nothing checks that the animal did what the scene asked, and the game's own warnings are never read
-- **R12-40** a finding at an approved picture is let through however much worse it is
-- **R12-41** the camera's jump check cannot see a pop that repeats
-- **R12-42** the watch mode films old spot tables and old body plans after they change
-- **R12-58** after a step down the otter skates on about a block with its legs frozen (a move's "rest" keeps moving)
-- **R12-59** an animal seen mid-move is first drawn at the move's start, then jumps to where it really is
-- **R12-60** a Nile monitor more than 48 blocks away pops a block up or down on every move
-- **R12-61** when the server runs slow, moves on screen rewind
-- **R12-70** the monitor's drawn leg fold turns its right hind foot the wrong way (a Java copy of the swim pose, "kept in step by hand", is out of step)
-- **R12-71** the spot tables and the pair check never see what the game draws on top of the clips, so a throat hold bites the air with every check green
-
-### B: it will cost us when building on this (103 left)
+### B: it will cost us when building on this (102 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -185,7 +165,6 @@ is left; no word means nobody has started it. The findings that wait for your ca
 
 **Round 12, the animation engine** (`docs/reviews/full/round-12-animation-engine.md`)
 
-- **R12-3** clip_check always exits 0, whatever it finds
 - **R12-5** the corner of a step or bank can sink into a box unseen, offline and in both game checks
 - **R12-6** the pair check sees only part of a looping prey clip, at one phase, and not the blend or the walk
 - **R12-7** "jaw to the hide" measures the nearest box of the prey, not the spot, so a jaw 2.6 px off its spot reads 0.0
@@ -449,3 +428,24 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R11-14** (B) a waiting find writes a diary line every second outside the raid hours
 - **R11-15** (B) a find on its way home is lost on a reload *Not a bug after all.*
 - **R11-16** (B) `Scouts.mayScout` lets any ant on the out list through unchecked
+
+**Round 12, the animation engine**
+
+- **R12-1** (A) a walk's planted feet are never judged for hanging, and a walk foot that never touches the ground raises no flag
+- **R12-2** (A) most of the checker's findings never say FLAGGED, and a jump (a pop) is never judged at all, so the summary the rule book reads counts none of them (BUGS 428)
+- **R12-3** (B) clip_check always exits 0, whatever it finds
+- **R12-4** (A) a part spun a whole turn at a clip change passes the blend check on any animal with a blend of 4 ticks or more (BUGS 427)
+- **R12-20** (A) the lab's floor sinks with the lowest foot, so feet pushed into the ground are never reported (BUGS 426)
+- **R12-35** (A) verify_animal says "passed" for an animal it never filmed in the game
+- **R12-36** (A) a game crash during the films is not a hard failure
+- **R12-37** (A) a course scene with no recording, or almost none, reads as "nothing found"
+- **R12-38** (A) nothing checks that the animal did what the scene asked, and the game's own warnings are never read (BUGS 429)
+- **R12-40** (A) a finding at an approved picture is let through however much worse it is
+- **R12-41** (A) the camera's jump check cannot see a pop that repeats
+- **R12-42** (A) the watch mode films old spot tables and old body plans after they change
+- **R12-58** (A) after a step down the otter skates on about a block with its legs frozen (a move's "rest" keeps moving) (BUGS 432)
+- **R12-59** (A) an animal seen mid-move is first drawn at the move's start, then jumps to where it really is
+- **R12-60** (A) a Nile monitor more than 48 blocks away pops a block up or down on every move
+- **R12-61** (A) when the server runs slow, moves on screen rewind (BUGS 380, 432)
+- **R12-70** (A) the monitor's drawn leg fold turns its right hind foot the wrong way (a Java copy of the swim pose, "kept in step by hand", is out of step)
+- **R12-71** (A) the spot tables and the pair check never see what the game draws on top of the clips, so a throat hold bites the air with every check green

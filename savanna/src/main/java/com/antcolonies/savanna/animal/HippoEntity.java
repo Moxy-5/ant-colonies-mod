@@ -211,6 +211,8 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     long dungUntil;
     @Nullable
     private BlockMoves.Play climb;
+    /** Drawing only: the time its move is drawn at, for its clip and its place. */
+    private final com.antcolonies.entity.body.MoveClock moveClock = new com.antcolonies.entity.body.MoveClock();
     @Nullable
     private CompoundTag climbRead;
     /** The body's clip player (the move's clock is read from it by the model). */
@@ -383,14 +385,13 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         return c != null && !c.turning(level().getGameTime());
     }
 
-    /** Drawing only: how far into its move's clip it is drawn now (ticks of the clip), 0 while easing in, below 0 when not on one. */
-    public double climbClipTicks() {
+    /**
+     * Drawing only: how far into its move's clip it is drawn now (ticks of the clip, 0 while it turns or eases in), or
+     * below 0 when not on a move. From the move's own time, as its clip ({@link BlockMoves#drawnTicks}).
+     */
+    public double climbClipTicks(float partialTick) {
         BlockMoves.Play c = climb();
-        if (c == null || bodyClips == null || bodyClips.getCurrentAnimation() == null
-                || !bodyClips.getCurrentAnimation().animation().name().equals(MOVES.clip(c))) {
-            return -1.0;
-        }
-        return bodyClips.getAnimationState() == AnimationController.State.TRANSITIONING ? 0.0 : bodyClips.clipTicks();
+        return c == null ? -1.0 : MOVES.drawnTicks(c, moveClock, level().getGameTime(), partialTick);
     }
 
     /** The body clip player's clock: a move's clip plays at the move's own time since its start ({@link SteadyController.Clock}). */
@@ -399,7 +400,7 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (c == null || !clip.equals(MOVES.clip(c))) {
             return -1.0;
         }
-        return Math.max(0.0, MOVES.ticks(c, level().getGameTime() + (tick - Math.floor(tick))));
+        return MOVES.drawnTicks(c, moveClock, level().getGameTime(), tick);
     }
 
     /**

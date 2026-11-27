@@ -137,11 +137,16 @@ public final class BlockMoves {
             return at(rise[size], t);
         }
 
-        /** How far forward at this many ticks into the clip (model pixels; held before, and after it goes on at its last speed). */
+        /**
+         * How far forward at this many ticks into the clip (model pixels; held before). After the clip a move ending
+         * afloat goes on at its last speed (the glide into the swim); a move ending on land stands where its path ends
+         * (code review R12-58: it went on too, so through its rest the box and the drawing slid on at the move's end
+         * speed with the clip held on its last frame, the otter about 0.9 blocks after a step down).
+         */
         public double along(int size, double t) {
             float[] row = along[size];
             int last = row.length - 1;
-            if (t > last) {
+            if (t > last && endsAfloat) {
                 return row[last] + (row[last] - row[last - 1]) * (t - last);
             }
             return at(row, t);
@@ -337,6 +342,21 @@ public final class BlockMoves {
     /** How far into its clip a move is at this game time (ticks of the clip; below 0 while it turns or eases in). */
     public double ticks(Play p, double gameTime) {
         return gameTime - p.start() - p.turn() - data.lead;
+    }
+
+    /**
+     * Drawing only: how far into its clip a move is drawn now (ticks of the clip; 0 while it turns or eases in). From
+     * the move's own time, for its pose (the clip player's clock) and its place alike, never from how far the clip
+     * player has got (code review R12-59: an animal first looked at in the middle of a move eases into the move's clip
+     * then, and for those ticks it was drawn back where the move began, then jumped to its place).
+     *
+     * @param clock    the animal's own ({@link MoveClock}: the time never set back under it)
+     * @param gameTime the player's side's game time
+     * @param partial  the part of a tick drawn, or the clip player's tick (only its part of a tick is read: a whole 1,
+     *                 as in a frozen game, is the tick's start for both)
+     */
+    public double drawnTicks(Play p, MoveClock clock, long gameTime, double partial) {
+        return Math.max(0.0, ticks(p, clock.at(p, gameTime + (partial - Math.floor(partial)))));
     }
 
     /** Where it faces at this game time: turning from where it faced to the move's heading, then the heading. */

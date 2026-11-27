@@ -81,6 +81,21 @@ def checkSpotTables = tasks.register('checkSpotTables', Exec) {
 }
 tasks.named('check') { dependsOn checkSpotTables }
 
+// The animation engine's own checks, checked (tools/engine_selftest.py, code review round 12): each test breaks a
+// real clip or recording the way a real fault would and expects the check to say so. Runs again only when a tool, a
+// body plan, a model or a clip has changed (about 15 seconds).
+def checkEngineTools = tasks.register('checkEngineTools', Exec) {
+    def marker = layout.buildDirectory.file('engine_selftest.txt')
+    inputs.files(fileTree('tools') { include '*.py' })
+    inputs.files(fileTree('savanna/src/main/resources/assets/antcolonies') {
+        include 'animations/**', 'geo/**', 'body_plans/**'
+    })
+    outputs.file(marker)
+    commandLine 'python', 'tools/engine_selftest.py'
+    doLast { marker.get().asFile.text = 'passed' }
+}
+tasks.named('check') { dependsOn checkEngineTools }
+
 neoForge {
     version = project.neo_version
 

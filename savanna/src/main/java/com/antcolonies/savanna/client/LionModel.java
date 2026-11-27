@@ -70,7 +70,8 @@ public class LionModel extends DefaultedEntityGeoModel<LionEntity> {
         float yaw = Mth.rotLerp(pt, lion.yBodyRotO, lion.yBodyRot);
         double scale = lion.getScale();
         LionEntity.Measures m = lion.measures;
-        new StandTilt(m.feetPx(), m.feetPx(), m.feetOutPx(), m.drawAheadPx(), 30.0).place(lion, lion.drawn, getAnimationProcessor().getBone("root"), scale, x, y, z, yaw, pt);
+        new StandTilt(m.feetPx(), m.feetPx(), m.feetOutPx(), m.drawAheadPx(), 30.0).place(lion, lion.drawn, getAnimationProcessor().getBone("root"), scale, x, y, z, yaw, pt,
+                lion.isPassenger());     // on its prey (holding it, feeding on it): set on the prey's spot, drawn level (R12-71)
         head(lion, scale, pt, x, z, yaw);
     }
 

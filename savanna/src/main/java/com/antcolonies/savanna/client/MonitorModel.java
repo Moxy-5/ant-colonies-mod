@@ -92,14 +92,12 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
     /** The body boxes' top and bottom (model pixels): the chest turns on the joint's outer edge, one or the other. */
     private static final double BODY_TOP = 16.0, BODY_BOTTOM = 5.0;
     /**
-     * The swim clip's legs folded back along the body (degrees, the left side as the clip file has them: upper, lower,
-     * foot; the right side mirrors y and z), for a pair whose feet lose the ground while the rest still walks. From
-     * {@code tools/monitor_models.py} (swim B, the hind feet held out wide); kept in step with it by hand.
+     * The swim clip's legs folded back along the body (degrees: each pair, each side, upper, lower and foot), for a pair
+     * whose feet lose the ground while the rest still walks: the clip's own first pose, read from its file
+     * ({@link SwimFold}; code review R12-70: a hand-copied table of the left side, the right made by mirroring it, drew
+     * the right hind foot turned round).
      */
-    private static final double[][][] FOLD = {
-            {{-16.981, -61.241, 1.022}, {121.979, 45.687, 27.192}, {-107.544, -55.625, 158.836}},
-            {{56.749, -52.764, -1.292}, {0.0, 0.0, 19.231}, {-56.661, 24.419, -131.013}}};
-    private static final String[] PIECES = {"upper", "lower", "foot"};
+    private final double[][][][] fold = SwimFold.read("/assets/" + SavannaMod.MODID + "/animations/entity/monitor.animation.json", "swim");
     /** The tail, base to tip, dragged ({@link TailDrag}). */
     /** How quickly the drawing slides from its box onto the climb's path, or back (seconds; my pick). */
     private static final double HAND_OVER = 0.12;
@@ -127,7 +125,9 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
             hinge(bone, PIVOT_Y);
         }
         hinge(hips, PIVOT_Y);
-        if (camera.distanceToSqr(x, y, z) > NEAR * NEAR) {
+        // (far off it is drawn at its box with none of the body rules; never on a move, which is drawn on its own path:
+        // its box climbs a step all at once at the face, code review R12-60)
+        if (camera.distanceToSqr(x, y, z) > NEAR * NEAR && monitor.climb() == null) {
             monitor.lookNanos = 0;
             monitor.headAim = 0;
             monitor.legNanos = 0;
@@ -192,7 +192,7 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
     private Vector3d place(MonitorEntity monitor, BlockMoves.Play climb, double scale, double x, double y, double z, float yaw, float pt) {
         double wx = x, wy = y, wz = z;
         if (climb != null) {
-            Vec3 at = MonitorEntity.MOVES.drawnAt(climb, Math.max(0.0, monitor.climbClipTicks()), scale / 16.0);
+            Vec3 at = MonitorEntity.MOVES.drawnAt(climb, Math.max(0.0, monitor.climbClipTicks(pt)), scale / 16.0);
             wx = at.x;
             wy = at.y;
             wz = at.z;
@@ -300,16 +300,16 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
                 continue;
             }
             double fold = 1.0 - monitor.legStand[pair];
-            String kind = pair == 0 ? "arm" : "leg";
+            String kind = SwimFold.KINDS[pair];
             for (int s = 1; s >= -1; s -= 2) {
-                String side = s > 0 ? "_left" : "_right";
+                String side = SwimFold.SIDES[s > 0 ? 0 : 1];
                 if (fold > 1.0E-3) {
-                    for (int p = 0; p < PIECES.length; p++) {
-                        GeoBone bone = getAnimationProcessor().getBone(kind + "_" + PIECES[p] + side);
-                        double[] f = FOLD[pair][p];
-                        // folded is the swim clip's turn on top of the leg's rest (a bone turns as -x, -y, z of a clip's;
-                        // the right side's clip mirrors y and z)
-                        turnToward(bone, -f[0], -s * f[1], s * f[2], fold);
+                    for (int p = 0; p < SwimFold.PIECES.length; p++) {
+                        GeoBone bone = getAnimationProcessor().getBone(kind + "_" + SwimFold.PIECES[p] + side);
+                        double[] f = this.fold[pair][s > 0 ? 0 : 1][p];
+                        // folded is the swim clip's turn on top of the leg's rest (a bone turns as -x, -y, z of a clip's),
+                        // each side its own in the clip
+                        turnToward(bone, -f[0], -f[1], f[2], fold);
                     }
                 }
                 if (monitor.legStand[pair] > 1.0E-3) {

@@ -277,6 +277,19 @@ body plan is the plan's optional `verify` section (young models, frame films, th
 `--quick` after a small change, full after a big one and before a merge into `master`. Not done: comparing key poses (a
 mid-walk frame, an open jaw) with the approved version, since the viewer draws a version only at rest.
 
+**What its verdict means (2026-11-26, code review round 12: it said "passed" for an animal never filmed, after a crash,
+and for a course with no recording).** `passed` (exit 0): every check ran and the game filmed the animal's moves.
+`NOT PASSED` (exit 2): the checks ran, but one says it did not judge what it should: no game film of its moves at all
+(no course entry, no frame film), a course scene the animal did not walk to its end (each scene's report says how far
+from the last place it was sent it ended), or a warning of the camera's in a film. `STOPPED at ...` (exit 1): a hard
+failure, the checks after it did not run: the game ended with an error or its camera never finished, a course scene
+with no recording or a camera warning (no route, no walker), a film with fewer pictures than its shot list asks for.
+`clip_check.py` itself now returns 2 when it flags anything and counts the flagged clips in its last line; a foot a
+clip holds up on purpose is named in the body plan (`checks.feet_up_ok`: `{"clip or pattern": ["l1", ...] or "*"}`).
+**The checks are checked:** `python tools/engine_selftest.py` (run by `./gradlew build` when a tool, plan, model or
+clip changed) breaks a real clip or recording the way a real fault would and expects the check to say so. **Rule: a new
+check comes with its self-test there, first the broken thing it must flag, then the real thing it must leave alone.**
+
 ### The steps (in this order; each builds the shared piece, the animal it is proved on is named)
 **A. One checker and one course for any animal. BUILT 2026-11-20** (overnight, branch `claude/engine-every-animal`;
 `tools/clip_check.py`, `tools/body_course.py` by family, `tools/body_plan.py`'s "checks" and "course" fields, body

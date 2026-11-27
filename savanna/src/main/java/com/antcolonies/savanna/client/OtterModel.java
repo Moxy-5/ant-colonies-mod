@@ -47,7 +47,7 @@ public class OtterModel extends DefaultedEntityGeoModel<OtterEntity> {
             return;
         }
         float yaw = Mth.rotLerp(pt, otter.yBodyRotO, otter.yBodyRot);
-        Vector3d shift = otter.rider().drawnShift(x, y, z, yaw, otter.rider().clipTicks(otter.bodyClips), pt);
+        Vector3d shift = otter.rider().drawnShift(x, y, z, yaw, pt);
         nudge(getAnimationProcessor().getBone("root"), shift);
         byte doing = otter.doing();
         // (rearing at a playmate it looks straight at it: its body faces it)

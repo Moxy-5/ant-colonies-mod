@@ -39,17 +39,28 @@ public record StandTilt(double frontFeetPx, double hindFeetPx, double feetOutPx,
      * feet to the ground under its front and hind feet, and raised or lowered so both pairs stand on it.
      */
     public void place(LivingEntity animal, DrawnGround drawn, GeoBone root, double scale, double x, double y, double z, float yaw, float pt) {
+        place(animal, drawn, root, scale, x, y, z, yaw, pt, false);
+    }
+
+    /**
+     * @param level drawn level about its box, the ground not read (eased there as onto any ground): an animal held by
+     *              another, or holding one. A holder is set on a spot of its prey's body as the prey's clips alone pose
+     *              it ({@code Spots}, and the offline pair check measures her jaw against that same body), so a tilt of
+     *              either would move the hide from under the jaw, a rump spot up to 10 px on a slope (code review R12-71)
+     */
+    public void place(LivingEntity animal, DrawnGround drawn, GeoBone root, double scale, double x, double y, double z, float yaw, float pt,
+            boolean level) {
         if (root == null) {
             return;
         }
         double fx = -Mth.sin(yaw * Mth.DEG_TO_RAD), fz = Mth.cos(yaw * Mth.DEG_TO_RAD);
         double perPx = scale / 16.0;
-        Level level = animal.level();
+        Level world = animal.level();
         boolean swims = animal.isInWater();
         double frontWant = y, hindWant = y;
-        if (animal.isAlive()) {
-            frontWant = Mth.clamp(groundUnder(level, x, z, fx, fz, (frontFeetPx - READ_IN) * perPx, feetOutPx * perPx, y, swims), y - MOST_DOWN, y);
-            hindWant = Mth.clamp(groundUnder(level, x, z, fx, fz, -(hindFeetPx - READ_IN) * perPx, feetOutPx * perPx, y, swims), y - MOST_DOWN, y);
+        if (animal.isAlive() && !level) {
+            frontWant = Mth.clamp(groundUnder(world, x, z, fx, fz, (frontFeetPx - READ_IN) * perPx, feetOutPx * perPx, y, swims), y - MOST_DOWN, y);
+            hindWant = Mth.clamp(groundUnder(world, x, z, fx, fz, -(hindFeetPx - READ_IN) * perPx, feetOutPx * perPx, y, swims), y - MOST_DOWN, y);
         }
         // eased in world heights, so its box stepping up a block (all at once) never jolts the drawing
         long now = DrawClock.nanos(animal, pt);           // game time (the Motion Studio, phase 2, step 4)

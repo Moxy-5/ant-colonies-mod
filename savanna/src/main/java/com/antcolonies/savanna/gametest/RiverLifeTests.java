@@ -1996,7 +1996,8 @@ public class RiverLifeTests {
     /**
      * The otter's own moves on a step (2026-11-22, the user: a quick cute scramble up a block, a quick hop down): sent up
      * a one-block step it scrambles up with its move (under a second) and stands on top; sent back down it hops down
-     * with its move and stands on the low ground.
+     * with its move and stands on the low ground. Through the stand after each move it stands (code review R12-58: its
+     * box slid on at the move's end speed, about 0.9 blocks after the hop down, the clip held on its last frame).
      */
     @GameTest(template = "arena", timeoutTicks = 700)
     public static void anOtterScramblesUpAStepAndHopsBackDown(GameTestHelper helper) {
@@ -2007,8 +2008,22 @@ public class RiverLifeTests {
         int[] upTicks = {0};
         StringBuilder fell = new StringBuilder();
         double[] lastY = {Double.NaN};
+        // where it was when a move's clip ended, the move, and the furthest it got from there before the move was over
+        net.minecraft.world.phys.Vec3[] stood = {null};
+        Object[] stoodOn = {null};
+        double[] slid = {0.0};
+        int[] stands = {0};
         helper.onEachTick(() -> {
             var play = otter.rider().play();
+            if (play != null && otter.rider().moves().ticks(play, helper.getLevel().getGameTime())
+                    >= otter.rider().moves().move(play.move()).ticks(play.size())) {
+                if (stoodOn[0] != play) {
+                    stoodOn[0] = play;
+                    stood[0] = otter.position();
+                    stands[0]++;
+                }
+                slid[0] = Math.max(slid[0], otter.position().distanceTo(stood[0]));
+            }
             if (play == null && !Double.isNaN(lastY[0]) && otter.getY() < lastY[0] - 0.3 && fell.length() < 400) {
                 var path = otter.getNavigation().getPath();
                 fell.append(String.format(" [dropped at x %.2f y %.2f yaw %.0f doing %d onGround %s path %s]",
@@ -2037,6 +2052,8 @@ public class RiverLifeTests {
             helper.assertTrue(otter.rider().play() == null && otter.onGround() && Math.abs(otter.getY() - low) < 0.05,
                     "the otter is not back on the low ground");
             helper.assertTrue(upTicks[0] < 40, "its scramble up took " + upTicks[0] + " ticks (it should be quick)");
+            helper.assertTrue(stands[0] >= 2, "the otter was seen standing after " + stands[0] + " of its two moves");
+            helper.assertTrue(slid[0] < 0.05, String.format("standing after a move the otter slid on %.2f blocks", slid[0]));
         });
     }
 

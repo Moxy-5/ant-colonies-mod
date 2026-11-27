@@ -51,19 +51,21 @@ public class BuffaloModel extends DefaultedEntityGeoModel<BuffaloEntity> {
         double z = Mth.lerp(pt, buffalo.zo, buffalo.getZ());
         float yaw = Mth.rotLerp(pt, buffalo.yBodyRotO, buffalo.yBodyRot);
         double scale = BuffaloEntity.MODEL_SCALE * buffalo.getScale();
-        TILT.place(buffalo, buffalo.drawn, getAnimationProcessor().getBone("root"), scale, x, y, z, yaw, pt);
+        TILT.place(buffalo, buffalo.drawn, getAnimationProcessor().getBone("root"), scale, x, y, z, yaw, pt, buffalo.held());
         eyes(buffalo, scale, pt, x, z, yaw);
     }
 
     /**
      * The eyes and head on what caught its eye: the pupil on the side it looks to slides out across its eye's white,
      * along the eye's plane (turned {@link #EYE_PLANE} back toward its side), darting there; the head turns a little
-     * toward it, slowly (not in the clips that carry the head: the hits, lying down and getting up, dying).
+     * toward it, slowly (not in the clips that carry the head: the hits, lying down and getting up, dying; and never
+     * while a lion holds it: a clamped throat cannot turn, and its holders are set on its body as its clips alone pose
+     * it, so the turn slid the hide 3 px from under their jaws, code review R12-71).
      */
     private void eyes(BuffaloEntity buffalo, double scale, float pt, double x, double z, float yaw) {
         byte d = buffalo.doing();
         boolean turnHead = buffalo.isAlive() && d != BuffaloEntity.HEADBUTT && d != BuffaloEntity.GORE && d != BuffaloEntity.CHARGE_HEADBUTT
-                && d != BuffaloEntity.REST_DOWN && d != BuffaloEntity.REST_UP;
+                && d != BuffaloEntity.REST_DOWN && d != BuffaloEntity.REST_UP && !buffalo.held();
         double ahead = EYES_AHEAD * scale / 16.0;
         buffalo.attention.aim(buffalo, pt, x - Mth.sin(yaw * Mth.DEG_TO_RAD) * ahead, z + Mth.cos(yaw * Mth.DEG_TO_RAD) * ahead, yaw,
                 turnHead ? HEAD_TURN : 0.0);

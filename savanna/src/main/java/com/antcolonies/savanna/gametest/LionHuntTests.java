@@ -307,6 +307,7 @@ public class LionHuntTests {
                 return;                                         // gripped, then settled over her blend
             }
             helper.assertTrue(she.getVehicle() == calf && she.holdSpot() == spot, "not riding the calf at its neck: " + she.about());
+            helper.assertTrue(calf.held(), "the calf she rides does not count as held (it would be drawn turning its head and tilted)");
             Vec3 jaw = jawAtBite(she, calf), at = calf.spotAt(spot);
             worst[0] = Math.max(worst[0], Math.hypot(jaw.x - at.x, jaw.z - at.z));
             helper.assertTrue(worst[0] < 0.05, String.format("her jaw at her bite %.2f blocks off the calf's spot", worst[0]));
