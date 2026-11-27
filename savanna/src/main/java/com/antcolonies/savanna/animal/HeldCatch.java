@@ -45,7 +45,8 @@ public final class HeldCatch {
     public record Grip(double along, double turn) {
     }
 
-    private static final Map<String, Fish> FISH = new HashMap<>();
+    /** Each prey kind's measures, read once; empty for a kind with none (review R12-63: "none" was never kept, so a crab's or frog's plan file was read and parsed again on every call, twice a frame per otter holding one). */
+    private static final Map<String, java.util.Optional<Fish>> FISH = new HashMap<>();
     @Nullable
     private static Carry carry;
 
@@ -83,9 +84,9 @@ public final class HeldCatch {
         String name = BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).getPath();
         return FISH.computeIfAbsent(name, n -> {
             JsonObject h = checks(n).getAsJsonObject("held");
-            return h == null ? null : new Fish(h.get("px").getAsDouble(), h.get("middle").getAsDouble(),
-                    h.get("centre_z").getAsDouble(), h.get("half").getAsDouble(), h.get("thick").getAsDouble());
-        });
+            return java.util.Optional.ofNullable(h == null ? null : new Fish(h.get("px").getAsDouble(), h.get("middle").getAsDouble(),
+                    h.get("centre_z").getAsDouble(), h.get("half").getAsDouble(), h.get("thick").getAsDouble()));
+        }).orElse(null);
     }
 
     private static double size(Entity e) {

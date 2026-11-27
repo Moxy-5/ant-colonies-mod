@@ -255,6 +255,8 @@ spot, gaps -0.07 to +0.21.
 **Fix proposed:** print and judge the jaw-to-spot distance (and its height difference) at each bite beside the gap to
 the skin; the skin gap only says "in the air" or "buried".
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: each bite's line also says how far the jaw is from the spot itself and how much of that is height, and over 4 px is flagged "jaw off its spot" (`clip_check.SPOT_OFF`, my pick). It found a real fault at once: the lioness's `hold_down` and `hold_sink` on a buffalo lying down or sinking put the jaw 5.5 to 5.9 px above every spot (15 lines); left for the animation rework.**
+
 ### R12-8 (B, measured): the pair check takes 75 s for one holder and prey
 **What is wrong:** `Boxes.depth` tests each of thousands of box points against each box whose bounds hold it, for every
 spot, every second tick and every pair: 6.3 million calls, 78 of 95 profiled seconds.
@@ -314,6 +316,8 @@ from the plan; `switch_strip` (drawn whenever a change is flagged) always leaves
 **Proof:** walked: `switch_poses(animal, a, b, ticks)` with `phase=None` gives `ta = 0.0` for a loop.
 **Fix proposed:** have `check_switch` return the worst phase and pass it to `switch_strip`; write it in the strip's title.
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: `check_switch` keeps the moment it judged (`WORST_PHASE`) and `switch_strip` draws that moment and writes it in the title.**
+
 ### R12-12 (B, proven by reading both): the offline dragged tail is its own simpler rule, never matched against the game's TailDrag
 (Also found by the thread reader.)
 **What is wrong:** on clips with a path the checker drags the tail itself (`Played._drag`, "as TailDrag pulls it"):
@@ -351,6 +355,8 @@ with the build green.
 **Fix proposed:** hash the whole `checks` section, `chain`, and a digest of `clip_check.py` and `anim_lab.py` (as
 anim_lab's own cache does); or build the table and compare it with the file ("would write the same file").
 
+**Status (2026-11-26, `claude/review-fix-b6`): half fixed: the fingerprint now takes the plan's `checks.hinge`, `checks.tail_drag`, `checks.px` and `chain`; the four tables were written again (only their fingerprints changed). Left on purpose: the posing code is still `FORMAT`'s, bumped by hand; hashing `clip_check.py` would put every table behind at each edit of the checker.**
+
 ### R12-14 (B, proven; measured clean today): names in a plan's "checks" are never checked, and a misspelt one silently switches its check off
 **What is wrong:** `body_plan.py check` checks the bones table, legs, spine and chain, but not the bone names and clip
 patterns in `checks`. A misspelt name does not fail; it turns the check off: `body_bones` misspelt makes the knee check
@@ -362,6 +368,8 @@ that match nothing simply do nothing.
 **Proof:** walked; measured: every name and pattern in all 18 animal plans' `checks` exists today.
 **Fix proposed:** add the `checks` names (bones must be roles of the model, clip patterns must match a clip, switch
 patterns must match on both sides) to `problems`, so `body_plan.py check` and the build fail on them.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: `body_plan.checks_problems` checks every bone name and clip pattern in a plan's `checks` (run by `body_plan.py check`); all 18 plans are clean, and a misspelt jaw bone or clip is named.**
 
 ### R12-15 (B, measured): clip_check redoes every clip on every run; the monitor takes about 9 minutes
 **What is wrong:** `anim_lab.py` keeps a cache and skips clips unchanged since their last run (2 s for the worker);
@@ -386,6 +394,8 @@ from the wrong bone, in the film's pair report with no warning.
 **Where:** `tools/pair_report.py:162`, `:205`.
 **Proof:** walked; lioness plan: `strikes.clips` = `stalk_leap_bite`, `jump_smack`; `holds.jaw` = `carry`; no `checks.carry`.
 **Fix proposed:** read `strikes.clips` and `holds.jaw` from the holder's plan.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: `pair_report` reads the strike clips from the holder's `strikes.clips` and the jaw from its `holds.jaw`.**
 
 ### R12-17 (C, proven): pair_report's "a tick" numbers mix in the in-between time
 **What is wrong:** with `record on 1 all` each tick holds one moment drawn at some in-between time, and the place read
@@ -484,6 +494,8 @@ units between t=0 and the loop's end gives no BAD.
 **Fix proposed:** run the same seam test over `position` (BAD over about 0.3 units) and `scale` (over about 0.03), and
 add position to the snap note.
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: a looping clip's seam is judged for position (over 0.3 units) and scale (over 0.03) too; no insect clip has such a jump today.**
+
 ### R12-22 (B, proven): nothing measures that the offline pose is the game's pose; `match` only puts pictures side by side
 (Merged: the lab reader for the insects' `match`, the thread reader for the animals, who have no match at all.)
 **What is wrong:** the engine's rule 1 says a rule that also lives in Python gets a match check proving it gives the
@@ -535,6 +547,8 @@ foot skates.
 **Fix proposed:** BAD above a limit (for example the walk's 35% slip as units a second, or over 0.5 units of travel
 while down), NOTE below it. Do it after R12-20, since today's "down" is measured against the wrong floor.
 
+**Status (2026-11-26, `claude/review-fix-b6`): open: tried 2026-11-26 as a fault over half a unit of slide and taken back: it flagged the approved grooming, clamp, head bang and falling clips, whose working or falling feet read as "down". The note now says how far the foot went in all. It needs a way for a clip to name the feet it works with first.**
+
 ### R12-25 (B, proven): `two_bone` gives wrong pieces (and says "no miss") when the target is close, and crashes at the root
 **What is wrong:** when the target is nearer the root than `|l1 - l2|`, the code raises the distance to the minimum but
 keeps dividing the old, shorter one by it. The "unit" direction then is not unit, the joint lands in the wrong place,
@@ -549,6 +563,8 @@ l1=l2=4 with the target at the root gives ZeroDivisionError.
 the minimum distance, set `target` and `miss` from that as the too-far branch does, then work out the rest from the new
 distance. Add both cases to the self-check.
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: an end nearer than the pieces fold to goes out to the nearest place they reach, with the miss saying by how much; an end at the root no longer divides by zero. Both cases are in the kit's self-check. Clips were not made again: a maker run again changes only poses that were wrong.**
+
 ### R12-26 (B, proven): a pole along the leg's line crashes `two_bone` and flips the knee 180 degrees as the target crosses it
 **What is wrong:** `bend_way` takes the pole's part square to the root-target line. When the target lies on the pole's
 line, that part is zero: `unit()` divides by zero and the maker crashes. Near that line, the knee jumps to the other
@@ -561,6 +577,8 @@ passes the pole's line (a leg stretched straight forward or back in a pounce or 
 **Fix proposed:** when the pole's square part is short (under about 0.2 of its length), blend toward a fallback way
 (the last frame's, or a second pole the maker gives) instead of normalising a near-zero vector; return a flag so the
 maker can say which frames were near it.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: when the limb's line runs along the pole (its square part under a fifth of it), the bend eases over to a second way square to the line, so nothing divides by zero and the joint does not flip sides; in the self-check. No flag is returned to the maker.**
 
 ### R12-27 (B, proven): the kit returns a miss but every newer maker throws it away
 **What is wrong:** `two_bone` and `digitigrade_leg` say how far a foot fell short of its target, the cheapest early
@@ -575,6 +593,8 @@ check or a film: slower animation making.
 **Fix proposed:** a small collector in the kit (`Misses()` with `.add(clip, foot, t, miss)` and a printed worst per clip
 over a limit), printed by the shared bake step, as the monitor's `worst` does.
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: the kit tallies every limb miss over 0.05 units itself and says the worst when the maker ends, by clip where the maker calls `clip_now(name)` (no maker calls it yet: one line for the run).**
+
 ### R12-28 (B, proven): the kit's clip cache leaves out the data files a maker reads, so a changed outline keeps old clips
 **What is wrong:** `fingerprint` hashes the kit and `model_parts.py` plus the files the maker passes in. The monitor
 passes only `__file__`, yet its climb and water clips are built from `references/outlines/monitor.json` (read at
@@ -586,6 +606,8 @@ clip check reads the game files and would show the mismatch: a wasted round of p
 **Proof:** walked the import-time read of the outline and the two `cached(...)` calls with `files=[__file__]`.
 **Fix proposed:** have `fingerprint` hash every module from `tools/` in `sys.modules` (the maker and all it imports),
 and let makers name their data files once (`DATA_FILES = [...]`).
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: the clip cache's fingerprint takes every tools module loaded (the maker and all it imports), and the monitor names its outline file.**
 
 ### R12-29 (C, measured): any edit to `termite_models.py` or `body_plan.py` reruns every insect's lab check
 **What is wrong:** the lab's cache key includes the whole of `termite_models.py` (used here only for its font and
@@ -752,6 +774,8 @@ notes are read by eye.
 **Proof:** walked `compare`; checked again by the main session.
 **Fix proposed:** keep the list, but count changed and missing pictures in the headline ("N pictures changed: look,
 then approve") and return non-zero, so `approve` is the way past a change on purpose.
+
+**Status (2026-11-26, `claude/review-fix-b6`): half fixed: approved pictures not filmed again are a problem now (a film cut short), and the headline counts the changed pictures ("N PICTURE(S) CHANGED in M scene(s): look, then approve"). Left: changed pictures alone still exit 0, as the tool was written.**
 
 ### R12-40 (A, proven): a finding at an approved picture is let through however much worse it is
 **What is wrong:** in `film_checks`, when every picture where a part is flagged is a picture already in the approved
@@ -1105,6 +1129,8 @@ otter holding a crab (crabs are its favourite prey). Not measured.
 **Proof:** walked; only `barb.json` and `tilapia.json` have `checks.held`.
 **Fix proposed:** keep "none" too (an `Optional`, or a marker), so each prey kind is read once.
 
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: `HeldCatch` keeps "none" too, so each prey kind's plan is read once.**
+
 ### R12-64 (B, proven): a lioness's throat hold and hold-down bite on a clock the drawn clip does not keep
 **What is wrong:** in a hold the server bites when `hold.bitesAt(l.clipTick())`: `clipTick` counts game ticks since the
 doing began, and a looping hold bites at `clipTick % ticks == hit` (38 and 10 for `throat_hold` and `hold_down`). But
@@ -1284,6 +1310,8 @@ exact), but for the hippo's row timing (R12-73).
 run by the build beside `checkSpotTables`; one unit test that loads every move file in the folder and checks each move
 (the end level reached, `rise` and `along` rows of one length, one clip a size, and, with R12-58, a land move's end
 speed near zero or its rest 0).
+
+**Status (2026-11-26, `claude/review-fix-b6`): half fixed: `BlockMovesFileTest.everyAnimalsMoveFileLoads` loads all seven move files as the game does and checks each move of each size. Left: the staleness check against the animation files.**
 
 ### R12-73 (C, proven): the hippo's climb-out paths are not one row a tick, and the move writer never checks
 **What is wrong:** the game reads a move's path rows as ticks (row index = tick); `block_moves` drops the rows' own

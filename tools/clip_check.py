@@ -850,6 +850,9 @@ def switch_poses(animal, a, b, ticks, phase=None):
     return before, blend, after, ca, cb
 
 
+WORST_PHASE = {}             # (animal, a, b) -> the moment of clip a check_switch judged the change at (None: its end)
+
+
 def check_switch(animal, a, b, ticks):
     """One clip change: how far apart the two clips' poses are, and how hard the blend jumps against the clips' own
     moves (a loop left at the worst of four moments; a gait change at its moment from the plan, the one the game
@@ -894,6 +897,7 @@ def check_switch(animal, a, b, ticks):
         if worst is None or blend_jump[0] > worst[1][0]:
             worst = (ph, blend_jump, own, turn, gap)
     ph, (jump, jb, jt), own, (turn, tb), gap = worst
+    WORST_PHASE[(animal.name, a, b)] = ph            # (review R12-11: the picture of a flagged change shows this moment)
     # the long way round (R12-4, BUGS 249's lesson): GeckoLib eases each angle straight to the new clip's, so one pose
     # written two ways (an angle, and the same plus a turn) spins a whole turn through the blend, however long it is
     spins = [f'{bn} {d:.0f}' for bn, d in sorted(far.items(), key=lambda kv: -kv[1])]
@@ -1234,6 +1238,9 @@ class Pair:
         return self.holder_point(frame, self.holder.model.world(b, self.holder.model.by[b]['pivot'], pose))
 
 
+SPOT_OFF = 4.0               # px: a jaw farther than this from its spot at a bite is flagged (my pick; today's holds: up to 2.6)
+
+
 def check_pair(holder, prey_name, spec, spots_wanted, step=2):
     """Each prey clip of a pair, each spot: the jaw against the skin at every bite, the holder's parts in the prey and the
     prey's in the holder (deepest; its head apart from the rest: a bite's muzzle goes into the hide), and every holder
@@ -1249,7 +1256,7 @@ def check_pair(holder, prey_name, spec, spots_wanted, step=2):
     for clip, kind in spec['clips'].items():
         n = round(Played(pair.prey, clip).length * 20) if kind == 'once' else 2 * (pair.h_ticks + pair.h_blend)
         lines.append(f'  {prey_name} {clip} ({kind}, {n} ticks):')
-        res = {s: {'gaps': [], 'head': 0.0, 'body': 0.0, 'prey_head': 0.0, 'prey': 0.0} for s in names}
+        res = {s: {'gaps': [], 'off': [], 'head': 0.0, 'body': 0.0, 'prey_head': 0.0, 'prey': 0.0} for s in names}
         for k in range(0, n + 1):
             if k % step and not pair.bites(k):
                 continue
@@ -1263,7 +1270,11 @@ def check_pair(holder, prey_name, spec, spots_wanted, step=2):
                 hposed, pose = pair.holder_posed(frame, k)
                 hb = Boxes(hposed)
                 if pair.bites(k):
-                    r['gaps'].append(prey.gap(pair.jaw(frame, pose)))
+                    jaw = pair.jaw(frame, pose)
+                    r['gaps'].append(prey.gap(jaw))
+                    # (review R12-7: and how far the jaw is from the spot itself, and how much of that is height; the
+                    # gap to the nearest skin read 0 for a jaw well above or below its spot, on the same flank)
+                    r['off'].append((math.dist(jaw, frame[3]), jaw[1] - frame[3][1]))
                 if not hb.overlaps(prey):
                     continue
                 into = prey.near(hb).deepest(with_edges_all(hposed))
@@ -1286,9 +1297,13 @@ def check_pair(holder, prey_name, spec, spots_wanted, step=2):
                 bad.append('jaw buried')
             if r['body'] > 1.0 or r['prey'] > 1.0:
                 bad.append('bodies in each other')      # (its head on the hide is the bite itself)
+            far = max(r['off'], default=(0.0, 0.0))
+            if far[0] > SPOT_OFF:
+                bad.append('jaw off its spot')
             flags += bool(bad)
             gs = f'{min(g):+.1f} to {max(g):+.1f}' if g else 'no bite'
-            lines.append(f'    {s:12s} jaw to the hide at its {len(g)} bites {gs} px (+ in the air); its head and the '
+            off = f', from its spot up to {far[0]:.1f} px ({far[1]:+.1f} in height)' if g else ''
+            lines.append(f'    {s:12s} jaw to the hide at its {len(g)} bites {gs} px (+ in the air){off}; its head and the '
                          f'{prey_name} in each other {max(r["head"], r["prey_head"]):.1f} px (a bite); its body and the {prey_name} '
                          f'{max(r["body"], r["prey"]):.1f}' + (f'  << {", ".join(bad)}' if bad else ''))
         # every holder at once, at a bite: the spots crowding each other
@@ -1474,7 +1489,10 @@ def strip(animal, pl, planted, times, views, flagged, path, title, held=None, an
 
 
 def switch_strip(animal, a, b, ticks, views, path):
-    before, blend, after, ca, cb = switch_poses(animal, a, b, ticks)
+    # (review R12-11: drawn at the moment check_switch judged, the worst of the loop; it always left the loop at 0 s,
+    # so the picture of a flagged change showed a calm one)
+    phase = WORST_PHASE.get((animal.name, a, b))
+    before, blend, after, ca, cb = switch_poses(animal, a, b, ticks, phase)
     seq = [('end of ' + a, p) for p in before[-2:]] + [(f'blend {i + 1}/{ticks}', p) for i, p in enumerate(blend)] + \
           [(b + f' +{i + 1}', p) for i, p in enumerate(after[:2])]
     model = animal.model
@@ -1483,7 +1501,7 @@ def switch_strip(animal, a, b, ticks, views, path):
     cw, ch, lh = 330, 240, 20
     rows_n = (len(seq) + cols - 1) // cols
     cv = lab.Canvas(cw * cols, (ch + lh) * rows_n * len(views) + 30)
-    cv.text(10, 8, f'{a} -> {b}  ({ticks} tick blend)', scale=2)
+    cv.text(10, 8, f'{a} -> {b}  ({ticks} tick blend' + (f', {a} left at {phase:.2f} s' if phase is not None else '') + ')', scale=2)
     last = None
     for vi, vname in enumerate(views):
         view = lab.VIEWS[vname]

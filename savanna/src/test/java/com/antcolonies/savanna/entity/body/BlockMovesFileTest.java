@@ -39,6 +39,28 @@ class BlockMovesFileTest {
         assertTrue(MOVES.move(6).startsAfloat && !MOVES.move(6).goesDown);
     }
 
+    /**
+     * Code review R12-72: every animal's move file loads as the game loads it and holds whole moves (only the monitor's
+     * was read here; the otter's and hippo's were checked by nothing but the game starting, the lions' and the
+     * buffalo's by nothing at all until the day they are wired in).
+     */
+    @Test
+    void everyAnimalsMoveFileLoads() {
+        for (String animal : new String[] {"monitor", "otter", "hippo", "buffalo", "lion", "lioness", "lion_cub"}) {
+            BlockMoves moves = BlockMoves.of(com.antcolonies.savanna.SavannaMod.class, "antcolonies", animal);
+            assertTrue(moves.count() > 0 && moves.sizes().length > 0, animal + ": no moves or no sizes");
+            for (int i = 0; i < moves.count(); i++) {
+                for (int size = 0; size < moves.sizes().length; size++) {
+                    int ticks = moves.move(i).ticks(size);
+                    assertTrue(ticks > 0, animal + ", move " + i + ", size " + size + ": no ticks");
+                    assertTrue(moves.move(i).clip(size) != null && !moves.move(i).clip(size).isEmpty(), animal + ", move " + i + ": no clip");
+                    assertTrue(Double.isFinite(moves.move(i).rise(size, ticks)) && Math.abs(moves.move(i).rise(size, ticks)) < 4.0,
+                            animal + ", move " + i + ", size " + size + ": its path ends at " + moves.move(i).rise(size, ticks));
+                }
+            }
+        }
+    }
+
     @Test
     void theClimbsEndABlockUpAndABlockDown() {
         for (int size = 0; size < 5; size++) {

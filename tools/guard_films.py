@@ -325,6 +325,9 @@ def approved_meta(scene):
     return json.loads(approved.read_text(encoding="utf-8")) if approved.exists() else None
 
 
+CHANGED = {}                 # scene -> pictures that differ from the approved ones in the last check
+
+
 def compare(scene, problems, notes):
     meta = approved_meta(scene)
     if meta is None:
@@ -348,6 +351,12 @@ def compare(scene, problems, notes):
         if name not in new_pictures:
             changed.append((1.0, name, "missing (was approved)"))
     changed.sort(reverse=True)
+    # Review R12-39: approved pictures that were not filmed again are a problem (a film cut short, a scene that ended
+    # early), and the headline counts the changed ones; before, both were only notes under "ALL CHECKS PASS".
+    gone = sum(1 for _, _, why in changed if why.startswith("missing"))
+    if gone:
+        problems.append(f"{scene}: {gone} approved picture(s) were not filmed again (the film is shorter than the approved one)")
+    CHANGED[scene] = len(changed) - gone
     notes.append(f"{scene}: {len(changed)} of {len(new_pictures)} picture(s) changed from the approved ones")
     for _, name, why in changed[:12]:
         notes.append(f"    {scene}/{name}: {why}")
@@ -476,7 +485,10 @@ def check(files):
             notes.append(f"{scene}: {len(body)} body finding(s), as approved: {body[0].split(': ', 1)[-1]}")
         compare(scene, problems, notes)
     frame_times(notes)
-    lines = ["Guard films: " + ("ALL CHECKS PASS" if not problems else f"{len(problems)} PROBLEM(S)"), ""]
+    moved = sum(CHANGED.values())
+    look = (f"; {moved} PICTURE(S) CHANGED in {sum(1 for n in CHANGED.values() if n)} scene(s): look, then approve"
+            if moved else "")
+    lines = ["Guard films: " + ("ALL CHECKS PASS" if not problems else f"{len(problems)} PROBLEM(S)") + look, ""]
     if problems:
         lines += ["Problems:"] + ["  " + p for p in problems] + [""]
     lines += ["Notes:"] + ["  " + n for n in notes]
