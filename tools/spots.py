@@ -364,7 +364,7 @@ def made_against(clip):
     for note in (clip.get('timeline') or {}).values():
         if isinstance(note, str) and note.startswith('made_against '):
             _, prey, sign = note.split()[:3]
-            return prey, sign
+            return prey, sign.rstrip(';')
     return None
 
 
@@ -392,8 +392,8 @@ def partners_stale(prey_tables=None):
 
 def maker_of(animal):
     """The maker that makes an animal's clips (its tool's name), for the message."""
-    for name in (f'{animal}_models.py', f'{animal.split("_")[0]}_models.py'):
-        if os.path.exists(os.path.join(HERE, name)):
+    for name in (f'{animal}_models.py', f'{animal.split("_")[0]}_models.py', {'lioness': 'lion_models.py'}.get(animal, '')):
+        if name and os.path.exists(os.path.join(HERE, name)):
             return name
     return '<its maker>'
 

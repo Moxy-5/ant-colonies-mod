@@ -808,6 +808,48 @@ public class LionHuntTests {
     }
 
     /**
+     * The feast bench's scene ({@code LionScenes.feast}, filmed by {@code tools/film/feast_bench.film}; the Motion Studio,
+     * the new phase 2): a hungry lioness goes to her feeding spot on a carcass and lies down straight into the feed
+     * (never a rest or calm tick between: BUGS 376; only getting up may turn it back), and a cow leaning on her as she
+     * feeds never shoves her off her place (the framework's {@code Placement}: a cow shoved a lying feeder 0.05 blocks a
+     * tick before).
+     */
+    @GameTest(template = "arena", timeoutTicks = 700, skyAccess = true)
+    public static void aLionessLiesDownIntoTheFeedAndALeaningCowNeverShovesHer(GameTestHelper helper) {
+        TestClock.still(helper, 20.0);
+        LionScenes.Feast scene = LionScenes.feast(helper.getLevel(), helper.absolutePos(BlockPos.ZERO));
+        LionEntity she = scene.lioness();
+        byte[] was = {LionEntity.CALM};
+        int[] fed = {0};
+        net.minecraft.world.entity.animal.Cow[] cow = {null};
+        helper.onEachTick(() -> {
+            byte d = she.doing();
+            helper.assertFalse(was[0] == LionEntity.REST_DOWN && d != LionEntity.REST_DOWN && d != LionEntity.FEED && d != LionEntity.REST_UP,
+                    "lying down at her spot went on into doing " + d + ", not the feed: " + she.about());
+            was[0] = d;
+            if (d != LionEntity.FEED) {
+                return;
+            }
+            if (cow[0] == null) {
+                cow[0] = EntityType.COW.create(helper.getLevel());
+                cow[0].setNoAi(true);
+                cow[0].moveTo(she.getX(), she.getY(), she.getZ(), 0.0F, 0.0F);
+                helper.getLevel().addFreshEntity(cow[0]);
+            }
+            // the cow leans on her from her side, inside her box, every tick
+            float yaw = she.yBodyRot * net.minecraft.util.Mth.DEG_TO_RAD;
+            cow[0].setPos(she.getX() + net.minecraft.util.Mth.cos(yaw) * 0.6, she.getY(), she.getZ() + net.minecraft.util.Mth.sin(yaw) * 0.6);
+            double off = LionHunt.feedOffForTests(she);
+            helper.assertTrue(off >= 0 && off < 0.05, "feeding off her place by " + off + " (" + LionHunt.feedOffAbout(she)
+                    + ") with the cow leaning on her: " + she.about());
+            if (++fed[0] >= 60) {
+                helper.succeed();
+            }
+        });
+        helper.runAtTickTime(680, () -> helper.fail("she never fed 60 ticks: " + she.about() + " at " + at(helper, she)));
+    }
+
+    /**
      * A creeping lioness never moves while a grown buffalo's head is up near her: she freezes outside its sight, creeps
      * while its head is down grazing, and is never seen (the herd never runs).
      */

@@ -120,6 +120,20 @@ final class FilmStep {
         return true;
     }
 
+    /**
+     * The game froze itself (the "until ... freeze" step, from its own tick, on its thread): it holds still at once, as
+     * after a step's last tick, so no empty tick runs before the camera's first order.
+     */
+    static void holdNow(MinecraftServer server) {
+        synchronized (LOCK) {
+            if (holding || !FilmDirector.active()) {
+                return;
+            }
+            holding = true;
+        }
+        hold(server);
+    }
+
     /** The burst was dropped (the watch mode starts again): steps asked for and not started yet are forgotten. */
     static void cancel() {
         waiting = false;

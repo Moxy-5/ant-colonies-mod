@@ -2,6 +2,7 @@ package com.antcolonies.savanna.entity.body;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.BeforeAll;
@@ -30,11 +31,8 @@ class ClipMapTest {
         for (String animal : ANIMALS) {
             ClipMap map = BodyPlans.clipMapOf(animal);
             Clips clips = Clips.of(ClipMapTest.class, "antcolonies", animal);
-            for (String posture : new String[] {"standing", "lying", "sitting", "held"}) {
-                ClipMap.Posture p = map.posture(posture);
-                if (p == null) {
-                    continue;
-                }
+            for (ClipMap.Posture p : map.postures()) {
+                String posture = p.name();
                 assertTrue(clips.has(p.hold()), animal + " " + posture + ": no clip " + p.hold());
                 assertTrue(p.down() == null || clips.has(p.down()), animal + " " + posture + ": no clip " + p.down());
                 p.up().forEach(c -> assertTrue(clips.has(c), animal + " " + posture + ": no clip " + c));
@@ -92,5 +90,20 @@ class ClipMapTest {
         assertEquals("rest_up", m.way("held_down", false, ClipMap.STANDING), "let go, it gets up");
         assertEquals("rest_up", m.way("held_sink", false, ClipMap.STANDING), "let go going down, it gets up at once");
         assertEquals("lying", m.startsIn("rest_up"), "a way up two postures share names the first's start");
+        assertTrue(m.touches("rest_up", "held"), "a shared way up touches both postures");
+        assertTrue(m.touches("held_sink", "held") && !m.touches("graze", "held"));
+    }
+
+    @Test
+    void aMapThatCannotWorkIsRefusedWithItsReason() {
+        // a way up that is a standing clip (it would 'get up' into a loop and never end), and a posture with nothing to rest in
+        String upIsStanding = "{\"postures\": {\"standing\": {\"hold\": \"idle\"},"
+                + " \"lying\": {\"hold\": \"rest\", \"down\": \"rest_down\", \"up\": [\"idle\"]}}}";
+        String noHold = "{\"postures\": {\"standing\": {\"hold\": \"idle\"}, \"lying\": {\"down\": \"rest_down\"}}}";
+        for (String plan : new String[] {upIsStanding, noHold}) {
+            IllegalStateException e = assertThrows(IllegalStateException.class,
+                    () -> ClipMap.read(com.google.gson.JsonParser.parseString(plan).getAsJsonObject()));
+            assertTrue(e.getMessage().contains("idle") || e.getMessage().contains("hold"), e.getMessage());
+        }
     }
 }

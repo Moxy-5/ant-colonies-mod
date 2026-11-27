@@ -8,6 +8,7 @@ import com.antcolonies.savanna.animal.BuffaloEntity;
 import com.antcolonies.savanna.animal.BuffaloGoals;
 import com.antcolonies.savanna.animal.LionEntity;
 import com.antcolonies.savanna.animal.LionHunt;
+import com.antcolonies.savanna.animal.RemainsEntity;
 import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
@@ -44,6 +45,36 @@ public final class LionScenes {
             }
             return hunt::tick;
         });
+        // the feast bench (the Motion Studio, the new phase 2, step 8): one carcass and two lions, nothing else
+        com.antcolonies.debug.FilmStages.signUp("lion_feast", (level, corner) -> {
+            Feast feast = feast(level, corner);
+            feast.carcass().setCustomName(Component.literal("film-carcass"));
+            feast.lioness().setCustomName(Component.literal("film-lioness"));
+            feast.male().setCustomName(Component.literal("film-male"));
+            return null;
+        });
+    }
+
+    /**
+     * The feast bench (the Motion Studio, the new phase 2, step 8): a 32 by 24 field, a cow's carcass at (12, 12) (killed
+     * by the pride of the den at its west edge), a hungry lioness 5 blocks west of it and the male 19 blocks east. She
+     * goes to the first spot of the feast order, lies down and feeds; he comes about 8 seconds later and, a male first
+     * at a kill, takes that spot: she gets up with a growl and lies down at the next, beside him (each filmed from the
+     * tick it lies down): the feast's clip changes, its order and its crowding at two spots next to each other
+     * (BUGS 467) with nothing else in the way. (From 10 blocks he came as she lay down, and turned her back.)
+     */
+    public record Feast(RemainsEntity carcass, LionEntity lioness, LionEntity male) {
+    }
+
+    public static Feast feast(ServerLevel level, BlockPos corner) {
+        field(level, corner, 0, 0, 32, 24);
+        BlockPos den = corner.offset(2, GROUND, 12);
+        RemainsEntity carcass = RemainsEntity.leave(level, RemainsEntity.Kind.BUFFALO,
+                Vec3.atLowerCornerOf(corner).add(12.5, FEET, 12.5), 0.0F, 0.9F);
+        carcass.setKilledBy(den);
+        LionEntity lioness = lion(level, corner, SavannaEntities.LIONESS.get(), 7.5, 12.5, den, LionHunt.HUNGRY);
+        LionEntity male = lion(level, corner, SavannaEntities.LION.get(), 30.5, 18.5, den, LionHunt.HUNGRY);
+        return new Feast(carcass, lioness, male);
     }
 
     /**

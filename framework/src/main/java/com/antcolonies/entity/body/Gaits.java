@@ -128,6 +128,9 @@ public final class Gaits {
                 // a young clip of the gait (gaits.<gait>.young: its clip, the size it is played under; its own min, max
                 // and change moments, else the grown gait's limits and no moments); its clip speed in checks.walks too
                 JsonObject y = g.getAsJsonObject("young");
+                if (!y.has("clip") || !y.has("below")) {
+                    throw new IllegalStateException("young of gait '" + name + "' needs its clip and the size it is played below");
+                }
                 String clip = y.get("clip").getAsString();
                 if (!walks.has(clip)) {
                     throw new IllegalStateException("young clip '" + clip + "' of gait '" + name + "' has no clip speed in checks.walks");

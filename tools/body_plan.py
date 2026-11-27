@@ -277,7 +277,7 @@ def checks_problems(plan, bones):
     the model's own names (or roles); clip patterns must match a clip of the animation file the checks read."""
     import fnmatch
     ck = plan.data.get('checks') or {}
-    if not ck:
+    if not ck and not plan.data.get('postures') and not plan.data.get('gaits'):
         return []
     out = []
     names = {b['name'] for b in bones} | set(plan.to_bone)
@@ -291,7 +291,8 @@ def checks_problems(plan, bones):
 
     def clip(key, pattern):
         if clips is not None and not any(fnmatch.fnmatch(c, pattern) for c in clips):
-            out.append(f'checks.{key} names clip "{pattern}", no clip matches it (its check would be switched off)')
+            out.append(f'{key if key.split(".")[0] in ("postures", "gaits") else "checks." + key} names clip "{pattern}", '
+                       'no clip matches it (its check would be switched off)')
 
     for key in ('body_bones', 'skip_bones', 'hide_in', 'hidden_at_rest'):
         for name in ck.get(key, []):
@@ -319,6 +320,8 @@ def checks_problems(plan, bones):
     for name, posture in (plan.data.get('postures') or {}).items():
         if not isinstance(posture, dict):
             continue                                    # ("about")
+        if 'hold' not in posture:
+            out.append(f'postures.{name} has no "hold" (the clip it rests in: the game would not start)')
         for key in ('hold', 'down'):
             if key in posture:
                 clip(f'postures.{name}.{key}', posture[key])
@@ -340,13 +343,18 @@ def checks_problems(plan, bones):
     return out
 
 
-def posture_switches(data):
+def posture_switches(data, loops=None):
     """The clip changes a plan's clip map makes in the game (the Motion Studio, the new phase 2, step 5, 2026-11-27;
     the framework's ClipMap walks them): for each posture, standing's hold into its way down; the way down played out
     straight into each of its clips (no calm tick), and turned back by its way up; each clip of it into its first way
     up (any of them is cut by getting up), and its hold into the other ways up (a goal's pick, as a wake-up's stretch);
     each way up into standing's hold; its hold into each of its own clips and each back to its hold (a one-shot's end).
-    clip_check.py --switches checks these with the plan's own list."""
+    With loops (the animal's clips: name -> whether it loops), also what the map's walk makes from any standing loop
+    (a walk, a stalk, a mood: ClipMap.way goes down from whatever stands; review 2026-11-27) into each way down, and
+    from each way up into each standing loop and each other posture's way down (a played-out way up hands over to the
+    clip wanted). A standing one-shot played out goes the same ways from its last pose: not listed (its end is near
+    idle's pose, and listing every one would treble the checks). clip_check.py --switches checks these with the plan's
+    own list."""
     postures = data.get('postures') or {}
     stand = (postures.get('standing') or {}).get('hold', 'idle')
     out = []
@@ -376,6 +384,24 @@ def posture_switches(data):
         for c in clips:
             add(hold, c)
             add(c, hold)
+    if loops:
+        named = {c for p in postures.values() if isinstance(p, dict)
+                 for c in [p.get('hold'), p.get('down')] + p.get('up', []) + p.get('clips', []) if c}
+        # (a face_<mood> clip plays on the face's own layer over the body's, never in its place)
+        standing = [c for c, loop in loops.items() if loop and c not in named and not c.startswith('face_')]
+        downs = {n: p.get('down') for n, p in postures.items() if isinstance(p, dict) and n != 'standing' and p.get('down')}
+        for c in standing:
+            for d in downs.values():
+                add(c, d)
+        for n, p in postures.items():
+            if n == 'standing' or not isinstance(p, dict):
+                continue
+            for u in p.get('up', []):
+                for c in standing:
+                    add(u, c)
+                for m, d in downs.items():
+                    if m != n:
+                        add(u, d)
     return out
 
 
@@ -623,10 +649,11 @@ def plan_text(data):
     return text + '\n'
 
 
-# Sections a model maker writes only part of: what the maker leaves out of them is kept too (one level down).
+# Sections a model maker writes only part of: what the maker leaves out of them is kept too, one level down, and so
+# are the entries others added to the maker's own lists and tables there (a clip's speed in checks.walks, a held clip
+# in checks.feet_free; review 2026-11-27: only "switches" was joined, so a maker run dropped the rest).
 MIXED = ('checks', 'verify')
-# Lists inside those that others add entries to: the maker's entries first, then every other entry the file had.
-JOINED = ('switches',)
+JOINED = ('switches',)        # (kept for a maker on another branch that names it; every list in MIXED is joined now)
 
 
 def keep_sections(path, data, say=True):
@@ -639,8 +666,8 @@ def keep_sections(path, data, say=True):
     course, the verify films, clip changes the game makes. The game cannot do without some of them, and rerunning a
     maker wiped them (lion_models.py game, buffalo_models.py game). The rule, for every maker alike: the maker's sections
     and values win; a section of the file the maker does not write is kept where it stood; inside "checks" and
-    "verify" a key the maker does not write is kept; the file's "switches" entries the maker lacks are kept after the
-    maker's own. With say, prints what was kept (a key the maker dropped on purpose shows there: delete it by hand)."""
+    "verify" a key the maker does not write is kept, and so is each entry of a list (after the maker's own) or table
+    there that the maker's lacks (a clip's speed added to checks.walks, a held clip to checks.feet_free). With say, prints what was kept (a key the maker dropped on purpose shows there: delete it by hand)."""
     if not os.path.exists(path):
         return data
     try:
@@ -657,11 +684,16 @@ def keep_sections(path, data, say=True):
         for k, v in new.items():
             if k in was and depth == 0 and k in MIXED and isinstance(v, dict) and isinstance(was[k], dict):
                 v = merge(was[k], v, where + [k], depth + 1)
-            elif k in was and k in JOINED and isinstance(v, list) and isinstance(was[k], list):
+            elif k in was and (depth == 1 or k in JOINED) and isinstance(v, list) and isinstance(was[k], list):
                 extra = [e for e in was[k] if e not in v]
                 if extra:
                     kept.append(f"{'.'.join(where + [k])} (+{len(extra)})")
                     v = v + extra
+            elif k in was and depth == 1 and isinstance(v, dict) and isinstance(was[k], dict):
+                extra = {kk: vv for kk, vv in was[k].items() if kk not in v}
+                if extra:
+                    kept.append(f"{'.'.join(where + [k])} (+{len(extra)})")
+                    v = {**v, **extra}
             out.append((k, v))
         names = list(was)
         for i, k in enumerate(names):

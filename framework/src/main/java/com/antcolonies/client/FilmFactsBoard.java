@@ -76,10 +76,61 @@ final class FilmFactsBoard {
                     out.put("facts_failed", e.toString());
                 }
                 out.values().removeIf(java.util.Objects::isNull);
+                if (entity.getCustomName() != null) {
+                    out.putIfAbsent("name", entity.getCustomName().getString());   // ("until doing=feed,name=film-lioness")
+                }
                 now.put(entity.getUUID(), java.util.Collections.unmodifiableMap(out));   // its own order kept
             }
         }
         board = new Board(now, event.getServer().overworld().getGameTime());
+        String[][] when = freezeWhen;
+        if (when != null && find(when) != null) {
+            // the "until ... freeze" step: the game stopped on the very tick its facts first read so, here on the game's
+            // side (the Motion Studio, the new phase 2, step 8): frozen from the drawing side it ran on a few ticks (60
+            // with a backlog, BUGS 449), so a take meant to start at a clip change started after it
+            freezeWhen = null;
+            event.getServer().tickRateManager().setFrozen(true);
+            if (alreadySo) {
+                LOG.warn("Film: frozen at game tick {}, but {} already read so when the step was reached: the take is not "
+                        + "at its start (an earlier take ran past it)", board.tick(), describe(when));
+            } else {
+                LOG.info("Film: frozen at game tick {} as {} first read so", board.tick(), describe(when));
+            }
+            FilmStep.holdNow(event.getServer());   // (still from here on: no empty tick before the take's first step)
+        }
+    }
+
+    /** The facts the game is to be frozen at the tick they first read so (null: none). */
+    private static volatile String[][] freezeWhen;
+    /** Whether they read so already when the step asked (the freeze then comes at once, and says so). */
+    private static volatile boolean alreadySo;
+
+    /**
+     * Freezes the game on the first tick some animal's facts read so ({@link #find(String[][])}); null: none (a new
+     * scene and a stopped film clear it, so a freeze left over never stops a later one).
+     */
+    static void freezeWhen(@Nullable String[][] when) {
+        alreadySo = when != null && find(when) != null;
+        freezeWhen = when;
+    }
+
+    /** "key=value,key=value" as pairs. */
+    static String[][] conditions(String text) {
+        String[] parts = text.split(",");
+        String[][] out = new String[parts.length][];
+        for (int i = 0; i < parts.length; i++) {
+            String[] kv = parts[i].split("=", 2);
+            out[i] = new String[] {kv[0], kv.length > 1 ? kv[1] : "true"};
+        }
+        return out;
+    }
+
+    static String describe(String[][] when) {
+        StringBuilder s = new StringBuilder();
+        for (String[] kv : when) {
+            s.append(s.length() > 0 ? "," : "").append(kv[0]).append('=').append(kv[1]);
+        }
+        return s.toString();
     }
 
     /** This animal's facts at the last game tick, or an empty map. */
@@ -102,11 +153,20 @@ final class FilmFactsBoard {
      */
     @Nullable
     static UUID find(String key, String value) {
+        return find(new String[][] {{key, value}});
+    }
+
+    /** The first animal (by id) whose facts read all of these (key, value) pairs, or null. */
+    @Nullable
+    static UUID find(String[][] when) {
         UUID best = null;
         for (Map.Entry<UUID, Map<String, Object>> e : board.facts().entrySet()) {
-            Object v = e.getValue().get(key);
-            if (v != null && String.valueOf(v).toLowerCase(Locale.ROOT).equals(value.toLowerCase(Locale.ROOT))
-                    && (best == null || e.getKey().compareTo(best) < 0)) {
+            boolean all = true;
+            for (String[] kv : when) {
+                Object v = e.getValue().get(kv[0]);
+                all &= v != null && String.valueOf(v).toLowerCase(Locale.ROOT).equals(kv[1].toLowerCase(Locale.ROOT));
+            }
+            if (all && (best == null || e.getKey().compareTo(best) < 0)) {
                 best = e.getKey();
             }
         }

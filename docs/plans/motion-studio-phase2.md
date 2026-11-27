@@ -121,3 +121,47 @@ full run), the four reviewers, their fixes, the notes, commit, push, `C:\Ant Mod
   what the pair check took for one holder. It found BUGS 467: neighbouring feeders 1 to 3.3 px in each other (mixed forms
   and the male's mane, never measured by BUGS 377's one-form check), ranks 0 to 2 lying into a feeder up to 2.6 px. A
   self-test.
+- **Step 8.** The film's `until <facts> <ticks> freeze` stops the game on its own side, on the very tick the facts first
+  read so (`FilmFactsBoard`, from the game's tick), holds it still for the take (`FilmStep.holdNow`, no empty tick before
+  the first step) and the camera goes on once its own side sees the freeze; facts may be joined (`doing=feed,name=x`,
+  a named animal's `name`). A camera may stand off its actor by its size (`cam <name> x y z sized`: the offsets times
+  the larger of its width and height). The first bench, `tools/film/feast_bench.film` on the stage `lion_feast`
+  (`LionScenes.feast`: a cow's carcass, a hungry lioness 5 blocks west, the male 19 east): one 60-tick take from the
+  tick she starts down (lying down straight into the feed), the male's the same, her lying down by the kill once full,
+  both from above; the game test `aLionessLiesDownIntoTheFeedAndALeaningCowNeverShovesHer` (`land`) runs the same scene.
+  **Filmed (2026-11-27):** the game froze on the very tick each lion started down (game ticks 221 and 429, both sides
+  agreeing), every take stepped a tick a picture, the recording's tick the game's; her lying down ran 23 ticks (the
+  clip's 19 and its blend) straight into the feed, his the same. The first layout (the male 10 blocks off, same side)
+  showed the feast order at work: a male takes the first spot of the order wherever he comes from (`bestFeedSpot`, not
+  the nearest), so arriving as she lay down he turned her back up with a growl; he now starts 19 blocks off, and his take
+  has her feeding at the next spot beside him. Between takes the game runs unrecorded (a doing seen to jump there, as
+  feed to a growl, is the gap: she got up first).
+
+### The four reviews (2026-11-27, after step 8; read only, each its own part)
+- **The framework (Placement, ClipMap, Gaits, the renderer, the film code).** Fixed: a broken number never puts an
+  animal out of the world (`Placement.place` and `seat` leave it where it was); the clip map refuses a way up that is a
+  standing clip and a posture with no hold, with the reason; a shared way up touches both its postures; a young gait
+  with no clip or size says so; the film watcher reads each changed kind of file once per shoot and a broken file no
+  longer closes the game (`FilmWatch`); the renderer's note on GeckoLib's head turn.
+- **The tools.** Fixed: `body_plan.keep_sections` joins lists and tables one level down too; the scene check keys a
+  holder twice on one prey by its hold; `posture_switches` lists the walk from every standing loop (not face clips);
+  `made_against` notes go at the first free time; the recording reader drops frames with broken numbers and judges a
+  slide over at least a quarter tick; the pace report counts only the moving and only under 0.8 of the model as young;
+  `spots.py` finds the lioness's maker. Self-tests for each.
+- **The tests and the bench.** Fixed: the freeze fired whenever the facts read so, even when they already did as the
+  step came (an earlier take run past it): it now says so in the log; a freeze left from a dropped shoot or scene is
+  cleared (`startScene`, `halt`); the camera waited only for the facts, not for its own side to be frozen; the bench's
+  lions came from both sides (never the two neighbouring spots of BUGS 467) and its feed take could start inside the
+  lying-down take: one take now runs from lying down into the feed, the male starts farther off. `ClipMapTest` runs
+  over every posture and checks that a map that cannot work is refused; the new feast game test.
+- **The lion's and buffalo's play (steps 3 to 6).** Fixed: a feeding lion counts as lying again for every goal (`lying()`
+  and `sitting()` ask the clip map: before, a player watched by a feeding lioness took her for a watch she never got up
+  for, and she could be shoved while it lasted); a feast ending while she fed no longer leaves her in the feed loop till
+  the next part of the day (`LionGoals.go` asks `down()`, the map's "lying or sitting, not getting up"); the lie-by-kill
+  check asks `lying()` (it missed the stretch up); a placed feeder keeps the game's height (it lies on what is under it:
+  the ground under her middle pulled one at a ledge's edge down 1 to 3 blocks into it); `toward` and `upright` never set
+  a doing the form lacks. Known and kept: a grooming lion called up gets up at once (the chorus, a walk to its place,
+  waking: before it finished the groom; real enough, and one rule); a buffalo or fish in a crocodile's jaws is drawn as
+  the crocodile places it (crosswise, a big one facing it), as a vanilla cow there always was (step 4; not filmed); the
+  otter draws its fish itself, so nothing changed there; a holder pushes nothing (a player can stand in a holding
+  lioness).

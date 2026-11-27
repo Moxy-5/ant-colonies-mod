@@ -137,7 +137,8 @@ def animal_report(path):
             continue                              # easing between two clips: neither one's feet
         feet, low, high = gait
         c.plays.append(play)
-        c.paces.append(speed / size)              # its pace per size (blocks a tick at size 1): what its clip must be made for
+        if speed > GLIDE / 4:
+            c.paces.append(speed / size)          # its pace per size (blocks a tick at size 1) while moving: what its clip must be made for
         if abs(play - low) < 1e-3 or abs(play - high) < 1e-3:
             c.limit += 1
         foot_speed = feet * size * play           # how fast the clip moves its feet past the body, drawn at its size

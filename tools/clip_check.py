@@ -508,7 +508,7 @@ def _digest(*parts):
 
 def cache_base(animal):
     """Everything a judgement of this animal rests on but the clip itself."""
-    if animal.name not in _BASE:
+    if (animal.name, animal.size) not in _BASE:
         here = os.path.dirname(os.path.abspath(__file__))
         files = sorted(os.path.join(here, f) for f in os.listdir(here) if f.endswith('.py'))
         files.append(lab.model_file(animal.model_name, 'geo', 'entity', f'{animal.model_name}.geo.json'))
@@ -516,9 +516,9 @@ def cache_base(animal):
         for spec in (animal.checks.get('controller'), (animal.checks.get('drawn_ahead') or {}).get('java')):
             if spec:
                 files.append(os.path.join(PROJECT, spec))
-        _BASE[animal.name] = _digest(animal.plan_data, animal.model_name, animal.size,
+        _BASE[(animal.name, animal.size)] = _digest(animal.plan_data, animal.model_name, animal.size,
                                      *[open(f, 'rb').read() for f in files if os.path.exists(f)])
-    return _BASE[animal.name]
+    return _BASE[(animal.name, animal.size)]
 
 
 def cached(animal, kind, name, key, make):
@@ -1221,7 +1221,8 @@ def pairs(animal, names):
     the Motion Studio, the new phase 2, step 5: the game's ways between lying, sitting and standing)."""
     out = []
     listed = [tuple(p[:2]) for p in animal.checks.get('switches', [])]
-    listed += [tuple(p) for p in body_plan.posture_switches(animal.plan_data) if tuple(p) not in listed]
+    loops = {n: animal.data[n].get('loop') is True for n in names}
+    listed += [tuple(p) for p in body_plan.posture_switches(animal.plan_data, loops) if tuple(p) not in listed]
     for a_pat, b_pat in listed:
         As = [n for n in names if fnmatch.fnmatch(n, a_pat)]
         Bs = [n for n in names if fnmatch.fnmatch(n, b_pat)]
@@ -1918,7 +1919,11 @@ def run_scene(prey, pose, times, views, out_dir):
     for size in sorted({p['size'] for p in pairs}, reverse=True):
         group = [p for p in pairs if p['size'] == size]
         kind = group[0]['clips'][pose]
-        holders = {p['holder']: Pair(Animal(p['holder']), prey.name, p) for p in group}
+        # each pair its own taker (a lioness biting the rump and one holding the throat are two; review 2026-11-27:
+        # keyed by the holder alone, the second pair of a holder was dropped)
+        twice = {p['holder'] for p in group if sum(q['holder'] == p['holder'] for q in group) > 1}
+        holders = {(f'{p["holder"]}:{p["hold"]}' if p['holder'] in twice else p['holder']): Pair(Animal(p['holder']), prey.name, p)
+                   for p in group}
         any_pair = next(iter(holders.values()))
         spots_all = [s for s in any_pair.table['names'] if any(s in h.spots for h in holders.values())]
         allowed = {s: [h for h, pr in holders.items() if s in pr.spots] for s in spots_all}

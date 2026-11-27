@@ -479,6 +479,12 @@ def a_maker_rewriting_a_plan_keeps_what_others_added():
         for k in ('controller', 'drawn_ahead', 'game_turns'):
             maker['checks'].pop(k, None)
         maker['checks']['switches'] = maker['checks'].get('switches', [])[:3]
+        # (review 2026-11-27) entries others added to the maker's own lists and tables come back too
+        for key in ('feet_free', 'tuck_ok'):
+            if maker['checks'].get(key):
+                maker['checks'][key] = maker['checks'][key][:-2]
+        if maker['checks'].get('walks'):
+            maker['checks']['walks'].pop(list(maker['checks']['walks'])[-1])
         merged = body_plan.keep_sections(path, maker, say=False)
         need(merged == full and list(merged) == list(full), f'{model}: the plan came back different')
     path = body_plan.plan_path('lioness')
@@ -556,6 +562,9 @@ def the_clip_maps_ways_are_checked_with_the_plans_own_list():
     animal = clip_check.Animal('lioness')
     checked = clip_check.pairs(animal, list(animal.data))
     need(('rest_down', 'rest_up') in checked and ('groom', 'rest_up') in checked, '--switches leaves the map out')
+    need(('stalk', 'rest_down') in checked and ('rest_up', 'walk') in checked, '--switches leaves out the walk from any standing loop')
+    need(not any(a.startswith('face_') for a, _ in checked if (a, _) not in [tuple(p[:2]) for p in data['checks']['switches']]),
+         'a face clip (its own layer) is listed as a body change')
     plan = body_plan.load('lioness')
     plan.data = copy.deepcopy(plan.data)
     plan.data['postures']['lying']['clips'] = ['groom', 'no_such_clip']

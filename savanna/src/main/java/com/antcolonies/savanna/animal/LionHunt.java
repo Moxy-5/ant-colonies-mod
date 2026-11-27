@@ -1266,8 +1266,7 @@ public final class LionHunt {
                 to = s.feedSettle.at(f, place.at());
                 yaw = s.feedSettle.yaw(f, place.yaw());
             }
-            double ground = groundAt(l.level(), to.x, to.z, l.getY());
-            l.placement.place(new Vec3(to.x, Double.isNaN(ground) ? l.getY() : ground, to.z), yaw);   // (lying where it got to: there)
+            l.placement.place(to.x, to.z, yaw);           // (lying where it got to: there; on what is under it)
             if (!l.toward(LionEntity.FEED)) {
                 return;                                         // (lying down still: the feed the tick it is down, no rest between)
             }
@@ -1321,12 +1320,12 @@ public final class LionHunt {
         /** Full: it lies a few blocks from the kill (by its rank), facing it. */
         private void lieByKill(RemainsEntity carcass, int now) {
             byte d = l.doing();
-            if (d == LionEntity.REST || d == LionEntity.REST_DOWN || d == LionEntity.GROOM || d == LionEntity.REST_UP) {
-                return;                                         // (lying by it, or still getting up from its feeding spot)
-            }
             if (d == LionEntity.FEED) {
                 onFeet();                                       // (full since before a reload: up from its spot)
                 return;
+            }
+            if (l.lying()) {
+                return;                                         // (lying by it, or still getting up from its feeding spot)
             }
             Vec3 spot = carcass.position().add(HomeGroup.offset(l.rank(), LIE_OUT + l.rank() * 0.6));
             if (HomeGroup.flat(l.position(), spot.x, spot.z) > 1.0 && now <= s.arriveBy) {   // out of reach: it lies where it got to

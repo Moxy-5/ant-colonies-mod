@@ -396,6 +396,9 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
         boolean out = playedOut();
         String next = clipMap.toward(clipOf(d), out, clipOf(want));
         byte n = next.equals(clipOf(want)) ? want : doingOf(next);
+        if (n < 0) {
+            return false;                               // (a way its doings do not have: it stays as it is)
+        }
         if (n != d || out) {
             setDoing(n);
         }
@@ -411,7 +414,7 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
             return true;
         }
         byte n = doingOf(way);
-        if (n != d) {
+        if (n >= 0 && n != d) {
             setDoing(n);
         }
         return false;
@@ -457,16 +460,19 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
         };
     }
 
-    /** Lying (down, still, getting up or grooming lying). */
+    /** Lying (going down, still, a clip played lying: a groom, the feed; or getting up): its clip map's lying posture. */
     boolean lying() {
-        byte d = doing();
-        return d == REST || d == REST_DOWN || d == REST_UP || d == GROOM || d == STRETCH_UP;
+        return clipMap.touches(clipOf(doing()), "lying");
     }
 
-    /** Sitting (down, still or getting up). */
+    /** Sitting (going down, still or getting up): its clip map's sitting posture. */
     boolean sitting() {
-        byte d = doing();
-        return d == SIT || d == SIT_DOWN || d == SIT_UP;
+        return clipMap.touches(clipOf(doing()), "sitting");
+    }
+
+    /** Down, and not getting up: lying or sitting, or going down into it (its clip leaves it there). */
+    boolean down() {
+        return !ClipMap.STANDING.equals(clipMap.endsIn(clipOf(doing())));
     }
 
     public float ownSize() {

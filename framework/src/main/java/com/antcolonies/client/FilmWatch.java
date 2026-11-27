@@ -274,6 +274,7 @@ final class FilmWatch {
         sceneFiles = stamps(FilmDirector.sceneFiles());
         Map<Path, String> now = stamps(assetFolders());
         boolean full = false, gecko = false;
+        java.util.Set<String> kinds = new java.util.LinkedHashSet<>();   // (the game's own readers, each read again once)
         for (Map.Entry<Path, String> file : now.entrySet()) {
             if (file.getValue().equals(assets.get(file.getKey()))) {
                 continue;
@@ -299,23 +300,33 @@ final class FilmWatch {
             String[] parts = name.split("/");
             if (parts.length > 2 && (parts[2].equals("animations") || parts[2].equals("geo"))) {
                 if (parts[2].equals("animations")) {
-                    com.antcolonies.entity.body.Clips.reloadAll();   // (the game's clip lengths read from the files: the new phase 2)
+                    kinds.add("clips");                         // (the game's clip lengths read from the files: the new phase 2)
                 }
                 gecko = true;
-            } else if (parts.length > 2 && parts[2].equals("block_moves")) {
-                // an animal's move file (the Animal Maker Engine step B): read again from the copied file, both sides
-                com.antcolonies.entity.body.BlockMoves.reloadAll();
-                gecko = true;
-            } else if (parts.length > 2 && parts[2].equals("spots")) {
-                // an animal's spot table (tools/spots.py): the game keeps it for ever, no resource reload reads it again
-                com.antcolonies.entity.body.Spots.reloadAll();
-                gecko = true;
-            } else if (parts.length > 2 && parts[2].equals("body_plans")) {
-                // a body plan (its gaits and their change moments): the same
-                com.antcolonies.entity.body.BodyPlans.reloadAll();
+            } else if (parts.length > 2 && (parts[2].equals("block_moves") || parts[2].equals("spots")
+                    || parts[2].equals("body_plans"))) {
+                // an animal's move file (the Animal Maker Engine step B), spot table (tools/spots.py) or body plan (its
+                // gaits, their change moments, its clip map): the game keeps them for ever, no resource reload reads them
+                // again; read again from the copied file, both sides
+                kinds.add(parts[2]);
                 gecko = true;
             } else {
                 full = true;
+            }
+        }
+        for (String kind : kinds) {
+            try {
+                switch (kind) {
+                    case "clips" -> com.antcolonies.entity.body.Clips.reloadAll();
+                    case "block_moves" -> com.antcolonies.entity.body.BlockMoves.reloadAll();
+                    case "spots" -> com.antcolonies.entity.body.Spots.reloadAll();
+                    default -> com.antcolonies.entity.body.BodyPlans.reloadAll();
+                }
+            } catch (RuntimeException e) {
+                // a broken file (a clip map that cannot work, a spot table half written) never closes the game: the
+                // shoot goes on with what each reader kept, and says why
+                lastError = "the " + kind + " files could not be read again: " + e.getMessage();
+                LOG.error("Film watch: {}", lastError, e);
             }
         }
         assets = now;

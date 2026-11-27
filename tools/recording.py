@@ -131,6 +131,8 @@ SLIDE_PX = 0.15    # a standing foot whose bearing corners move more than this a
 CATCH_UP = 3       # after ticks not recorded the game eases the animal to its new place over 3 ticks (Minecraft's own
                    # steps for an entity sent a new place): no slide is judged in them
 LIFTED, DOWN, SLIDING, NO_GROUND, NOT_DRAWN = 0, 1, 2, -1, -2
+MIN_DT = 0.25      # moments closer than a quarter tick are not judged for a slide: the drawing's noise over a tiny
+                   # time reads as a fast slide (R12-17's floor, kept when pair_report moved onto this rule)
 
 
 class Ground:
@@ -172,7 +174,7 @@ def model_px(header, moments):
     moment it was drawn."""
     for m in moments:
         b = m['b'][0]
-        if b != 0:
+        if b != 0 and all(math.isfinite(v) for v in b):
             return math.hypot(b[0], b[4], b[8]) / 16 or 1 / 16
     return 1 / 16
 
@@ -214,8 +216,9 @@ def feet(header, moments, legs, ground, keys, since_gap, origin=(0, 0, 0)):
             drawn = known = False
             for bi in parts:
                 b = m['b'][bi]
-                if b == 0:
-                    now.extend([None] * len(corners[bi]))      # (a part not drawn: none of its corners bears)
+                if b == 0 or not all(math.isfinite(v) for v in b):
+                    # (a part not drawn, or written as NaN: none of its corners bears; replay.pack hides it too)
+                    now.extend([None] * len(corners[bi]))
                     bear.extend([False] * len(corners[bi]))
                     continue
                 drawn = True
@@ -250,7 +253,7 @@ def feet(header, moments, legs, ground, keys, since_gap, origin=(0, 0, 0)):
                     # when that moment was at most two ticks before, and not while the game eases the animal on after
                     # ticks not recorded)
                     dt = keys[j] - prev_key if j > 0 else 0
-                    if state == DOWN and prev_state is not None and prev_state >= DOWN and 0 < dt <= 2 and since_gap[j] > CATCH_UP:
+                    if state == DOWN and prev_state is not None and prev_state >= DOWN and MIN_DT <= dt <= 2 and since_gap[j] > CATCH_UP:
                         total, both = 0.0, 0
                         for i, (b1, b0) in enumerate(zip(bear, bore)):
                             if b1 and b0:

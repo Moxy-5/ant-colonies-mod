@@ -102,10 +102,14 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  *                                 game's side at that spot (its animals with their own minds; its job, if any, run each tick)
  * seed 7                          the game's and every animal's dice set, so the scene plays the same way each run
  * until stage=FIGHT 3000          the game runs (unfrozen) until some animal's fact reads so
- *                                 ({@link com.antcolonies.debug.FilmFacts}), at most 3000 client ticks
+ *                                 ({@link com.antcolonies.debug.FilmFacts}), at most 3000 client ticks; several facts
+ *                                 of one animal "doing=feed,name=film-lioness" (a named animal's "name" is a fact);
+ *                                 "until doing=feed 600 freeze" freezes the game on its own side on the very tick they
+ *                                 first read so, so the take after it starts at that clip change (the new phase 2, step 8)
  * aim film-calf                   the cameras below follow the animal of that name ("aim fact holding=true": the first
  *                                 animal with that fact; "aim off")
- * cam south 0 2 -9                a camera this far off the aimed animal's middle, looking at it; every "shot" and
+ * cam south 0 2 -9 [sized]        a camera this far off the aimed animal's middle ("sized": in its size, its box's width
+ *                                 or height, the larger), looking at it; every "shot" and
  *                                 every burst picture is taken from each camera in turn, one take (named
  *                                 &lt;burst&gt;_south_00, ...); "cam off" drops them all. While the game runs the first
  *                                 camera keeps it in view
@@ -291,6 +295,7 @@ public final class FilmDirector {
         aimName = null;
         aimFact = null;
         untilLeft = 0;
+        FilmFactsBoard.freezeWhen(null);
         FilmFactsBoard.setStageJob(null);
         framesPerTick = 1;
         drawPartial = 0.0F;
@@ -372,12 +377,14 @@ public final class FilmDirector {
             if (!cams.isEmpty()) {
                 aimCamera(mc, cams.get(0));    // the game runs: the first camera keeps the scene in view (so it is drawn)
             }
-            java.util.UUID met = FilmFactsBoard.find(untilKey, untilValue);
-            if (met != null) {
-                LOG.info("Film: until {}={} met after {} ticks (game tick {})", untilKey, untilValue, untilAsked - untilLeft, FilmFactsBoard.tick());
+            java.util.UUID met = FilmFactsBoard.find(until);
+            String what = FilmFactsBoard.describe(until);
+            if (met != null && (!untilFreezes || frozen())) {   // (a freeze: on once this side has it too)
+                LOG.info("Film: until {} met after {} ticks (game tick {})", what, untilAsked - untilLeft, FilmFactsBoard.tick());
                 untilLeft = 0;
             } else if (--untilLeft == 0) {
-                LOG.warn("Film: until {}={} NOT met in {} ticks; the scene goes on", untilKey, untilValue, untilAsked);
+                FilmFactsBoard.freezeWhen(null);
+                LOG.warn("Film: until {} NOT met in {} ticks; the scene goes on", what, untilAsked);
             } else {
                 return;
             }
@@ -494,6 +501,7 @@ public final class FilmDirector {
         logLines.setLength(0);
         BodyRecorder.stop();
         untilLeft = 0;
+        FilmFactsBoard.freezeWhen(null);
         FilmFactsBoard.setStageJob(null);
         checks = new FilmChecks();
         filmed = true;
@@ -594,10 +602,12 @@ public final class FilmDirector {
             case "stage" -> stage(mc, w[1], Integer.parseInt(w[2]), Integer.parseInt(w[3]), Integer.parseInt(w[4]));
             case "seed" -> seed(mc, Long.parseLong(w[1]));
             case "until" -> {
-                String[] kv = w[1].split("=", 2);
-                untilKey = kv[0];
-                untilValue = kv.length > 1 ? kv[1] : "true";
+                until = FilmFactsBoard.conditions(w[1]);
                 untilAsked = untilLeft = Math.max(1, Integer.parseInt(w[2]));
+                // "freeze": the game frozen on the very tick the facts first read so, on its own side (a take starts
+                // at the clip change, never ticks after it: BUGS 449)
+                untilFreezes = w.length > 3 && w[3].equals("freeze");
+                FilmFactsBoard.freezeWhen(untilFreezes ? until : null);
             }
             case "aim" -> {
                 aimName = null;
@@ -612,7 +622,8 @@ public final class FilmDirector {
                 if (w[1].equals("off")) {
                     cams.clear();
                 } else {
-                    cams.add(new Cam(w[1], Double.parseDouble(w[2]), Double.parseDouble(w[3]), Double.parseDouble(w[4])));
+                    cams.add(new Cam(w[1], Double.parseDouble(w[2]), Double.parseDouble(w[3]), Double.parseDouble(w[4]),
+                            w.length > 5 && w[5].equals("sized")));
                 }
             }
             case "quit" -> {
@@ -627,8 +638,11 @@ public final class FilmDirector {
 
     // --- the Motion Studio's steps (phase 0, 2026-11-25) ------------------------------------------------------------------
 
-    /** A camera of the "cam" step: its name and where it is from the aimed animal's middle (blocks). */
-    private record Cam(String name, double dx, double dy, double dz) {
+    /**
+     * A camera of the "cam" step: its name and where it is from the aimed animal's middle (blocks; "sized": in the
+     * aimed animal's size, the larger of its box's width and height, so a cub and a lion fill a take alike).
+     */
+    private record Cam(String name, double dx, double dy, double dz, boolean sized) {
     }
 
     private static final java.util.List<Cam> cams = new java.util.ArrayList<>();
@@ -638,7 +652,9 @@ public final class FilmDirector {
     private static String aimName;
     private static String[] aimFact;
     /** The "until" step: the fact waited for, the client ticks left and asked. */
-    private static String untilKey, untilValue;
+    private static String[][] until;
+    /** Whether the "until" step freezes the game as its facts first read so. */
+    private static boolean untilFreezes;
     private static int untilLeft, untilAsked;
 
     /** The animal the cameras follow, as this side draws it, or null. */
@@ -661,7 +677,8 @@ public final class FilmDirector {
             return;                             // nothing to aim at (not come yet, or gone): the camera stays
         }
         Vec3 middle = target.position().add(0.0, target.getBbHeight() * 0.5, 0.0);
-        Vec3 eye = middle.add(cam.dx(), cam.dy(), cam.dz());
+        double k = cam.sized() ? Math.max(target.getBbWidth(), target.getBbHeight()) : 1.0;
+        Vec3 eye = middle.add(cam.dx() * k, cam.dy() * k, cam.dz() * k);
         Vec3 to = middle.subtract(eye);
         float yaw = (float) (Mth.atan2(to.z, to.x) * Mth.RAD_TO_DEG) - 90.0F;
         float pitch = (float) (-Mth.atan2(to.y, Math.sqrt(to.x * to.x + to.z * to.z)) * Mth.RAD_TO_DEG);

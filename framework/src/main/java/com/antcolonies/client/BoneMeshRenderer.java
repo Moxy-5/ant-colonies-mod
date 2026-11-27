@@ -57,7 +57,9 @@ public class BoneMeshRenderer<T extends Entity & GeoAnimatable> extends GeoEntit
      * framework's {@link com.antcolonies.entity.body.Placement}) is drawn at its own heading, which its mount set. GeckoLib
      * turns every rider to its mount's heading (within 50 degrees exactly the mount's, it never asks the mount's
      * {@code shouldRiderSit}), so a lioness faced in at a calf's flank was drawn along the calf, her jaw 1.4 to 1.8 blocks
-     * off its body (the hunt film, 2026-11-26), and a buffalo in a crocodile's jaws drawn along the crocodile.
+     * off its body (the hunt film, 2026-11-26), and a buffalo in a crocodile's jaws drawn along the crocodile (a vanilla
+     * cow there was drawn across its jaws all along: Minecraft's own renderer asks). The head's turn GeckoLib works out
+     * against the mount ({@code netHeadYaw}) is left as it is: no animal drawn here turns its head by it.
      */
     @Override
     protected void applyRotations(T entity, PoseStack poseStack, float ageInTicks, float rotationYaw, float partialTick,

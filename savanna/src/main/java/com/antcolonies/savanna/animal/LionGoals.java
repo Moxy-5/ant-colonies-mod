@@ -432,8 +432,7 @@ public final class LionGoals {
                 if (now < departAt) {
                     return;                                     // lying or sitting on until its turn
                 }
-                boolean down = d == LionEntity.REST || d == LionEntity.SIT;
-                if (!down && !getUp()) {
+                if (!l.down() && !getUp()) {
                     return;                                     // lying or sitting it first sees where it goes: it may be there
                 }
                 if (!choosePlace(now)) {
@@ -445,7 +444,7 @@ public final class LionGoals {
                 }
             }
             double dist = HomeGroup.flat(l.position(), stand);
-            if (d == LionEntity.REST || d == LionEntity.REST_DOWN || d == LionEntity.SIT || d == LionEntity.SIT_DOWN) {
+            if (l.down()) {                                    // (lying, sitting, a groom, a feed left when the feast ended)
                 if (dist <= arriveDone()) {
                     arrive(now);                               // already at its place (its goal started again)
                 } else {

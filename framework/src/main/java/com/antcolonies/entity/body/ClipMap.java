@@ -56,7 +56,8 @@ public final class ClipMap {
             for (String c : p.up()) {
                 if (startsIn.putIfAbsent(c, p.name()) == null) {
                     endsIn.put(c, STANDING);                    // (a way up two postures share, as a buffalo's up from
-                } else if (!endsIn.get(c).equals(STANDING)) {   // lying and from being held down: the first names its start)
+                } else if (!endsIn.get(c).equals(STANDING)     // lying and from being held down: the first names its start)
+                        || startsIn.get(c).equals(STANDING)) {   // (a standing clip, or a way down, is no way up)
                     throw new IllegalStateException("the clip map names " + c + " as a way up and as something else");
                 }
             }
@@ -82,6 +83,9 @@ public final class ClipMap {
                 continue;                                       // ("about")
             }
             JsonObject p = e.getValue().getAsJsonObject();
+            if (!p.has("hold")) {
+                throw new IllegalStateException("the clip map's posture '" + e.getKey() + "' has no hold (the clip it rests in)");
+            }
             out.put(e.getKey(), new Posture(e.getKey(), p.get("hold").getAsString(),
                     p.has("down") ? p.get("down").getAsString() : null, list(p, "up"), list(p, "clips")));
         }
@@ -103,6 +107,11 @@ public final class ClipMap {
         return postures.get(name);
     }
 
+    /** Every posture, standing first as the plan lists them. */
+    public java.util.Collection<Posture> postures() {
+        return postures.values();
+    }
+
     /** The posture a clip is played in (a way down is played standing; a clip the map does not name too). */
     public String startsIn(String clip) {
         return startsIn.getOrDefault(clip, STANDING);
@@ -113,9 +122,13 @@ public final class ClipMap {
         return endsIn.getOrDefault(clip, STANDING);
     }
 
-    /** Whether a clip has it in a posture at any moment: played there, or a way into or out of it. */
+    /** Whether a clip has it in a posture at any moment: played there, or a way into or out of it (a shared way up too). */
     public boolean touches(String clip, String posture) {
-        return startsIn(clip).equals(posture) || endsIn(clip).equals(posture);
+        if (startsIn(clip).equals(posture) || endsIn(clip).equals(posture)) {
+            return true;
+        }
+        Posture p = postures.get(posture);
+        return p != null && p.up().contains(clip);
     }
 
     /** The clip a one-shot leads into once it has played out: the clip it rests in where the one-shot left it. */

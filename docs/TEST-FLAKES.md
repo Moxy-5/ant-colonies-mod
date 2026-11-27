@@ -6,7 +6,7 @@ from the list of bugs (`docs/OPEN-BUGS.md`) on purpose. **This file is written b
 `python tools/open_bugs.py`; never edit it by hand.** Each number is an entry in `docs/BUGS.md` tagged
 `[flake]`, one per test: a new failure of a listed test is a line on its entry.
 
-**53 flaky tests.**
+**57 flaky tests.**
 
 - **62** The fallen tree up a bowl fails beside other tests (`aFallenTreeLiesOnTheSlopeUphill`)
 - **75** The minors at the holes test failed once beside the fight tests (`minorsGuardTheHolesAndLineTheForagersTrailThenGoInLast`)
@@ -60,4 +60,8 @@ from the list of bugs (`docs/OPEN-BUGS.md`) on purpose. **This file is written b
 - **460** The dusk raid test failed once beside others, a stung termite left lying at the spot (`aRaidCaughtByDuskAtTheSpotTurnsHomeWithWhatItStung`)
 - **465** The half-fed colony's scout test failed once beside others, its find at a place far outside the test (`aHalfFedColonysScoutsPassOverLoneTermitesAndTakeARicherSpotFurtherOut`)
 - **468** The test `aTilapiaMotherWithNoRoomKeepsHerEggsUntilThereIs` failed beside others and once alone, "3 fry from 4 eggs with room for all"
+- **470** The sand bank test once found no crocodile slide on a bend beside other tests; alone it passes.
+- **471** The tree growing round a player's block once missed a day's growth beside other tests; alone it passes.
+- **472** The otter once carried its catch but did not eat it on the bank in time beside other tests; alone it passes.
+- **474** The tadpole in the dying hippo grass test once did not graze in time beside other tests; alone it passes.
 - **R9-39** The mid-climb tests fail now and then because the monitor's own idle goals take it off the test's route (BUGS 255, 290, 292) *(code review; half fixed)*

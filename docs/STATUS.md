@@ -13,6 +13,8 @@ Keep this short. The full story is in `docs/HISTORY.md`; every status bullet is 
 
 **The Motion Studio, phase 1 (2026-11-27, branch `claude/motion-phase1`):** see the game's own recording of a film: `python tools/replay.py run-film/screenshots/lion_hunt`, then open `references/replay/lion_hunt.html` (every animal as the game drew it, any angle, slow motion, a footfall chart that turns red where a planted foot slides). It shows the lions' walk and the stalk-to-freeze switch sliding their feet.
 
+**The Motion Studio, the new phase 2 (2026-11-27, branch `claude/motion-glue`):** the glue between a clip and the game, checked by four reviewers. The game reads each clip's length from the clip file; a lion holding or feeding, or a catch in a crocodile's jaws, is placed after the game's physics and never shoved; the lion's ways of lying down and getting up come from one clip map; a test bench films the feast from the very tick a lion lies down (`./gradlew runFilm -PfilmScene=tools/film/feast_bench.film`). Visible: a buffalo or fish in a crocodile's jaws is drawn across them, as a cow always was.
+
 ## Now (2026-11-21): the Animal Maker Engine overnight, steps A to C and the full check
 Branch `claude/engine-every-animal` (not yet in `C:\Ant Mod`, which holds another session's uncommitted notes). One checker and one course for any animal, shared climbing moves in the framework, shared leg maths, game faces automatic, the monitor's S-curve, and `python tools/verify_animal.py <animal> [--quick]` (the one command that checks an animal all the way). Every built animal passed it. Open: BUGS 255 (a monitor can stand at a one-block step without climbing, found by a new test), BUGS 256 (young crocodiles' tails inside blocks at steps).
 

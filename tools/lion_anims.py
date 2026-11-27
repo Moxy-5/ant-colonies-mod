@@ -440,8 +440,14 @@ def _mark_made_against(made, holder):
     for name, clip in made.items():
         sign = _MADE_AGAINST.get((holder, name))
         if sign is not None:
+            # a note of its own, at the first time key free (another note at 0.0 is left whole: the game reads notes by
+            # how they start, so one prefixed with this would be lost; review 2026-11-27)
             notes = clip.setdefault("timeline", {})
-            notes["0.0"] = f"made_against buffalo {sign}" + (f"; {notes['0.0']}" if "0.0" in notes else "")
+            for key in [k for k, v in notes.items() if isinstance(v, str) and v.startswith("made_against ")]:
+                del notes[key]
+            key = next(f"{i / 1000:.3f}".rstrip("0").rstrip(".") + ("" if i % 1000 else ".0") for i in range(1000)
+                       if (f"{i / 1000:.3f}".rstrip("0").rstrip(".") + ("" if i % 1000 else ".0")) not in notes)
+            notes[key] = f"made_against buffalo {sign}"
     return made
 
 

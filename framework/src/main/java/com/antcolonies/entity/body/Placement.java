@@ -13,7 +13,9 @@ import net.minecraft.world.phys.Vec3;
  * rule, one place for every animal:
  * <ul>
  * <li><b>Placed by its own game code</b> ({@link #place}, each tick it stays, on the server): set there after the game's
- * own physics ({@link #afterTick}, the end of its tick), so nothing of its walk, a push or a fall moves it off.</li>
+ * own physics ({@link #afterTick}, the end of its tick), so nothing of its walk or a push moves it off. Its height stays
+ * the game's own: it lies on whatever is under it, as any animal does (one over a ledge's edge held by it, not dropped to
+ * the ground under its middle; the review of 2026-11-27).</li>
  * <li><b>Carried by a mount that does not seat it</b> (Minecraft's {@code shouldRiderSit} false; the mount's
  * {@code positionRider} calls {@link #seat}): set there on the server and on every screen alike, after its own tick
  * (Minecraft places riders after they tick).</li>
@@ -28,7 +30,7 @@ import net.minecraft.world.phys.Vec3;
  */
 public final class Placement {
     private final Mob mob;
-    private double x, y, z;
+    private double x, z;
     private float yaw;
     private int placedAt = Integer.MIN_VALUE / 2;
 
@@ -36,11 +38,16 @@ public final class Placement {
         this.mob = mob;
     }
 
-    /** Puts it on a place this tick, facing that way (its own game code, on the server; asked every tick it stays). */
-    public void place(Vec3 at, float yaw) {
-        this.x = at.x;
-        this.y = at.y;
-        this.z = at.z;
+    /**
+     * Puts it on a place this tick (across the ground: its height is the game's), facing that way (its own game code, on
+     * the server; asked every tick it stays).
+     */
+    public void place(double x, double z, float yaw) {
+        if (!Double.isFinite(x) || !Double.isFinite(z) || !Float.isFinite(yaw)) {
+            return;                                     // (a broken sum never puts an animal out of the world)
+        }
+        this.x = x;
+        this.z = z;
         this.yaw = yaw;
         this.placedAt = mob.tickCount;
     }
@@ -61,24 +68,29 @@ public final class Placement {
         if (mob.tickCount != placedAt || mob.isPassenger()) {
             return;
         }
-        mob.setPos(x, y, z);
+        mob.setPos(x, mob.getY(), z);
         face(mob, yaw);
         still(mob);
     }
 
     /**
      * A mount sets a rider it carries (from its {@code positionRider}, on the server and every screen alike): there,
-     * facing that way, still.
+     * facing that way, still. A broken sum (not a number) leaves it where it was.
      */
     public static void seat(Entity rider, Entity.MoveFunction move, double x, double y, double z, float yaw) {
-        move.accept(rider, x, y, z);
+        if (!Float.isFinite(yaw)) {
+            seat(rider, move, x, y, z);
+            return;
+        }
+        seat(rider, move, x, y, z);
         face(rider, yaw);
-        still(rider);
     }
 
     /** The same for a rider whose heading is its own (a carried player looks where it likes). */
     public static void seat(Entity rider, Entity.MoveFunction move, double x, double y, double z) {
-        move.accept(rider, x, y, z);
+        if (Double.isFinite(x) && Double.isFinite(y) && Double.isFinite(z)) {
+            move.accept(rider, x, y, z);
+        }
         still(rider);
     }
 

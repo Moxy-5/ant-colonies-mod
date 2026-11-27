@@ -1,0 +1,50 @@
+# The feast bench (the Motion Studio, the new phase 2, step 8, idea 54; docs/plans/motion-studio-phase2.md): one
+# interaction and nothing else, a cow's carcass with a hungry lioness and the male of its den (LionScenes.feast), so
+# a clip change in the feast is filmed from its first tick. Each take starts on the very game tick its lion starts to
+# lie down: "until ... freeze" stops the game on its own side as the fact first reads so, and holds it still for the
+# take (frozen from the drawing side it ran on a few ticks, 60 with a backlog: BUGS 449, the hunt film's hold burst
+# that filmed the feast). Its cameras stand off the lion by its size ("sized"), and every take is stepped a tick a
+# picture, so the recording's game tick is the take's clock: 60 ticks, her lying down (19) straight into the feed
+# with nothing between (BUGS 376); then the male, from the tick he lies down: a male first at a kill, he comes about
+# 8 seconds after her (19 blocks off, she 5; from 10 he came as she lay down and turned her back) and takes the first
+# spot of the feast order, hers: she gets up with a growl and lies down at the next, so his take has her feeding
+# beside him (BUGS 467: two spots side by side); then her lying down by the kill once she is full (BUGS 467's other
+# half: the full lying by a feeder), and both from above. Between takes the game runs and is not recorded.
+#   ./gradlew runFilm -PfilmScene=tools/film/feast_bench.film     pictures in run-film/screenshots/feast_bench/
+#   python tools/replay.py run-film/screenshots/feast_bench
+# The field's corner is at -12 -62 -12: the carcass at 0.5 -60 0.5, the lioness 5 blocks west, the male 19 east.
+cmd time set 14000
+cmd weather clear
+cmd effect give @s minecraft:night_vision infinite 0 true
+lens 50
+cmd tick freeze
+stage lion_feast -12 -62 -12
+seed 7
+aim film-carcass
+cam wide 0 9 -16
+record on 1 all
+cmd tick unfreeze
+# she lies down at her spot and feeds: from the tick she starts down
+until doing=rest_down,name=film-lioness 900 freeze
+aim film-lioness
+cam off
+cam south 0 0.7 -2.6 sized
+cam east 2.6 0.7 0 sized
+cam above 0.4 2.4 0.2 sized
+burst lie_down_feed 60 1
+# the male takes his spot (hers): from the tick he starts down, her getting up and growling beside him
+cmd tick unfreeze
+until doing=rest_down,name=film-male 900 freeze
+aim film-male
+burst male_down_feed 60 1
+# full, she lies down by the kill: from the tick she starts down (about 45 s on)
+cmd tick unfreeze
+until doing=rest_down,name=film-lioness 1500 freeze
+aim film-lioness
+burst full_lie_by 40 1
+# both from above
+aim film-carcass
+cam off
+cam above 0 7 0.2
+burst both 10 4
+record off
