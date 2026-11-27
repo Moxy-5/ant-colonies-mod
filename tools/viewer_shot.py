@@ -95,13 +95,20 @@ class Browser:
     page's every view and score is taken in one launch instead of two launches a picture."""
 
     def __init__(self, profile, size):
-        import socket
-        import time
-        import urllib.request
         w, h = (int(v) for v in size.split(","))
         self.proc = subprocess.Popen([str(browser()), *FLAGS, f"--user-data-dir={profile}", "--remote-debugging-port=0",
                                       f"--window-size={w},{h}", "about:blank"],
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            self._start(profile, w, h)
+        except BaseException:  # (a browser that started but could not be reached is never left running)
+            self.proc.kill()
+            raise
+
+    def _start(self, profile, w, h):
+        import socket
+        import time
+        import urllib.request
         port_file = Path(profile) / "DevToolsActivePort"
         text = ""
         for _ in range(300):
@@ -112,7 +119,10 @@ class Browser:
             if text:
                 break
             time.sleep(0.1)
+        if not text:
+            raise RuntimeError(f"the browser ({browser()}) did not open its debugging port in 30 s")
         port = int(text.split()[0])
+        page = None
         for _ in range(100):
             try:
                 pages = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{port}/json/list", timeout=5).read())
@@ -120,6 +130,8 @@ class Browser:
                 break
             except Exception:  # noqa: BLE001  (the browser still starting)
                 time.sleep(0.1)
+        if page is None:
+            raise RuntimeError("the browser opened its debugging port but listed no page in 10 s")
         path = page["webSocketDebuggerUrl"].split(f":{port}", 1)[1]
         self.sock = socket.create_connection(("127.0.0.1", port), timeout=60)
         key = base64.b64encode(os.urandom(16)).decode()
@@ -172,7 +184,13 @@ class Browser:
                 return msg.get("result", {})
 
     def evaluate(self, expr):
-        return self.call("Runtime.evaluate", expression=expr, returnByValue=True).get("result", {}).get("value")
+        """The expression's value; a JavaScript error in it is raised here, never read as an empty answer."""
+        r = self.call("Runtime.evaluate", expression=expr, returnByValue=True)
+        if "exceptionDetails" in r:
+            d = r["exceptionDetails"]
+            raise RuntimeError(f"JavaScript error in {expr[:80]!r}: "
+                               + ((d.get("exception") or {}).get("description") or d.get("text") or "unknown"))
+        return r.get("result", {}).get("value")
 
     def view(self, page, hash_, out, settle=2.5, timeout=30.0):
         """Loads the page at this address (afresh: the page reads its address once), waits until it has drawn (its

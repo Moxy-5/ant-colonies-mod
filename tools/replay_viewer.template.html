@@ -86,6 +86,13 @@
 <!--VIEWER-->
 <script>
 const DATA = /*DATA*/null;
+// a name in the page's address as written (the shared reader turns a value starting with a digit into a number, so
+// an animal named "2nd-cow" read back as 2); its pieces still encoded, for a list split on commas
+function rawHash(key) {
+  const kv = location.hash.slice(1).split('&').map(x => x.split('=')).find(([k]) => k === key);
+  return kv ? kv.slice(1).join('=') : '';
+}
+const rawPick = (() => { try { return decodeURIComponent(rawHash('pick')); } catch (e) { return ''; } })();
 document.getElementById('title').textContent = 'Replay: ' + DATA.title;
 document.title = DATA.title + ' Replay';
 const $ = id => document.getElementById(id);
@@ -246,7 +253,8 @@ function show(t) {
   $('when').classList.toggle('gap', gapBefore[now] > GAP);
   $('stamp').textContent = DATA.title + ' · ' + text;
   // follow: the camera moves with the picked animal's own place (not its drawn box, which bobs with the legs)
-  if (follow && was && picked.now >= 0) {
+  // (with a camera button lit, that camera stays put on the animal, turning with it; turned by hand, it slides along)
+  if (follow && was && picked.now >= 0 && !(settings.cam && aim(settings.cam))) {
     const p = picked.pos[picked.now], d = new THREE.Vector3(p[0] - was[0], p[1] - was[1], p[2] - was[2]);
     st.camera.position.add(d); st.controls.target.add(d);
   }
@@ -309,6 +317,9 @@ function info() {
   const v = a.v[j], sp = Math.hypot(v[0], v[2]) * 20;
   rows.push(['moving', `${sp.toFixed(2)} blocks a second` + (Math.abs(v[1]) > 0.09 ? `, ${(v[1] * 20).toFixed(1)} up` : '') +
     `, facing ${(((a.yaw[j] % 360) + 360) % 360).toFixed(0)}°`]);
+  const step = stepAt(a, j);                    // (where the game drew it: after ticks not recorded the game eases an
+                                                // animal on to where it is, much faster than it moves)
+  if (step) rows.push(['drawn', `${step.move.toFixed(3)} blocks and ${step.turn.toFixed(1)}° a tick since its moment before`]);
   rows.push(['standing', a.held[j] ? 'held, drawn by its holder' : a.water[j] ? `in water (${a.fluid[j]} deep)` : a.ground[j] ? 'on the ground' : '<span class="warn">in the air</span>']);
   const facts = a.facts[j] || {};
   Object.keys(facts).forEach(k => rows.push([esc(k), esc(JSON.stringify(facts[k]).replace(/^"|"$/g, ''))]));
@@ -341,46 +352,80 @@ function sceneView() {
   st.camera.position.set(c.x + s * 0.6, c.y + s * 0.55, c.z + s * 0.8);
   st.controls.target.copy(c); st.controls.update();
 }
-// how far back a camera looking along -dir at target must stand for every drawn part of the animal to fit in the
-// picture with a margin round it (its own shape, not a box round it: a lioness's long tail does not push the camera
-// back in a front view)
-function fitDistance(a, target, dir) {
+// the space the animal takes up in its own frame (forward, left and up from its place) over its whole recording: each
+// camera is fitted to it, so it stands at one distance from the animal however it turns, lies down or stretches, and
+// pictures of a strip, a turn or a follow keep one size (fitted to one moment's pose, the zoom jumped from moment to
+// moment and a turn cropped it: the stage 3 review, 2026-11-27). Over the frames j0..j1 when a tool asks (a strip is
+// fitted to its own moments: one lioness's leap throws a claw 1.7 blocks to her side, and fitted to the whole
+// recording every picture of her walk was small)
+function envelopeOf(a, j0 = 0, j1 = a.n - 1) {
+  const key = j0 + '-' + j1;
+  a.envelopes = a.envelopes || {};
+  if (a.envelopes[key]) return a.envelopes[key];
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity], M = a.M;
+  for (let j = j0; j <= j1; j++) {              // (every moment: a leap between two samples was cropped)
+    const yaw = a.yaw[j] * Math.PI / 180, fx = -Math.sin(yaw), fz = Math.cos(yaw), lx = Math.cos(yaw), lz = Math.sin(yaw);
+    for (let b = 0; b < a.B; b++) {
+      const o = (j * a.B + b) * 12, s = a.turn[b], v = a.move[b];
+      if (hidden(M, o)) continue;
+      for (const c of a.bones[b].cubes) for (let k = 0; k < 24; k += 3) {
+        const x = c[k], y = c[k + 1], z = c[k + 2];
+        const wx = (M[o] * x + M[o + 1] * y + M[o + 2] * z) * s + M[o + 3] * v;
+        const wy = (M[o + 4] * x + M[o + 5] * y + M[o + 6] * z) * s + M[o + 7] * v;
+        const wz = (M[o + 8] * x + M[o + 9] * y + M[o + 10] * z) * s + M[o + 11] * v;
+        const q = [wx * fx + wz * fz, wx * lx + wz * lz, wy];
+        for (let i = 0; i < 3; i++) { if (q[i] < lo[i]) lo[i] = q[i]; if (q[i] > hi[i]) hi[i] = q[i]; }
+      }
+    }
+  }
+  if (!(lo[0] <= hi[0])) { lo.fill(-0.5); hi.fill(0.5); }
+  return (a.envelopes[key] = {lo, hi});
+}
+// how far back a camera looking along -dir at target must stand for these points to fit in the picture with a margin
+// round them
+function fitDistance(points, target, dir) {
   const z = dir.clone().normalize(), x = new THREE.Vector3(0, 1, 0).cross(z).normalize(), y = z.clone().cross(x);
   const tanV = Math.tan(st.camera.fov * Math.PI / 360), tanH = tanV * st.camera.aspect, MARGIN = 1.15;
+  const span = points.length ? points[0].distanceTo(points[points.length - 1]) : 1;
   const p = new THREE.Vector3();
-  let dist = 0.5;
-  a.meshes.forEach(m => {
-    if (!m || !m.visible) return;
-    if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
-    const b = m.geometry.boundingBox;
-    for (let k = 0; k < 8; k++) {
-      p.set(k & 1 ? b.max.x : b.min.x, k & 2 ? b.max.y : b.min.y, k & 4 ? b.max.z : b.min.z).applyMatrix4(m.matrixWorld).sub(target);
-      const toward = p.dot(z);
-      dist = Math.max(dist, toward + MARGIN * Math.abs(p.dot(x)) / tanH, toward + MARGIN * Math.abs(p.dot(y)) / tanV, toward + 0.3);
-    }
+  let dist = 0;
+  points.forEach(q => {
+    p.copy(q).sub(target);
+    const toward = p.dot(z);
+    dist = Math.max(dist, toward + MARGIN * Math.abs(p.dot(x)) / tanH, toward + MARGIN * Math.abs(p.dot(y)) / tanV,
+                    toward + 0.1 * span);      // (never nearer to a point than a tenth of the animal: a termite too)
   });
   return dist;
 }
 // the picked animal from one side: its own left (Minecraft: facing (-sin yaw, cos yaw), left (cos yaw, sin yaw)),
-// near enough to fill the picture; with nothing picked, or the pick not drawn now, the whole scene
+// near enough for its envelope to fill the picture; above looks down with its head to the left, as the side view
 const CAMS = [['three-quarter', 'Three quarters'], ['side', 'Side'], ['front', 'Front'], ['behind', 'Behind'], ['above', 'Above'], ['wide', 'Wide']];
+function aim(name) {
+  const a = picked;
+  if (!a || a.now < 0) return false;
+  const j = a.now, p = a.pos[j], yaw = a.yaw[j] * Math.PI / 180, {lo, hi} = envelopeOf(a, ...(a.fitRange || []));
+  const fwd = new THREE.Vector3(-Math.sin(yaw), 0, Math.cos(yaw)), left = new THREE.Vector3(Math.cos(yaw), 0, Math.sin(yaw));
+  const at = (f, l, y) => new THREE.Vector3(p[0] + fwd.x * f + left.x * l, p[1] + y, p[2] + fwd.z * f + left.z * l);
+  const corners = [];
+  for (let k = 0; k < 8; k++) corners.push(at(k & 1 ? hi[0] : lo[0], k & 2 ? hi[1] : lo[1], k & 4 ? hi[2] : lo[2]));
+  const centre = at((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2);
+  const low = new THREE.Vector3(0, 0.15, 0);   // (a little over the ground: the feet and the ground under them show)
+  const dir = {side: left.clone().add(low), front: fwd.clone().add(low), behind: fwd.clone().negate().add(low),
+               above: new THREE.Vector3(0, 1, 0).addScaledVector(left, 0.02),
+               'three-quarter': fwd.clone().add(left).normalize().add(new THREE.Vector3(0, 0.45, 0)),
+               wide: fwd.clone().add(left).normalize().add(new THREE.Vector3(0, 0.8, 0))}[name].normalize();
+  const dist = fitDistance(corners, centre, dir) * (name === 'wide' ? 3 : 1);
+  st.camera.position.copy(centre).addScaledVector(dir, dist);
+  st.controls.target.copy(centre);
+  st.controls.update();
+  return true;
+}
 function camera(name) {
   name = String(name || '').toLowerCase();
   if (!CAMS.some(([k]) => k === name)) name = 'three-quarter';
-  const a = picked, at = a && a.now >= 0 ? centreOf(a) : null;
-  if (!at) { settings.cam = ''; camBtns(null); sceneView(); writeState(); writeAddress(); return; }
+  if (!aim(name)) { settings.cam = ''; camBtns(null); sceneView(); writeState(); writeAddress(); return; }
   settings.cam = name;
   camBtns(name);
-  const yaw = a.yaw[a.now] * Math.PI / 180;
-  const fwd = new THREE.Vector3(-Math.sin(yaw), 0, Math.cos(yaw)), left = new THREE.Vector3(Math.cos(yaw), 0, Math.sin(yaw));
-  const low = new THREE.Vector3(0, 0.15, 0);   // (a little over the ground: the feet and the ground under them show)
-  const dir = {side: left.clone().add(low), front: fwd.clone().add(low), behind: fwd.clone().negate().add(low),
-               above: new THREE.Vector3(0.02, 1, 0.02), 'three-quarter': fwd.clone().add(left).normalize().add(new THREE.Vector3(0, 0.45, 0)),
-               wide: fwd.clone().add(left).normalize().add(new THREE.Vector3(0, 0.8, 0))}[name].normalize();
-  const dist = fitDistance(a, at.c, dir) * (name === 'wide' ? 3 : 1);
-  st.camera.position.copy(at.c).addScaledVector(dir, dist);
-  st.controls.target.copy(at.c);
-  st.controls.update();
   writeState();
   writeAddress();
 }
@@ -521,9 +566,19 @@ function feetOf(a) {
   });
   return a.feet;
 }
-function feetNow(a) {
-  const j = a ? a.now : -1;
-  return j < 0 ? [] : feetOf(a).map(f => ({name: f.name, planted: f.state[j] >= 1, sliding: f.state[j] === 2,
+// the body's drawn step since the animal's recorded moment before: how far it moved (blocks) and turned (degrees) a
+// tick, or null (the camera follows the animal, so a jump shows here, not in a picture)
+function stepAt(a, j) {
+  const dt = j > 0 ? a.key[j] - a.key[j - 1] : 0;
+  if (!(dt > 0)) return null;
+  const p = a.pos[j], q = a.pos[j - 1];
+  return {move: Math.hypot(p[0] - q[0], p[2] - q[2]) / dt, turn: (((a.yaw[j] - a.yaw[j - 1]) % 360 + 540) % 360 - 180) / dt};
+}
+function feetNow(a) { return a ? feetAt(a, a.now) : []; }
+// each foot at the animal's frame j, in words a tool can read (heightPx: its lowest corner over the ground, in model
+// pixels, below 0 inside it; slidePx: how far its touching part moved, model pixels a tick)
+function feetAt(a, j) {
+  return j < 0 ? [] : feetOf(a).map(f => ({name: f.name, drawn: f.state[j] !== -2, planted: f.state[j] >= 1, sliding: f.state[j] === 2,
     groundKnown: f.state[j] !== -1, heightPx: isNaN(f.height[j]) ? null : +f.height[j].toFixed(2),
     slidePx: isNaN(f.slide[j]) ? null : +f.slide[j].toFixed(3), slide: isNaN(f.slide[j]) ? null : +(f.slide[j] * pxOf(a)).toFixed(4)}));
 }
@@ -837,7 +892,8 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if
 (function watchRatio() {
   matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener('change', () => { if (ready) drawChartNow(); watchRatio(); }, {once: true});
 })();
-st.onResize.push(() => { if (ready) drawChartNow(); });
+st.onResize.push(() => { if (ready) { drawChartNow(); if (settings.cam) aim(settings.cam); } });   // (a lit camera fitted
+                                                                                                 // to the new shape)
 // a left click (not a drag) on an animal picks it; on the ground, lets the pick go
 const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
 let down = null;
@@ -911,7 +967,7 @@ st.onFrame.push(() => {
     $('animalBtns').appendChild(pair);
     a.btn = b; a.hideBtn = h;
   });
-  (settings.hide ? String(settings.hide).split(',') : []).forEach(n => {
+  (rawHash('hide') ? rawHash('hide').split(',').map(n => { try { return decodeURIComponent(n); } catch (e) { return n; } }) : []).forEach(n => {
     const a = animals.find(x => x.name === n);
     if (a) { a.on = false; a.btn.classList.add('off'); a.hideBtn.textContent = 'Show'; }
   });
@@ -927,7 +983,7 @@ st.onFrame.push(() => {
     const t = tickAt.findIndex(v => v >= settings.at);
     start = t >= 0 ? t : timeline.length - 1;
   }
-  picked = animals.find(a => a.name === settings.pick) || null;
+  picked = animals.find(a => a.name === rawPick) || null;
   if (picked) picked.btn.classList.add('on');
   speed = SPEEDS.some(([v]) => v === settings.speed) ? settings.speed : 1; speedBtns(speed);
   follow = !!settings.follow; $('followBtn').classList.toggle('on', follow);
@@ -950,38 +1006,60 @@ st.onFrame.push(() => {
   // what tools may call (moments are indexes from 0 here; the page and #m count from 1). tools/replay_strips.py takes
   // its pictures through these: one page open, the moment and the camera set, the scene drawn, the picture read back.
   const byName = n => animals.find(a => a.name === n) || null;
+  // one animal at moment t, read from its recording (nothing shown): its own tick, whether this is its own recorded
+  // moment (not its last one held while another animal's moment is shown), every clip player (speed and how far in
+  // null when not recorded), feet, drawn step, mind and place
+  function aboutAt(a, t) {
+    const j = a.frameAt[t];
+    if (j < 0) return {moment: t + 1, index: t, drawn: false, sceneTick: tickAt[t]};
+    const table = a.clipTable[a.clips[j]], play = a.play[j] || {}, clips = {};
+    Object.keys(table).forEach(k => {
+      const [name, state] = table[k].split(' '), p = play[k] || [];
+      clips[k] = {name, state: state || '', speed: p[0] == null ? null : +p[0], ticks: p[1] == null ? null : +p[1]};
+    });
+    const o = DATA.origin || [0, 0, 0];
+    return {moment: t + 1, index: t, drawn: true, own: a.slot[j] === t, tick: a.ft[j], sceneTick: tickAt[t],
+            ticksSince: j > 0 ? a.ft[j] - a.ft[j - 1] : null, clips, feet: feetAt(a, j), step: stepAt(a, j),
+            facts: a.facts[j] || {}, place: a.pos[j].map((x, i) => +(x + o[i]).toFixed(3)), yaw: a.yaw[j]};
+  }
+  const fixedViews = {};                        // a camera's place kept from its first picture (--fixed)
   window.Replay = {
     show: t => { setPlaying(false); show(t); }, pick: n => pick(byName(n)), camera, follow: setFollow, play: setPlaying,
     moments: () => timeline.length, ready: true,
     names: () => animals.map(a => a.name),
+    cams: () => CAMS.map(([k]) => k),
     has: n => !!byName(n),
-    // the moments (indexes) where this animal is drawn between two game ticks (-1: from its first moment; to 40
-    // moments on), or null
+    // the first and last moments (indexes) of this animal's own recorded moments whose own game tick lies between from
+    // and to (-1 for from: its first; -1 for to: 40 of its moments on), or why there are none
     span: (n, from, to) => {
       const a = byName(n);
-      if (!a) return null;
-      const drawn = [];
-      for (let t = 0; t < timeline.length; t++) if (a.frameAt[t] >= 0) drawn.push(t);
-      if (!drawn.length) return null;
-      const first = from >= 0 ? drawn.find(t => tickAt[t] >= from) : drawn[0];
-      if (first === undefined) return null;
-      const last = to >= 0 ? [...drawn].reverse().find(t => tickAt[t] <= to) : drawn[Math.min(drawn.length - 1, drawn.indexOf(first) + 40)];
-      return last === undefined || last < first ? null : [first, last];
+      if (!a) return {why: `no animal named ${n}`};
+      const own = [];
+      for (let j = 0; j < a.n; j++) if (a.slot[j] >= 0 && a.frameAt[a.slot[j]] === j) own.push(j);
+      if (!own.length) return {why: `${n} has no moment drawn in this recording`};
+      const k0 = from >= 0 ? own.findIndex(j => a.ft[j] >= from) : 0;
+      if (k0 < 0) return {why: `${n}'s last recorded tick is ${a.ft[own[own.length - 1]]}`};
+      let k1 = own.length - 1;
+      if (to >= 0) { while (k1 >= 0 && a.ft[own[k1]] > to) k1--; } else k1 = Math.min(own.length - 1, k0 + 40);
+      if (k1 < k0) return {why: `${n} has no recorded moment between game ticks ${from} and ${to} (its next is tick ${a.ft[own[k0]]})`};
+      return {first: a.slot[own[k0]], last: a.slot[own[k1]]};
     },
-    // one animal at the moment shown: its clip, play speed, how far in, feet and mind
-    about: n => {
-      const a = byName(n);
-      if (!a || a.now < 0) return {name: n, drawn: false, moment: now + 1, index: now, tick: tickAt[now]};
-      const j = a.now, body = (a.clipTable[a.clips[j]].body || '-').split(' '), play = (a.play[j] || {}).body || [];
-      return {name: n, drawn: true, moment: now + 1, index: now, tick: tickAt[now], gapBefore: gapBefore[now],
-              clip: body[0], clipState: body[1] || '', speed: play[0] === undefined || play[0] === null ? 1 : +play[0],
-              clipTicks: play[1] === undefined ? null : play[1], feet: feetNow(a), facts: a.facts[j] || {},
-              place: a.pos[j].map((x, i) => +(x + (DATA.origin || [0, 0, 0])[i]).toFixed(3)), yaw: a.yaw[j]};
-    },
+    // the cameras fitted to the space this animal takes up over moments t0 to t1 (indexes) only, not its whole recording
+    fit: (n, t0, t1) => { const a = byName(n); a.fitRange = [Math.max(0, a.frameAt[t0]), a.frameAt[t1] < 0 ? a.n - 1 : a.frameAt[t1]]; },
+    // aboutAt for every moment from t0 to t1 (indexes)
+    rows: (n, t0, t1) => { const a = byName(n), out = []; for (let t = t0; t <= t1; t++) out.push(aboutAt(a, t)); return out; },
+    // the foot paths and ghosts of the picked animal in the pictures (paths: true/false; ghosts: 0, 4 or 8)
+    traces: (p, g) => { paths = !!p; $('pathsBtn').classList.toggle('on', paths); ghosts = [0, 4, 8].includes(g) ? g : 0; ghostBtns(ghosts); show(now); },
     // the scene from one of the picked animal's cameras, drawn now and read back as a PNG (no labels: they are not
-    // drawn on the canvas)
-    snap: cam => {
-      camera(cam);
+    // drawn on the canvas); fixed: the camera stays where it stood for this camera's first picture, so the animal's
+    // own travel and turns show
+    snap: (cam, fixed) => {
+      if (fixed && fixedViews[cam]) {
+        st.camera.position.copy(fixedViews[cam].at); st.controls.target.copy(fixedViews[cam].look); st.controls.update();
+      } else {
+        camera(cam);
+        if (fixed) fixedViews[cam] = {at: st.camera.position.clone(), look: st.controls.target.clone()};
+      }
       sunToView();
       st.renderer.render(st.scene, st.camera);
       return st.renderer.domElement.toDataURL('image/png');

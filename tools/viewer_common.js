@@ -27,7 +27,7 @@ const Viewer = (() => {
   function settingsFromHash(defaults) {
     const s = Object.assign({}, defaults);
     location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
-      const [k, v] = kv.split('=').map(decodeURIComponent);
+      const [k, v] = kv.split('=').map(x => { try { return decodeURIComponent(x); } catch (e) { return x; } });   // (a stray % kept as it is)
       s[k] = isNaN(parseFloat(v)) ? v : parseFloat(v);
     });
     return s;
