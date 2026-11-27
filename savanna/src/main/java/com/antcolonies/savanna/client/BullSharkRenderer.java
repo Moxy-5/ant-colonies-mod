@@ -16,7 +16,7 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;
 import software.bernie.geckolib.cache.object.GeoBone;
 import software.bernie.geckolib.model.DefaultedEntityGeoModel;
-import software.bernie.geckolib.renderer.GeoEntityRenderer;
+import com.antcolonies.client.BoneMeshRenderer;
 import software.bernie.geckolib.renderer.layer.GeoRenderLayer;
 
 /**
@@ -30,7 +30,7 @@ import software.bernie.geckolib.renderer.layer.GeoRenderLayer;
  * across the jaws, its middle between the teeth. It is drawn after the shark, from the bone's place noted while the
  * shark was drawn, so the two models' buffers never mix (as {@code CatfishRenderer} draws its tilapia).
  */
-public class BullSharkRenderer extends GeoEntityRenderer<BullSharkEntity> {
+public class BullSharkRenderer extends BoneMeshRenderer<BullSharkEntity> {
     /** The catfish model's body middle over its feet (blocks at its size 1; its mouth is 0.17 up, CatfishEntity.mouth). */
     private static final float CATFISH_MID = 0.17F;
 

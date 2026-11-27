@@ -8,14 +8,14 @@ import com.mojang.math.Axis;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;
 import software.bernie.geckolib.model.DefaultedEntityGeoModel;
-import software.bernie.geckolib.renderer.GeoEntityRenderer;
+import com.antcolonies.client.BoneMeshRenderer;
 
 /**
  * Draws the Nile tilapia (M9 river life, 2026-11-14): one model ({@code tools/tilapia_models.py game}) in three textures,
  * young, everyday or breeding by {@link TilapiaEntity#look()}, and a female's swollen throat with her mouth full; the body pitched toward where it swims. The death clip
  * rolls it onto its side itself, so Minecraft's own tip-over is off.
  */
-public class TilapiaRenderer extends GeoEntityRenderer<TilapiaEntity> {
+public class TilapiaRenderer extends BoneMeshRenderer<TilapiaEntity> {
     /**
      * The model is about 1.72 blocks long as made (its boxes in pixels); a grown fish is 0.6 blocks (my pick, bigger than life
      * so it is seen: the user, 2026-11-14), its own

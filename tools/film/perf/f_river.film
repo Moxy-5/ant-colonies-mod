@@ -1,0 +1,115 @@
+# Drawing-cost scene (made by tools/perf_scenes.py, do not edit by hand): a busy river in view at once: 20 barbs, 8 tadpoles, 20 tilapia, 10 catfish, 4 distichodus, 12 crabs, 8 snails, 4 bullfrogs, 2 otters, 2 monitors, 5 crocodiles, 6 hippos, 2 bull sharks.
+cmd time set noon
+cmd weather clear
+lens 60
+cmd fill -8 -63 -8 9 -61 -6 minecraft:water
+cmd fill -8 -63 -5 9 -61 -3 minecraft:water
+cmd fill -9 -63 -2 10 -61 0 minecraft:water
+cmd fill -3 -63 25 4 -61 30 minecraft:water
+cmd summon antcolonies:barb -7.60 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb -7.00 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb -6.40 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb -5.80 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb -5.20 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb -4.60 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb -4.00 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb -3.40 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb -2.80 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb -2.20 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb -1.60 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb -1.00 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb -0.40 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb 0.20 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb 0.80 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb 1.40 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb 2.00 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb 2.60 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb 3.20 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:barb 3.80 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tadpole 4.40 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tadpole 5.00 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tadpole 5.60 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tadpole 6.20 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tadpole 6.80 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tadpole 7.40 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tadpole 8.00 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tadpole 8.60 -62.5 -7.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia -7.10 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia -6.30 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia -5.50 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia -4.70 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia -3.90 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia -3.10 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia -2.30 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia -1.50 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia -0.70 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia 0.10 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia 0.90 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia 1.70 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia 2.50 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia 3.30 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia 4.10 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia 4.90 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia 5.70 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia 6.50 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia 7.30 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:tilapia 8.10 -62.5 -4.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:catfish -8.20 -62.5 -1.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:catfish -6.80 -62.5 -1.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:catfish -5.40 -62.5 -1.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:catfish -4.00 -62.5 -1.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:catfish -2.60 -62.5 -1.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:catfish -1.20 -62.5 -1.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:catfish 0.20 -62.5 -1.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:catfish 1.60 -62.5 -1.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:catfish 3.00 -62.5 -1.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:catfish 4.40 -62.5 -1.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:distichodus 5.70 -62.5 -1.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:distichodus 6.90 -62.5 -1.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:distichodus 8.10 -62.5 -1.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:distichodus 9.30 -62.5 -1.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:crab -8.70 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:crab -7.90 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:crab -7.10 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:crab -6.30 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:crab -5.50 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:crab -4.70 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:crab -3.90 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:crab -3.10 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:crab -2.30 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:crab -1.50 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:crab -0.70 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:crab 0.10 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:snail 0.85 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:snail 1.55 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:snail 2.25 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:snail 2.95 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:snail 3.65 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:snail 4.35 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:snail 5.05 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:snail 5.75 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:bullfrog 6.60 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:bullfrog 7.60 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:bullfrog 8.60 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:bullfrog 9.60 -60 2.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:otter -1.75 -60 6.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:otter -0.25 -60 6.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:monitor 1.25 -60 6.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:monitor 2.75 -60 6.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:crocodile -3.50 -60 14.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:crocodile -1.50 -60 14.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:crocodile 0.50 -60 14.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:crocodile 2.50 -60 14.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:crocodile 4.50 -60 14.25 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:hippo -7.00 -60 22.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:hippo -4.00 -60 22.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:hippo -1.00 -60 22.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:hippo 2.00 -60 22.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:hippo 5.00 -60 22.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:hippo 8.00 -60 22.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:bull_shark -1.00 -62.5 28.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:bull_shark 2.00 -62.5 28.00 {NoAI:1b,Rotation:[180f,0f]}
+camera 0.5 -50 -18 0 30
+wait 300
+shot f_river
+quit

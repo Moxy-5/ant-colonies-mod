@@ -8,14 +8,14 @@ import com.mojang.math.Axis;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;
 import software.bernie.geckolib.model.DefaultedEntityGeoModel;
-import software.bernie.geckolib.renderer.GeoEntityRenderer;
+import com.antcolonies.client.BoneMeshRenderer;
 
 /**
  * Draws the six-banded distichodus (the river food web's step 5, 2026-11-23; model, paint and clips from
  * {@code tools/distichodus_models.py game}): the body pitched toward where it swims, but never while it leaps (the leap
  * clip pitches it through its arc itself). The death clip rolls it onto its side itself, so Minecraft's tip-over is off.
  */
-public class DistichodusRenderer extends GeoEntityRenderer<DistichodusEntity> {
+public class DistichodusRenderer extends BoneMeshRenderer<DistichodusEntity> {
     /** The model is 37 pixels long as made (2.3125 blocks); a grown one is drawn 0.8 blocks (the plan's), its own size on top. */
     static final float SCALE = 0.8F / 2.3125F;
 

@@ -16,7 +16,7 @@ import net.minecraft.world.entity.LivingEntity;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import software.bernie.geckolib.cache.object.GeoBone;
-import software.bernie.geckolib.renderer.GeoEntityRenderer;
+import com.antcolonies.client.BoneMeshRenderer;
 import software.bernie.geckolib.renderer.layer.GeoRenderLayer;
 
 /**
@@ -24,7 +24,7 @@ import software.bernie.geckolib.renderer.layer.GeoRenderLayer;
  * ({@code tools/otter_models.py game}), drawn at {@link OtterEntity#MODEL_SCALE} of its 2.6-block model, with mud on its
  * fur when it has been in mud. Its death clip lays it on its side, so Minecraft's tip-over is off.
  */
-public class OtterRenderer extends GeoEntityRenderer<OtterEntity> {
+public class OtterRenderer extends BoneMeshRenderer<OtterEntity> {
     /** Its head's place as drawn this frame (noted at the carry bone, a still child of the head), and whether it was drawn. */
     private final Matrix4f headPose = new Matrix4f();
     private final Matrix3f headNormal = new Matrix3f();

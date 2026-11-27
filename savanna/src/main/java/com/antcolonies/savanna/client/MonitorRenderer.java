@@ -3,13 +3,13 @@ package com.antcolonies.savanna.client;
 import com.antcolonies.savanna.animal.MonitorEntity;
 
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
-import software.bernie.geckolib.renderer.GeoEntityRenderer;
+import com.antcolonies.client.BoneMeshRenderer;
 
 /**
  * Draws the Nile monitor (M9 river life, 2026-11-17; head and eyes on a near player in {@link MonitorModel}): one model and look ({@code tools/monitor_models.py game}), drawn
  * at {@link MonitorEntity#MODEL_SCALE} of its 6-block model. Its death clip lays it flat, so Minecraft's tip-over is off.
  */
-public class MonitorRenderer extends GeoEntityRenderer<MonitorEntity> {
+public class MonitorRenderer extends BoneMeshRenderer<MonitorEntity> {
     public MonitorRenderer(EntityRendererProvider.Context context) {
         super(context, new MonitorModel());
         addRenderLayer(new com.antcolonies.client.MudCoatLayer<>(this));      // mud on its body (savanna mud step 4)

@@ -18,7 +18,7 @@ import software.bernie.geckolib.cache.object.GeoBone;
 import software.bernie.geckolib.renderer.layer.GeoRenderLayer;
 import net.minecraft.resources.ResourceLocation;
 import software.bernie.geckolib.model.DefaultedEntityGeoModel;
-import software.bernie.geckolib.renderer.GeoEntityRenderer;
+import com.antcolonies.client.BoneMeshRenderer;
 
 /**
  * Draws the river catfish (M9 river life, 2026-11-14): one model and look A ({@code tools/catfish_models.py game}), the
@@ -31,7 +31,7 @@ import software.bernie.geckolib.renderer.GeoEntityRenderer;
  * heading the way the catfish does (caught from behind). It is drawn after the catfish, from the bone's place noted
  * while the catfish was drawn, so the two models' buffers never mix.
  */
-public class CatfishRenderer extends GeoEntityRenderer<CatfishEntity> {
+public class CatfishRenderer extends BoneMeshRenderer<CatfishEntity> {
     /** The model is 2.9 blocks long as made (snout to tail fin, 46.4 pixels); a usual catfish is 2 blocks (the user's pick). */
     static final float SCALE = 2.0F / 2.9F;
 

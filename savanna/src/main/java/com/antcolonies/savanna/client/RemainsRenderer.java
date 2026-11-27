@@ -7,14 +7,14 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;
 import software.bernie.geckolib.model.GeoModel;
-import software.bernie.geckolib.renderer.GeoEntityRenderer;
+import com.antcolonies.client.BoneMeshRenderer;
 
 /**
  * Draws a fish's remains (M9 river life, 2026-11-15): the model of its kind and stage, made by
  * {@code tools/remains_models.py game} already laid on its side with its lowest point at its feet, at the size of the
  * fish's own renderer times the fish's size.
  */
-public class RemainsRenderer extends GeoEntityRenderer<RemainsEntity> {
+public class RemainsRenderer extends BoneMeshRenderer<RemainsEntity> {
     private static final ResourceLocation ANIMATIONS = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "animations/entity/remains.animation.json");
     private static final ResourceLocation CARCASS_POSE = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "animations/entity/buffalo_carcass.animation.json");
     /** The living buffalo's model, which a carcass is drawn on. */

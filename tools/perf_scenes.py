@@ -9,6 +9,13 @@ writes run-film/screenshots/frames.txt, and a scene's cost is its middle frame t
   ./gradlew runFilm -PfilmScene=perf     film them all (one launch)
   python tools/perf_scenes.py report     the table: milliseconds a frame and microseconds an insect
 
+The animals' scenes (code review R4-18, 2026-11-26): f_river is a busy river all in view at once (about half the
+spawn caps of the small kinds and all of the big ones, about 14,400 boxes), g_savanna a buffalo herd and a pride. The
+fish stand in pools; every animal has NoAI. To time GeckoLib's own box drawing against the ready-made faces
+(client/BoneMesh), film them once more with -PplainBoxes:
+
+  ./gradlew runFilm -PfilmScene=perf/a_empty,perf/f_river,perf/g_savanna [-PplainBoxes]
+
 The scenes are made by this script, not by hand: change the crowds here and run it again.
 """
 import sys
@@ -36,6 +43,29 @@ SCENES = {
                       [(WORKER, 150), (SOLDIER_MINOR, 35), (SOLDIER_MAJOR, 15)]),
 }
 
+# The animals' scenes: scene name -> (what it shows, the camera line, rows from the camera outward, each a list of
+# (entity, how many, blocks between two, how deep the row is, whether it stands in a pool))
+ANIMAL_SCENES = {
+    "f_river": ("a busy river in view at once: 20 barbs, 8 tadpoles, 20 tilapia, 10 catfish, 4 distichodus, 12 crabs, "
+                "8 snails, 4 bullfrogs, 2 otters, 2 monitors, 5 crocodiles, 6 hippos, 2 bull sharks",
+                "camera 0.5 -50 -18 0 30",
+                [[("antcolonies:barb", 20, 0.6, 1.5, True), ("antcolonies:tadpole", 8, 0.6, 1.5, True)],
+                 [("antcolonies:tilapia", 20, 0.8, 2.0, True)],
+                 [("antcolonies:catfish", 10, 1.4, 3.0, True), ("antcolonies:distichodus", 4, 1.2, 3.0, True)],
+                 [("antcolonies:crab", 12, 0.8, 1.5, False), ("antcolonies:snail", 8, 0.7, 1.5, False),
+                  ("antcolonies:bullfrog", 4, 1.0, 1.5, False)],
+                 [("antcolonies:otter", 2, 1.5, 5.0, False), ("antcolonies:monitor", 2, 1.5, 5.0, False)],
+                 [("antcolonies:crocodile", 5, 2.0, 8.5, False)],
+                 [("antcolonies:hippo", 6, 3.0, 5.0, False)],
+                 [("antcolonies:bull_shark", 2, 3.0, 5.0, True)]]),
+    "g_savanna": ("a buffalo herd and a pride: 12 buffalo, 1 lion, 3 lionesses, 2 cubs",
+                  "camera 0.5 -50 -18 0 30",
+                  [[("antcolonies:lion", 1, 2.5, 4.0, False), ("antcolonies:lioness", 3, 2.5, 4.0, False),
+                    ("antcolonies:lion_cub", 2, 1.5, 4.0, False)],
+                   [("antcolonies:buffalo", 6, 3.0, 5.0, False)],
+                   [("antcolonies:buffalo", 6, 3.0, 5.0, False)]]),
+}
+
 COLUMNS = 15
 SPACING = 0.8
 
@@ -53,11 +83,35 @@ def scene(name, about, crowd):
     return "\n".join(lines) + "\n"
 
 
+def animal_scene(name, about, camera, rows):
+    """Rows of animals facing the camera, one row behind the other; a row of water animals stands in a pool 3 deep."""
+    lines = [f"# Drawing-cost scene (made by tools/perf_scenes.py, do not edit by hand): {about}.",
+             "cmd time set noon", "cmd weather clear", "lens 60"]
+    summons = []
+    z = -8.0
+    for row in rows:
+        deep = max(kind[3] for kind in row)
+        wide = sum(count * gap for _, count, gap, _, _ in row)
+        if any(kind[4] for kind in row):
+            x1, x2 = int(0.5 - wide / 2 - 1), int(0.5 + wide / 2 + 1)
+            lines.append(f"cmd fill {x1} -63 {int(z)} {x2} -61 {int(z + deep)} minecraft:water")
+        x = 0.5 - wide / 2
+        for entity, count, gap, _, wet in row:
+            for _ in range(count):
+                summons.append(f"cmd summon {entity} {x + gap / 2:.2f} {-62.5 if wet else -60} {z + deep / 2:.2f} "
+                               f"{{NoAI:1b,Rotation:[180f,0f]}}")
+                x += gap
+        z += deep + 1.0
+    return "\n".join(lines + summons + [camera, "wait 300", f"shot {name}", "quit"]) + "\n"
+
+
 def write():
     OUT.mkdir(parents=True, exist_ok=True)
     for name, (about, crowd) in SCENES.items():
         (OUT / f"{name}.film").write_text(scene(name, about, crowd), encoding="utf-8", newline="\n")
-    print(f"{len(SCENES)} scenes written to {OUT}")
+    for name, (about, camera, rows) in ANIMAL_SCENES.items():
+        (OUT / f"{name}.film").write_text(animal_scene(name, about, camera, rows), encoding="utf-8", newline="\n")
+    print(f"{len(SCENES) + len(ANIMAL_SCENES)} scenes written to {OUT}")
 
 
 def report():
@@ -71,10 +125,11 @@ def report():
     base = times["a_empty"][1]
     # frame ms: the middle drawing time by time (FilmFrameMeter), so the scene's empty first moments do not count
     print(f"{'scene':16}{'insects':>8}{'frame ms':>10}{'1 in 20':>9}{'insects ms':>12}{'us each':>9}")
-    for name, (about, crowd) in SCENES.items():
+    counts = {name: sum(n for _, n in crowd) for name, (about, crowd) in SCENES.items()}
+    counts.update({name: sum(kind[1] for row in rows for kind in row) for name, (about, camera, rows) in ANIMAL_SCENES.items()})
+    for name, count in counts.items():
         if name not in times:
             continue
-        count = sum(n for _, n in crowd)
         frames, middle, slow = times[name]
         cost = middle - base
         each = f"{cost * 1000 / count:9.0f}" if count else f"{'':9}"

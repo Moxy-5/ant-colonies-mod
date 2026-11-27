@@ -10,14 +10,14 @@ import net.minecraft.resources.ResourceLocation;
 import software.bernie.geckolib.animation.AnimationState;
 import software.bernie.geckolib.cache.object.GeoBone;
 import software.bernie.geckolib.model.DefaultedEntityGeoModel;
-import software.bernie.geckolib.renderer.GeoEntityRenderer;
+import com.antcolonies.client.BoneMeshRenderer;
 
 /**
  * Draws the bullfrog's tadpole (the river tie-up, 2026-11-23; {@code tools/tadpole_models.py game}): the body pitched
  * toward where it swims, its hind leg buds hidden until day 3 ({@link TadpoleEntity#hasLegs}). The death clip rolls it
  * belly up itself, so Minecraft's own tip-over is off.
  */
-public class TadpoleRenderer extends GeoEntityRenderer<TadpoleEntity> {
+public class TadpoleRenderer extends BoneMeshRenderer<TadpoleEntity> {
     /** The model is 18 pixels long as made (1.125 blocks); a tadpole is drawn 0.15 blocks (the plan's pick). */
     static final float SCALE = 0.15F / 1.125F;
 

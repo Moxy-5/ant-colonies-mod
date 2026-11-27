@@ -1,0 +1,26 @@
+# Drawing-cost scene (made by tools/perf_scenes.py, do not edit by hand): a buffalo herd and a pride: 12 buffalo, 1 lion, 3 lionesses, 2 cubs.
+cmd time set noon
+cmd weather clear
+lens 60
+cmd summon antcolonies:lion -4.75 -60 -6.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:lioness -2.25 -60 -6.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:lioness 0.25 -60 -6.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:lioness 2.75 -60 -6.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:lion_cub 4.75 -60 -6.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:lion_cub 6.25 -60 -6.00 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:buffalo -7.00 -60 -0.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:buffalo -4.00 -60 -0.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:buffalo -1.00 -60 -0.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:buffalo 2.00 -60 -0.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:buffalo 5.00 -60 -0.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:buffalo 8.00 -60 -0.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:buffalo -7.00 -60 5.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:buffalo -4.00 -60 5.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:buffalo -1.00 -60 5.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:buffalo 2.00 -60 5.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:buffalo 5.00 -60 5.50 {NoAI:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:buffalo 8.00 -60 5.50 {NoAI:1b,Rotation:[180f,0f]}
+camera 0.5 -50 -18 0 30
+wait 300
+shot g_savanna
+quit

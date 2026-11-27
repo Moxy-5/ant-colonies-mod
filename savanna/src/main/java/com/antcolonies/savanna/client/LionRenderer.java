@@ -5,13 +5,13 @@ import com.mojang.blaze3d.vertex.PoseStack;
 
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.util.Mth;
-import software.bernie.geckolib.renderer.GeoEntityRenderer;
+import com.antcolonies.client.BoneMeshRenderer;
 
 /**
  * Draws the lion, the lioness and the cub (2026-11-25; its form, coat, tilt and head in {@link LionModel}). Its death clip
  * lays it down itself, so Minecraft's tip-over is off.
  */
-public class LionRenderer extends GeoEntityRenderer<LionEntity> {
+public class LionRenderer extends BoneMeshRenderer<LionEntity> {
     public LionRenderer(EntityRendererProvider.Context context) {
         super(context, new LionModel());
         shadowRadius = 0.8F;

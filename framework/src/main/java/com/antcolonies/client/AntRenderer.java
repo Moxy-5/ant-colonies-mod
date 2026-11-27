@@ -12,7 +12,6 @@ import net.minecraft.world.phys.Vec3;
 
 import software.bernie.geckolib.cache.object.GeoBone;
 import software.bernie.geckolib.model.GeoModel;
-import software.bernie.geckolib.renderer.GeoEntityRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 
@@ -28,7 +27,7 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
  * difference is smaller than a pixel ({@link #withFarLook}). Everything else (clips, live layer, lost legs, loads) is
  * the same, as the bones are.
  */
-public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<T> {
+public class AntRenderer<T extends AbstractAntEntity> extends BoneMeshRenderer<T> {
 
     /**
      * How far the model is moved up while climbing, so the tail doesn't sink into the floor, and toward the wall, so the
@@ -75,17 +74,6 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
             far.withScale(scaleWidth, scaleHeight);
         }
         return this;
-    }
-
-    /** A bone's boxes from its ready-made faces ({@link BoneMesh}), the buried ones left out. */
-    @Override
-    public void renderCubesOfBone(PoseStack poseStack, GeoBone bone, VertexConsumer buffer, int packedLight,
-            int packedOverlay, int colour) {
-        if (BoneMesh.PLAIN) {
-            super.renderCubesOfBone(poseStack, bone, buffer, packedLight, packedOverlay, colour);
-        } else if (!bone.isHidden()) {
-            BoneMesh.draw(poseStack.last(), bone, buffer, packedLight, packedOverlay, colour);
-        }
     }
 
     /** Whether this insect is drawn with the far look this frame, from how far the camera is. */

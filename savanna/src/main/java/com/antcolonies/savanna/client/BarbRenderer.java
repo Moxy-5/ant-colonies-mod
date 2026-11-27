@@ -8,14 +8,14 @@ import com.mojang.math.Axis;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;
 import software.bernie.geckolib.model.DefaultedEntityGeoModel;
-import software.bernie.geckolib.renderer.GeoEntityRenderer;
+import com.antcolonies.client.BoneMeshRenderer;
 
 /**
  * Draws the river barb (M9 river life, 2026-11-20): one model ({@code tools/barb_models.py game}) in two textures, the
  * everyday look and the flash (the flank bright silver) while it turns hard or darts off ({@link BarbEntity#flashing});
  * the body pitched toward where it swims. The death clip rolls it onto its side itself, so Minecraft's own tip-over is off.
  */
-public class BarbRenderer extends GeoEntityRenderer<BarbEntity> {
+public class BarbRenderer extends BoneMeshRenderer<BarbEntity> {
     /** The model is 30 pixels long as made (1.875 blocks); a grown barb is drawn 0.25 blocks (my pick), its own size on top. */
     static final float SCALE = 0.25F / 1.875F;
 

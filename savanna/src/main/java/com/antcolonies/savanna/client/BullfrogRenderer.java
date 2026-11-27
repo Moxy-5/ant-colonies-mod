@@ -22,7 +22,7 @@ import software.bernie.geckolib.cache.object.BakedGeoModel;
 import software.bernie.geckolib.animation.AnimationState;
 import software.bernie.geckolib.cache.object.GeoBone;
 import software.bernie.geckolib.model.DefaultedEntityGeoModel;
-import software.bernie.geckolib.renderer.GeoEntityRenderer;
+import com.antcolonies.client.BoneMeshRenderer;
 
 /**
  * Draws the African bullfrog (prey plan step 3, 2026-11-20): its model and clips ({@code tools/bullfrog_models.py
@@ -40,7 +40,7 @@ import software.bernie.geckolib.renderer.GeoEntityRenderer;
  * sticks the fly to the pad, drawn here at the pad's place each frame (never lagging the tongue) until it is swallowed;
  * a miss and the fly darts away just before the pad arrives, and the pad slaps the air it left.
  */
-public class BullfrogRenderer extends GeoEntityRenderer<BullfrogEntity> {
+public class BullfrogRenderer extends BoneMeshRenderer<BullfrogEntity> {
     static final float SCALE = 0.8F / 2.5F;
     /** The rope's colours: the tongue's pink, its shaded side, the pad's deeper rose (RGB). */
     private static final int PINK = 0xE07C88, PINK_SHADE = 0xB65866, PAD = 0xC4475E;
