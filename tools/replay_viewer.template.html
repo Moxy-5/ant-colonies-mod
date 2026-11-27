@@ -1050,6 +1050,31 @@ st.onFrame.push(() => {
     rows: (n, t0, t1) => { const a = byName(n), out = []; for (let t = t0; t <= t1; t++) out.push(aboutAt(a, t)); return out; },
     // the foot paths and ghosts of the picked animal in the pictures (paths: true/false; ghosts: 0, 4 or 8)
     traces: (p, g) => { paths = !!p; $('pathsBtn').classList.toggle('on', paths); ghosts = [0, 4, 8].includes(g) ? g : 0; ghostBtns(ghosts); show(now); },
+    // every animal but the picked one drawn see-through and casting no shadow (the user's call, 2026-11-27: a neighbour
+    // never hides the animal checked, and the shape of what it touches, its prey or its holder, still shows)
+    // (one even layer of glass: a depth-only twin of each part is drawn after the solid scene, then only the nearest
+    // surface of the animal is tinted, so its many overlapping boxes do not stack up to solid)
+    fadeOthers: on => {
+      const depthOnly = new THREE.MeshBasicMaterial({colorWrite: false, side: THREE.DoubleSide});
+      animals.forEach(a => {
+        const fade = on && a !== picked;
+        if (fade && !a.faded) a.faded = new THREE.MeshLambertMaterial({color: a.colour, transparent: true, opacity: 0.4,
+          depthWrite: false, depthFunc: THREE.LessEqualDepth, side: THREE.DoubleSide});
+        a.meshes.forEach(m => {
+          if (!m) return;
+          m.material = fade ? a.faded : settings.pieces ? m.userData.tint : m.userData.mat;
+          m.castShadow = !fade;
+          m.renderOrder = fade ? 2 : 0;
+          if (fade && !m.userData.twin) {
+            const t = new THREE.Mesh(m.geometry, depthOnly);
+            t.renderOrder = 1;                   // (after the solid scene, before the glass)
+            m.add(t);
+            m.userData.twin = t;
+          }
+          if (m.userData.twin) m.userData.twin.visible = fade;
+        });
+      });
+    },
     // the scene from one of the picked animal's cameras, drawn now and read back as a PNG (no labels: they are not
     // drawn on the canvas); fixed: the camera stays where it stood for this camera's first picture, so the animal's
     // own travel and turns show

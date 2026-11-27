@@ -8,11 +8,12 @@ phase 1, 2026-11-27; docs/plans/motion-studio.md, idea 5).
 Builds the scene's replay page (tools/replay.py, afresh each run, into a folder of its own: never a page built for
 something else) and takes, in one headless browser launch (tools/viewer_shot.Browser), the picked animal at every
 N-th of its own recorded moments between two of its game ticks, from each camera round it: side, front and above by
-default. The cameras turn with the animal and stand at one distance from it for the whole recording (fitted to the
-space it takes up over the recording), so its pictures keep one size; with --fixed each camera stays where its first
+default. The cameras turn with the animal and stand at one distance from it for the strip (fitted to the space it
+takes up over the strip's moments), so its pictures keep one size; with --fixed each camera stays where its first
 picture was taken, so the animal's own travel and turns show. Each picture shows its feet's paths over the last 1.5
-seconds (dark on the ground, red sliding, grey lifted) unless --no-paths. Other animals are drawn as the game drew
-them, so one may stand in the way. The pictures go on sheets of ten rows, each labelled with its moment, the animal's
+seconds (dark on the ground, red sliding, grey lifted) unless --no-paths. Every other animal is drawn see-through
+and casts no shadow (the user's call, 2026-11-27): a neighbour never hides the animal checked, and the shape of what
+it touches, its prey or its holder, still shows. The pictures go on sheets of ten rows, each labelled with its moment, the animal's
 own game tick, its clip and feet; a row where a foot slides is framed red. Under the last sheet, the page's footfall
 chart for those moments.
 
@@ -187,6 +188,7 @@ def take(page, pick, start, end, every, cams, fixed, paths, size, pictures=True)
             if pictures:
                 b.evaluate(f'Replay.pick({json.dumps(pick)})')
                 b.evaluate(f'Replay.traces({json.dumps(paths)}, 0)')
+                b.evaluate('Replay.fadeOthers(true)')    # (every other animal see-through: none hides it)
                 tile = tile_size(len(cams))
                 for r in [r for r in rows if r['drawn'] and r['own']][::every]:
                     b.evaluate(f"Replay.show({r['index']})")

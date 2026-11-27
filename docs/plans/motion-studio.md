@@ -274,9 +274,12 @@ each reviewed by three subagents and their findings fixed:**
 - The film itself misses the hold (BUGS 449). Two measuring tools have their own feet rules with faults (BUGS 456,
   457); later, one Python feet rule in `tools/recording.py` matching the page's.
 
-**What phase 1 did not do:** idea 4 (the clip as made beside the clip as drawn); idea 8 in the game. In the strips an
-animal standing between the camera and the picked one hides it: two tries at judging which animal is in the way failed
-(the prey faded; then crowding pride-mates kept solid), so it is the user's call (drawing every other animal see-through).
+**Other animals in the strips (the user's call, 2026-11-27, "Yes, see-through"):** two tries at judging which animal
+stands in the way failed (the prey faded; then crowding pride-mates kept solid), so in a strip every animal but the
+picked one is drawn as one even layer of glass (40 in 100, only its nearest surface, no shadow): none hides the animal
+checked, and the shape of its prey or holder still shows. The page itself draws them solid.
+
+**What phase 1 did not do:** idea 4 (the clip as made beside the clip as drawn); idea 8 in the game.
 
 ## Watch out for
 - **Never copy the game's rules into Python.** A lab that re-imagines the game drifts from it; the recording is the
