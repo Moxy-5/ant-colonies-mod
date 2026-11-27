@@ -57,6 +57,25 @@ yet: 3, 4, 5, 6.
 **Round 6 (2026-11-26):** read, the Matabele ants all but the raids: 33 findings, 3 of grade A, 8 waiting for the
 user's call (`docs/reviews/full/round-06-matabele.md`, branch `claude/review-round-6`); fixes not started.
 
+**Round 5 (2026-11-27), read in two halves on the user's word ("split this up, I'm expecting a lot of bugs"):**
+the termite code measures about 19,000 lines today (the raid and Matabele files in the same folders went to rounds 6
+and 11). **Part A, the mound, read:** `Mound`, `MoundPlan`, `MoundGrowth`, `MoundShaping`, `MoundReach`, `MoundWear`,
+`MoundAwayBuilding`, `NewLandMounds`, `DeadMounds`, `DeadWorks`, `BarePatches`, `FungusGarden`, `GardenAway`,
+`Mushrooms`, `KingCare`, the king and queen, the two building goals and the mound, tunnel, comb and mushroom blocks
+(about 9,100 lines): 51 findings, 8 of grade A, 4 waiting for the user's call
+(`docs/reviews/full/round-05-termites.md`, the readers' own files in `round-05a-readers/`); fixes not started.
+**Part B, not read yet** (about 9,900 lines; its findings go at the end of the same file and carry on the numbers
+from R5-52): `GalleryWeb`, `GalleryUpkeep`, `Galleries`, `GalleryCatchUp`, `HiddenTrips`, `SavannaParts`;
+`HoleTurns`, `ClosedHoles`, `FeedingGallery`, `FeedingSpots`, `DeadWoodCall`, `PlugHoleGoal`, the worker, the food
+blocks (dry grass, branches, dead wood, pulp, frass, the hole, mud crust and casts), `SavannaNumbers`; `Alarm`,
+`Soldiers`, `SentryLine`, the soldier, `DefendGoal`, `WalkBeatGoal`, `RetreatGoal`, `TermiteCommands`,
+`SavannaEvents`. **How it was run (the user's count, 2026-11-27): 4 Opus readers with a slice each and 2 Fable
+readers on a thread each** (part A's threads: near against away and save and reload; every block placed or removed;
+part B's planned threads: the food loop over a day and night; alarm and defence meeting everything else, the seam with
+the raids included), one half at a time in one chat, the lead checking each grade A finding itself. Part A cost
+about 1.6 million subagent tokens. For part B's readers: R5-3 (no random ticks near a spectator, read in Minecraft's
+own code) most likely holds for the mud crust, mud casts and remains too.
+
 ## What every round looks for (the user's order, 2026-11-23: lag first, then behaviours that fight, then bugs)
 
 ### 1. Lag (high tick times)

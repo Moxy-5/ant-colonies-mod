@@ -6,7 +6,7 @@ from the list of bugs (`docs/OPEN-BUGS.md`) on purpose. **This file is written b
 `python tools/open_bugs.py`; never edit it by hand.** Each number is an entry in `docs/BUGS.md` tagged
 `[flake]`, one per test: a new failure of a listed test is a line on its entry.
 
-**57 flaky tests.**
+**58 flaky tests.**
 
 - **62** The fallen tree up a bowl fails beside other tests (`aFallenTreeLiesOnTheSlopeUphill`)
 - **75** The minors at the holes test failed once beside the fight tests (`minorsGuardTheHolesAndLineTheForagersTrailThenGoInLast`)
@@ -64,4 +64,5 @@ from the list of bugs (`docs/OPEN-BUGS.md`) on purpose. **This file is written b
 - **471** The tree growing round a player's block once missed a day's growth beside other tests; alone it passes.
 - **472** The otter once carried its catch but did not eat it on the bank in time beside other tests; alone it passes.
 - **474** The tadpole in the dying hippo grass test once did not graze in time beside other tests; alone it passes.
+- **R5-47** The new-land tests set a static fence and read the world's "last" things, the leak BUGS 363 traced a flake to *(code review; not started)*
 - **R9-39** The mid-climb tests fail now and then because the monitor's own idle goals take it off the test's route (BUGS 255, 290, 292) *(code review; half fixed)*

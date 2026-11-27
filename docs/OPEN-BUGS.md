@@ -9,21 +9,24 @@ for the number there).
 
 | Part | Left |
 |---|---|
-| In the game: A, it breaks play | 1 |
-| In the game: B, it looks or plays wrong | 15 |
-| In the game: C, small or rare | 36 |
-| Waiting for your call | 19 |
-| Behind the scenes (code review) | 168 |
+| In the game: A, it breaks play | 4 |
+| In the game: B, it looks or plays wrong | 26 |
+| In the game: C, small or rare | 43 |
+| Waiting for your call | 23 |
+| Behind the scenes (code review) | 193 |
 | Tool faults | 6 |
-| *Test flakes, in `docs/TEST-FLAKES.md`* | *57* |
+| *Test flakes, in `docs/TEST-FLAKES.md`* | *58* |
 
-## A: it breaks play (1)
+## A: it breaks play (4)
 
 Something a player meets goes wrong in a way that matters: a crash, a freeze, a system that does not do its job.
 
 - **306** The raids were rewritten from scratch (2026-11-24) and three long unattended runs are done: every raid ends, none hangs or crashes, and since the fix of the tail left behind (BUGS 450) the raiding colonies bring home enough to hold their size (151 termites in the last run, 23 and 57 before). Still to do: you watch raids in-game; the smaller raid bugs left are on this list.
+- **R5-1** A freeze of one to two seconds, with no cause in sight, for each far termite colony asked: on `/antcolonies list`, when new land puts in a dead mound, when a Matabele scout looks round, and on the first tick of a colony the player is beside when the world opens.
+- **R5-2** A termite colony the player has not been near for a long time (a rough sum: one to three game weeks) comes back with no young, a garden of all-old comb and its queen dead of hunger, and dwindles to a dead mound; colonies near the player are fine.
+- **R5-3** Watching a mound in spectator, no block the termites lay ever sets, so they cannot stack soil on their own soil; the mound grows only when the "stuck" clocks fire (building from outside at night, stages moving on unfinished) and by the builder numbers.
 
-## B: it looks or plays wrong (15)
+## B: it looks or plays wrong (26)
 
 A player will likely see it, and the game goes on.
 
@@ -40,10 +43,21 @@ A player will likely see it, and the game goes on.
 - **R3-38** A Matabele that lost a leg has all six again after it goes into the nest out of sight and comes out. *(half fixed)*
 - **R4-18** A busy river costs frames: about 6.5 ms a frame for 103 river animals in view (it was 13.3). *(half fixed)*
 - **R4-26** A bullfrog (or a land animal later) caught by a crocodile hangs upright and still while the crocodile rolls it.
+- **R5-4** Builders stand idle while the mound has tunnels still to carve and spire pieces still to thicken; the stage only moves on after the 5-minute stall, and the same job is still lowest on the next stage.
+- **R5-5** A hole in the mound's skin that never closes; termites can walk out through it by day, past the rule that they go out only by the foraging holes.
+- **R5-6** A short hitch now and then while walking or flying through savanna with dead mounds that still have wear to do, most of all on coming back to one left for days. Its length is not measured.
+- **R5-7** A short hitch as each mound of new land appears while exploring, worst for big living mounds and for old dead ones; one can go in every half second while places wait.
+- **R5-8** Short freezes beside a mound whose building has stalled (a player broke the tunnels, odd ground, or a spectator watching, see R5-3), because the fallbacks open exactly then. Not measured.
+- **R5-14** After a player digs into a garden the colony list keeps showing comb that is gone, and the nest unlocks levels from food it no longer has; away, workers can starve beside old comb.
+- **R5-19** After one `/time set day` in a world 60 days old, no dead mound wears and no dead comb rots for 60 days of play; with the daylight cycle off they never do.
+- **R5-20** Round every mound that died in play, little patches of coarse dirt round the old foraging holes never green over, while the holes themselves and the mound beside them grass over.
+- **R5-21** Now and then a mound of new land whose rooms are flooded (a river bank, a buried pool, a cave), or lava running into a nest.
+- **R5-23** Coming back to a mound that died long ago: it stands as it was left, then drops a slice every 5 seconds, top first, with a burst of breaking sounds, until weeks of wear are done in a minute or two.
+- **R5-24** A mound whose colony has been dead for 100 days stands fresh and only begins to wear on arrival; until then Matabele scouts walk out to a mound with nobody in it.
 - **R6-20** Likely, not proven: one block you put in a Matabele nest's chimney (a torch) makes the colony lose all its rooms.
 - **R8-3** Likely, not proven: with a biome mod that is a data pack (Terralith, say) its biomes may not appear at all.
 
-## C: small or rare (36)
+## C: small or rare (43)
 
 Hard to notice, or it needs an unusual case.
 
@@ -72,6 +86,13 @@ Hard to notice, or it needs an unusual case.
 - **R4-27** The termite queen's walk and turn lose their body bob.
 - **R4-28** After F3+T the monitor's tail rest pose and the otter's faces stay as they were.
 - **R4-30** Coming within 48 or 64 blocks of a crocodile or monitor, its whole pose snaps into place in one frame.
+- **R5-10** Part of the tick time beside a big mound with many real workers, most by day. Not measured.
+- **R5-12** Rarely, a stray channel through the mound; a termite crawling in it by day may be sent home as if it were outside.
+- **R5-15** A small stutter on coming back to a big mound after a long time away. Not measured.
+- **R5-16** A colony founded and grown far from the player keeps the founding queen's 10 eggs a day instead of reaching 80; far colonies grow more slowly than watched ones, by days.
+- **R5-18** A live king in the royal chamber of a mound whose colony has died, for good; if a queen with no king is ever within 32 blocks he walks over and joins her.
+- **R5-25** Rarely, an ant or small animal standing at a dead mound's foot is suddenly inside a block of soil and takes "stuck in a wall" damage; the likeliest victims are Matabele ants living in a mound that died less than about 14 days before.
+- **R5-27** Today only with a spawn egg: a queen put beside a living mound, or on a mound that died a week ago, and the two fight over the same cells, block out, block in; on the dead mound the new colony's first comb turns black.
 - **R6-4** A termite soldier clamped on a raider's leg vanishes when its mound is far from every player.
 - **R6-8** The ants tending the wounded are the first taken for a raid.
 - **R6-9** A shut-in Matabele with a termite soldier on it bites the wall instead of fighting.
@@ -84,7 +105,7 @@ Hard to notice, or it needs an unusual case.
 - **R9-18** When a hippo pool dries up, each hippo picks its own new spot instead of the pod going together. *(half fixed)*
 - **R9-23** A bull shark that spawned in a hole too small to swim in lies still. *(half fixed)*
 
-## Waiting for your call (19)
+## Waiting for your call (23)
 
 Code review findings whose fix changes how the game looks or plays, or a balance number, so nothing is
 built until you say. Each has what happens today and my pick. Answer whenever you like: tell Claude the
@@ -108,6 +129,14 @@ number and what you want.
   - *Your call:* should a crocodile's and monitor's hit boxes follow the body where it lies over a bank (head dipped to the water, chest up on a step)? Today the hit boxes stay level at the animal's own height, so a swing or arrow at a dipped head can pass through it. My pick: yes, but only after it is seen in play to matter; it is server work for every crocodile and monitor every tick.
 - **R4-32** (how bodies are drawn) A dying buffalo or lion on a step drops its tilt at once and dies with its legs hanging in the air
   - *Your call:* should a buffalo or lion killed on a step fall along the slope it stood on? Today it straightens level in a fifth of a second and its death plays with one end hanging over the lower ground. My pick: yes, keep its tilt through the death.
+- **R5-9** (the termites) Three "the termites are stuck" judges all fire long before a fresh layer of soil has set
+  - *Your call:* should a mound's stage wait for its soil to set before the next stage starts? Today the stage moves on after 1 and 5 idle minutes whether or not anything is stuck, so drying soil sets the pace and termites build from outside most nights. My pick: yes, the stage waits (your own rule that soil must set first), and building from outside comes only when a spot is truly cut off; a watched mound's stages may then move on more slowly.
+- **R5-11** (the termites) The mound's growth rate was set for 60 workers; with today's 200 a full mound takes about a third of the 20 hours asked for
+  - *Your call:* how long should a full colony take to raise a full mound? Today a colony of 200 workers earns 52 blocks a day, so the full mound stands after about 6.5 hours of play. My pick: 0.075 blocks a day for each worker (17 a day at 200 workers, the 20 hours you asked for; a young colony of 20 builds 3.5 a day), which keeps "weak early, growing over many hours".
+- **R5-17** (the termites) The foragers lay the comb themselves; real comb is built by the young workers from their droppings
+  - *Your call:* who should build the fungus comb? Today the old foragers walk down into the garden rooms and lay the comb themselves, and the young nurses never build it. My pick: the young workers lay it, as the design says and as real Macrotermes do; it is a real detail the player can watch.
+- **R5-22** (the termites) The dead mounds near the player all turn into humps within about a month of play, while new land keeps showing standing ones
+  - *Your call:* how fast should a dead mound slump? Today spires go in about 5 days and the whole mound is a 4-block grassy hump after about a month of play, so the land you live in ends up with only humps. My pick: spires and comb as today, but the body's slump about ten times slower, so a standing dead cathedral stays a landmark and a Matabele home for a long game, as real ones do for years.
 - **R6-5** (the Matabele ants (not raids)) A limping ant stops to call for helpers who can never come
   - *Your call:* After a raid that broke up, a limping ant on the way home stops and squeaks for 10 seconds every 40 while healthy nestmates walking home beside it go past: they count as "help is near" but their walk home outranks the rescue. Should an ant walking home by itself stop and carry a calling nestmate? My pick: yes (real Megaponera coming back from a raid do pick up a caller, Frank et al. 2017). The other way is the small fix: the hurt one no longer calls for them and just limps on.
 - **R6-6** (the Matabele ants (not raids)) The nest's defence calls out the wounded first, and ants carrying a hurt nestmate or carried themselves
@@ -129,13 +158,13 @@ number and what you want.
 - **R11-22** (the new raid code) Numbers
   - *Your call:* Real ants in one raid. `most_real` is 75, while the project's aim is about 50 to 60 real mobs for a whole colony. Lower it to about 50 (the rest of a big raid goes along as numbers, as now), or keep 75 for the look of a long column? My pick: keep 75 unless you see lag in a big raid; it is your eye that decides.
 
-## Behind the scenes (168)
+## Behind the scenes (193)
 
 Code review findings no player sees: code that will cost us when building on it (speed not yet measured,
 rules in two places, gaps in the checks) and tidy-ups. *Open* means looked at and left for the reason
 given; *half fixed* says what is left; no word means nobody has started it.
 
-### Will cost us when building on it (43)
+### Will cost us when building on it (46)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -173,6 +202,12 @@ given; *half fixed* says what is left; no word means nobody has started it.
 - **R4-20** Every insect the client knows searches for edges and corners every tick, drawn or not
 - **R4-21** The crocodile and the monitor read the ground under every joint every frame
 - **R4-31** A doum grove makes each chunk rebuild redo every crown, and a ripening bunch redoes a whole crown
+
+**Round 5, the termites** (`docs/reviews/full/round-05-termites.md`)
+
+- **R5-13** The proof and the game judge "what job is here" in two places that already differ
+- **R5-26** "may the colony change this block?" is answered in about a dozen places, each a little differently
+- **R5-28** What the player sees and no test checks
 
 **Round 6, the Matabele ants (not raids)** (`docs/reviews/full/round-06-matabele.md`)
 
@@ -242,7 +277,7 @@ given; *half fixed* says what is left; no word means nobody has started it.
 - **R12-65** `MoveRider`, the planned one home for block moves, lacks two lessons of the monitor's copy, and the drawing half is copied three times
   - *Half fixed:* `MoveRider` has the two lessons: its room checks for up, down and out ask for the middle line too (no change for the otter: its feet stand 0.22 blocks out, so the middle is always one of the feet's columns), and a move cut on its ...
 
-### Tidy-ups (125)
+### Tidy-ups (147)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -320,6 +355,31 @@ given; *half fixed* says what is left; no word means nobody has started it.
 - **R4-35** Throwaway objects made every frame per animal
 - **R4-36** Hand-copied numbers and files read past the resource system
 - **R4-37** Wrong or misplaced comments
+
+**Round 5, the termites** (`docs/reviews/full/round-05-termites.md`)
+
+- **R5-29** The mushrooms go by a second judge of rain, come up only for a colony that was near when the rain stopped, and have no socket for the season
+- **R5-30** The mound's building pace ignores rain and the season, and leaves no socket for the season source
+- **R5-31** The saved soil counts are trusted for good, even after the mound's plan has changed
+- **R5-32** After `/reload` with a new `max_height`, a watched mound keeps its old plan
+- **R5-33** A mound plan that fails to grow is retried every second with no log line, and the plan stores are never cleared between worlds
+- **R5-34** `max_height` 0 in the species file crashes the colony's tick, and a species with a garden part and no garden numbers crashes the colony list
+- **R5-35** Comments and notes that disagree with the code
+- **R5-36** The "clear a piece" branches of shaping can never run
+- **R5-37** Log lines at INFO level in normal play
+- **R5-38** Reshaping "through a window" never bites one
+- **R5-39** A termite in a spire's channel is buried when the piece is reshaped into a solid tip
+- **R5-40** Small block leftovers
+- **R5-41** Every nurse's "is there food" rebuilds the garden's cell list and reads every comb, and looks for the king by a scan for entities
+- **R5-42** Small things in the garden
+- **R5-43** A settled dead mound keeps every column of its wear for good, and the whole book is written at every save while any mound changes
+- **R5-44** The "already put in" check of new land can never be reached
+- **R5-45** A dead colony of new land is given its days since death as its age
+- **R5-46** The dead works' list of "the nest, never filled" leaves out the side rooms
+- **R5-48** The mound's allowance for a whole absence is paid at the head count on the day of return
+- **R5-49** The bare patches catch up all in one tick on return
+- **R5-50** Two block reads with no loaded-land check, reachable today only by the kill command
+- **R5-51** Three places where the mound meets the player's own digging and building
 
 **Round 6, the Matabele ants (not raids)** (`docs/reviews/full/round-06-matabele.md`)
 
@@ -417,7 +477,7 @@ Faults in the test and film tools, not in the game.
 
 ## The code review so far
 
-422 findings: 210 left (above), 212 done (below). The plan: `docs/plans/code-review.md`.
+473 findings: 261 left (above), 212 done (below). The plan: `docs/plans/code-review.md`.
 
 | Round | System | Found | Left | Done |
 |---|---|---|---|---|
@@ -425,7 +485,7 @@ Faults in the test and film tools, not in the game.
 | 2 | the legs | 43 | 18 | 25 |
 | 3 | the insect body | 45 | 32 | 13 |
 | 4 | how bodies are drawn | 37 | 32 | 5 |
-| 5 | the termites | not read yet | | |
+| 5 | the termites | 51 | 51 | 0 |
 | 6 | the Matabele ants (not raids) | 33 | 30 | 3 |
 | 7 | the giant trees | 36 | 15 | 21 |
 | 8 | the world | 20 | 14 | 6 |
