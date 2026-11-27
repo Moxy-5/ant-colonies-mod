@@ -14,6 +14,7 @@ import com.antcolonies.animal.LifeStage;
 import com.antcolonies.animal.SeekMateGoal;
 
 import com.antcolonies.entity.body.GroundBend;
+import com.antcolonies.entity.body.Placement;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -717,12 +718,10 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         double px = getX() - Mth.sin(yaw) * ahead, pz = getZ() + Mth.cos(yaw) * ahead;
         double want = Math.max(getY() + ROLL_AXIS * getScale() - passenger.getBbHeight() * 0.5, floorAt(px, pz));
         heldY = Double.isNaN(heldY) || Math.abs(want - heldY) > 3.0 ? want : heldY + Mth.clamp(want - heldY, -0.2, 0.2);
-        callback.accept(passenger, px, heldY, pz);
-        if (!(passenger instanceof Player) && passenger instanceof LivingEntity living) {
-            float across = yBodyRot + (big ? 180.0F : 90.0F);
-            living.setYRot(across);
-            living.yBodyRot = across;
-            living.yHeadRot = across;
+        if (!(passenger instanceof Player) && passenger instanceof LivingEntity) {
+            Placement.seat(passenger, callback, px, heldY, pz, yBodyRot + (big ? 180.0F : 90.0F));
+        } else {
+            callback.accept(passenger, px, heldY, pz);  // (a held player looks where it likes)
         }
     }
 

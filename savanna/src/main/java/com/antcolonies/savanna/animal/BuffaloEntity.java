@@ -281,14 +281,6 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
         return lion.walking() && dist <= LION_SEEN;
     }
 
-    /** A lion clinging to it never shoves it, nor it the lion (they would slide apart). */
-    @Override
-    protected void doPush(Entity other) {
-        if (!(other instanceof LionEntity lion && lion.holding())) {
-            super.doPush(other);
-        }
-    }
-
     /** A lion clings to it this tick (each holder calls it every tick it holds). */
     public void heldBy(Entity lion) {
         holders.put(lion.getId(), level().getGameTime());
