@@ -14,7 +14,7 @@ for the number there).
 | In the game: C, small or rare | 31 |
 | Waiting for your call | 19 |
 | Behind the scenes (code review) | 168 |
-| Tool faults | 6 |
+| Tool faults | 8 |
 | *Test flakes, in `docs/TEST-FLAKES.md`* | *50* |
 
 ## A: it breaks play (1)
@@ -401,7 +401,7 @@ given; *half fixed* says what is left; no word means nobody has started it.
 - **R12-69** The dragged tail does all its ground reading even when it has no say
 - **R12-73** The hippo's climb-out paths are not one row a tick, and the move writer never checks
 
-## Tool faults (6)
+## Tool faults (8)
 
 Faults in the test and film tools, not in the game.
 
@@ -411,6 +411,8 @@ Faults in the test and film tools, not in the game.
 - **429** On the course the monitor, the bullfrog and the crocodiles stop short of where a scene sends them
 - **435** The six walker guard scenes come out different on every launch
 - **449** The lion hunt film misses the hold; its "hold" burst films the feast instead
+- **456** `tools/body_course.py` measures a lion's hind feet at the shin
+- **457** `tools/pair_report.py` counts a foot as planted up to 0.1 blocks over the ground, so a lifting paw's swing reads as a slide
 
 ## The code review so far
 

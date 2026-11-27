@@ -176,7 +176,9 @@ def build(folder, start=None, end=None, only=None, out=None):
             'width': header.get('width'), 'height': header.get('height'), 'scale': header.get('scale'),
             'bones': [{'name': b['name'], 'parent': b.get('parent'), 'pivot': b.get('pivot', [0, 0, 0]),
                        'cubes': [[r(v, 5) for v in c] for c in b['cubes']]} for b in header['bones']],
-            'legs': plan.get('legs', {}),
+            # each leg from the body outward, its role names turned into the model's own bone names (the plan's
+            # "bones" table: a bone renamed in the model changes only that table)
+            'legs': {k: [(plan.get('bones') or {}).get(r, r) for r in chain] for k, chain in (plan.get('legs') or {}).items()},
             'n': len(moments), 'B': n_bones, 'offset': offset, 'turn': s_turn, 'move': s_move,
             'key': keys, 'ft': [m.get('ft') for m in moments], 'pt': [r(m.get('pt', 0), 3) for m in moments],
             'pos': [[r(m['pos'][0] - origin[0]), r(m['pos'][1] - origin[1]), r(m['pos'][2] - origin[2])] for m in moments],
