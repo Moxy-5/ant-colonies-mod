@@ -17,6 +17,13 @@ the game draws it, then in the game frame by frame.
                foot slides), and a red frame round a picture taken within a frame of a flagged jump or joint snap.
   --fresh      judges every clip and clip change again (without it, one judged before is read back from
                run-film/clip_cache/clip_check/ while its keys, the model, the plan and these tools are unchanged)
+  --scene <pose>  (the Motion Studio, the new phase 2, step 7, 2026-11-27) everyone round the prey at once, the
+               prey named first (buffalo --scene carcass): each spot of its plan's pairs on that clip or pose taken by
+               each form the pairs allow there, at the pairs' real sizes, every few ticks; each against the prey, every
+               two at their spots against each other, and (round a carcass) the full lions lying by the kill where the
+               game lays them (savanna LionHunt.lieByKill, its numbers read from the Java), the carcass turned every 30
+               degrees. It names the parts in each other ("lion leg_fl_2 in lioness chest 1.8"); flagged: bodies over
+               1 px in each other (a feeder's head on the hide is its bite, shown, not flagged).
   --size s     (the Motion Studio, the new phase 2, step 6, 2026-11-27) checks the clips as a young animal of size s
                plays them (a calf 0.5, a cub 0.4): a model pixel s times as many blocks, so speeds are its own blocks a
                second and a step or bank made for a grown one is raised to a block at its size (a cub stepping up a
@@ -1379,6 +1386,29 @@ class Boxes:
                     best = d
         return best
 
+    def where(self, p):
+        """How deep a point is inside the body and the bone of the box it is deepest in ((0, None) outside)."""
+        x, y, z = p
+        best, bone = 0.0, None
+        for bn, cs, lo, hi in self.boxes:
+            if lo[0] <= x <= hi[0] and lo[1] <= y <= hi[1] and lo[2] <= z <= hi[2]:
+                d = box_depth(p, cs)
+                if d > best:
+                    best, bone = d, bn
+        return best, bone
+
+    def deepest_named(self, points):
+        """The deepest of these (bone, point) pairs inside the body, by the two parts: {(its bone, the body's bone): depth}
+        (the Motion Studio, the new phase 2, step 5's lesson: "mane in ribs", not "body 1.8 px")."""
+        (x0, y0, z0), (x1, y1, z1) = self.lo, self.hi
+        out = {}
+        for bn, q in points:
+            if x0 <= q[0] <= x1 and y0 <= q[1] <= y1 and z0 <= q[2] <= z1:
+                d, into = self.where(q)
+                if into is not None and d > out.get((bn, into), 0.0):
+                    out[(bn, into)] = d
+        return out
+
     def deepest(self, points):
         """The deepest of these (bone, point) pairs inside the body, by bone group: {bone: depth}. (The points outside
         the body's bounds are dropped in one pass first: most of them, and the test was 78 of the pair check's 95
@@ -1835,6 +1865,174 @@ def run_pairs(holder, prey_name, holds, spots_wanted, times, views, out_dir):
     return 2 if flags else 0
 
 
+# --- the whole scene round a prey (the Motion Studio, the new phase 2, step 7, idea 55, 2026-11-27) -------------------
+SCENE_STEP = 4               # ticks between the moments judged (the feed and hold loops move slowly; my pick)
+BODIES_IN = 1.0              # px (a sixteenth of a block): parts of two bodies deeper than this in each other are flagged
+
+
+def _java_number(path, pattern, what):
+    """A number from the game's Java (the tool never keeps a copy): the pattern's one group in the file."""
+    text = open(os.path.join(PROJECT, path), encoding='utf-8').read()
+    m = re.search(pattern, text)
+    if not m:
+        raise SystemExit(f'cannot read {what} from {path} (the Java changed: update clip_check.py\'s pattern)')
+    expr = m.group(1).replace('Math.PI', 'pi').replace('Math.sqrt', 'sqrt')     # (a number, or Math.PI * (3 - Math.sqrt(5)))
+    return float(eval(expr, {'__builtins__': {}, 'pi': math.pi, 'sqrt': math.sqrt}))
+
+
+def bystanders():
+    """Where full lions lie by a kill (savanna LionHunt.lieByKill: rank r at LIE_OUT + 0.6 r blocks from the carcass,
+    at r golden angles round it, HomeGroup.offset; facing it): [(rank, x, z blocks from the carcass)]."""
+    hunt = 'savanna/src/main/java/com/antcolonies/savanna/animal/LionHunt.java'
+    out = _java_number(hunt, r'static final double LIE_OUT = ([0-9.]+);', 'LIE_OUT')
+    step = _java_number(hunt, r'HomeGroup\.offset\(l\.rank\(\), LIE_OUT \+ l\.rank\(\) \* ([0-9.]+)\)', 'the rank step')
+    golden = _java_number('savanna/src/main/java/com/antcolonies/savanna/animal/HomeGroup.java',
+                          r'GOLDEN_ANGLE = (Math\.PI \* \(3\.0 - Math\.sqrt\(5\.0\)\));', 'GOLDEN_ANGLE')
+    return [(r, math.cos(r * golden) * (out + r * step), math.sin(r * golden) * (out + r * step)) for r in range(6)]
+
+
+def place_points(posed, size, da, feet, d, left):
+    """A model's posed boxes set on the ground in the prey's frame (px = a sixteenth of a block): its feet there,
+    facing d, its left `left` (as Pair.holder_point)."""
+    def at(p):
+        a, side = (-p[2] + da) * size, p[0] * size
+        return (feet[0] + d[0] * a + left[0] * side, p[1] * size, feet[1] + d[1] * a + left[1] * side)
+    return [(bn, [at(p) for p in cs], col) for bn, cs, col in posed]
+
+
+def named(into, flag_heads=None):
+    """'a in b 1.8' for the deepest few named overlaps, deepest first."""
+    items = sorted(into.items(), key=lambda kv: -kv[1])
+    return ', '.join(f'{a} in {b} {v:.1f}' for (a, b), v in items[:4]) or 'none'
+
+
+def run_scene(prey, pose, times, views, out_dir):
+    """--scene: everyone the prey's plan lists round this pose at once (each feeding or holding spot taken by each
+    form its pairs allow there, at the pairs' real sizes), every few ticks of their clips, and the full lions lying by
+    the kill round it, saying which parts are in which."""
+    pairs = [p for p in prey.plan_data.get('spots', {}).get('pairs', []) if pose in p['clips']]
+    if not pairs:
+        print(f'the plan of {prey.name} lists no pairs on {pose} (spots.pairs)')
+        return 1
+    flags = 0
+    for size in sorted({p['size'] for p in pairs}, reverse=True):
+        group = [p for p in pairs if p['size'] == size]
+        kind = group[0]['clips'][pose]
+        holders = {p['holder']: Pair(Animal(p['holder']), prey.name, p) for p in group}
+        any_pair = next(iter(holders.values()))
+        spots_all = [s for s in any_pair.table['names'] if any(s in h.spots for h in holders.values())]
+        allowed = {s: [h for h, pr in holders.items() if s in pr.spots] for s in spots_all}
+        n = max(pr.h_ticks + pr.h_blend for pr in holders.values())
+        ticks = list(range(0, n, SCENE_STEP))
+        print(f'== {prey.name} {pose} (size {size}): {len(spots_all)} spots ({", ".join(spots_all)}), taken by '
+              + ', '.join(f'{h} ({pr.spec["hold"]}, size {pr.hs})' for h, pr in holders.items())
+              + f'; {len(ticks)} moments a {SCENE_STEP} ticks apart (px: a sixteenth of a block)')
+        # everyone posed once a moment: the prey, and each form at each spot it may take
+        placed = {}
+        prey_at = {}
+        for k in ticks:
+            pposed, pboxes, ppts = any_pair.prey_posed(pose, kind, k)
+            prey_at[k] = (pposed, pboxes)
+            row = any_pair.prey_place(pose, kind, k)
+            for s in spots_all:
+                for h in allowed[s]:
+                    pr = holders[h]
+                    hposed, _ = pr.holder_posed(pr.holder_frame(s, row), k)
+                    placed[(s, h, k)] = (hposed, Boxes(hposed), with_edges_all(hposed))
+        # 1. each at its spot against the prey: its head on the hide is the feeding (shown, not flagged), the rest flagged
+        print(f'  each against the {prey.name} (deepest over the moments; its head on the hide is the bite):')
+        for s in spots_all:
+            for h in allowed[s]:
+                pr = holders[h]
+                head, body = {}, {}
+                for k in ticks:
+                    hposed, hb, hpts = placed[(s, h, k)]
+                    pposed, pb = prey_at[k]
+                    if not hb.overlaps(pb):
+                        continue
+                    for key, v in pb.near(hb).deepest_named(hpts).items():
+                        (head if key[0] in pr.head else body)[key] = max(v, (head if key[0] in pr.head else body).get(key, 0.0))
+                    for (pa, hbn), v in hb.near(pb).deepest_named(with_edges_all(pposed)).items():
+                        key = (hbn, pa)
+                        target = head if hbn in pr.head else body
+                        target[key] = max(v, target.get(key, 0.0))
+                worst = max(body.values(), default=0.0)
+                bad = worst > BODIES_IN
+                flags += bad
+                print(f'    {s:13s} {h:8s} head: {named(head)}; body: {named(body)}' + ('  << bodies in each other' if bad else ''))
+        # 2. every two spots, each form each may hold, at every moment: the feeders crowding each other
+        print('  feeders against each other (every two spots, every form each may take; the worst moment):')
+        any_touch = False
+        for i, a in enumerate(spots_all):
+            for b in spots_all[i + 1:]:
+                for ha in allowed[a]:
+                    for hb_ in allowed[b]:
+                        worst, at_k, parts = 0.0, None, {}
+                        for k in ticks:
+                            pa, ba, pts_a = placed[(a, ha, k)]
+                            pb_, bb, pts_b = placed[(b, hb_, k)]
+                            if not ba.overlaps(bb):
+                                continue
+                            into = dict(bb.near(ba).deepest_named(pts_a))
+                            for (y, x), v in ba.near(bb).deepest_named(pts_b).items():
+                                into[(x, y)] = max(v, into.get((x, y), 0.0))
+                            top = max(into.values(), default=0.0)
+                            if top > worst:
+                                worst, at_k, parts = top, k, into
+                        if worst > 0.0:
+                            any_touch = True
+                            bad = worst > BODIES_IN
+                            flags += bad
+                            print(f'    {a} {ha} + {b} {hb_}: {named(parts)} (the {ha}\'s part first; tick {at_k})'
+                                  + ('  << crowd' if bad else ''))
+        if not any_touch:
+            print('    none touch')
+        # 3. the full lions lying by the kill, the carcass turned every 30 degrees (their places are fixed round it)
+        if pose == 'carcass':
+            lying = {}
+            for h, pr in holders.items():
+                if 'rest' in pr.holder.data:
+                    pl = Played(pr.holder, 'rest')
+                    lying[h] = (pr, pr.holder.model.posed(pl.pose(pl.length / 2)))
+            print('  the full lions lying by it (rank: where; the nearest feeder or carcass part, the carcass turned every 30 degrees):')
+            for rank, wx, wz in bystanders():
+                for h, (pr, rposed) in lying.items():
+                    worst, what = 0.0, None
+                    nearest = 1e9
+                    for turn in range(0, 360, 30):
+                        th = math.radians(turn)
+                        # the world offset in the prey's frame (x to its left, z toward its tail), px
+                        x = (wx * math.cos(th) + wz * math.sin(th)) * 16
+                        z = (wx * math.sin(th) - wz * math.cos(th)) * 16
+                        L = math.hypot(x, z) or 1e-9
+                        d = (-x / L, -z / L)
+                        left = (-d[1], d[0])
+                        posed = place_points(rposed, pr.hs, pr.da_h, (x, z), d, left)
+                        bx, pts = Boxes(posed), with_edges_all(posed)
+                        k = ticks[0]
+                        others = [(f'{prey.name}', prey_at[k][1])] + [
+                            (f'{fh} at {fs}', placed[(fs, fh, k)][1]) for fs in spots_all for fh in allowed[fs][:1]]
+                        for who, ob in others:
+                            gap = math.dist([(bx.lo[i] + bx.hi[i]) / 2 for i in (0, 2)], [(ob.lo[i] + ob.hi[i]) / 2 for i in (0, 2)])
+                            nearest = min(nearest, gap)
+                            if not bx.overlaps(ob):
+                                continue
+                            into = ob.near(bx).deepest_named(pts)
+                            top = max(into.values(), default=0.0)
+                            if top > worst:
+                                worst, what = top, (who, turn, into)
+                    bad = worst > BODIES_IN
+                    flags += bad
+                    where = f'{math.hypot(wx, wz):.1f} blocks out'
+                    if what:
+                        print(f'    rank {rank} {h:8s} {where}: in the {what[0]} at a {what[1]} degree turn: {named(what[2])}'
+                              + ('  << lies in them' if bad else ''))
+                    else:
+                        print(f'    rank {rank} {h:8s} {where}: clear')
+    print(f'  {flags} flagged')
+    return 2 if flags else 0
+
+
 # --- the command ------------------------------------------------------------------------------------------------------
 def main(argv):
     if not argv or argv[0] in ('-h', '--help'):
@@ -1844,7 +2042,7 @@ def main(argv):
     times, views, model, out_dir, names, switches = None, ('side', 'three', 'front'), None, None, [], False
     changes, write, fresh = False, False, False
     hold, angles = None, [90.0, 25.0, 155.0]
-    pair_with, spots_wanted, size = None, [], 1.0
+    pair_with, spots_wanted, size, scene = None, [], 1.0, None
     i = 0
     while i < len(args):
         a = args[i]
@@ -1887,6 +2085,9 @@ def main(argv):
         elif a == '--size':
             size = float(args[i + 1])
             i += 2
+        elif a == '--scene':
+            scene = args[i + 1]
+            i += 2
         else:
             names.append(a)
             i += 1
@@ -1894,6 +2095,8 @@ def main(argv):
     out_dir = out_dir or os.path.join(PROJECT, 'references', 'anim_lab', animal_name + ('' if size == 1.0 else f'_size{size:g}'))
     if pair_with:
         return run_pairs(animal, pair_with, names, spots_wanted, times, views, out_dir)
+    if scene:
+        return run_scene(animal, scene, times, views, out_dir)
     every = list(animal.data)
     if changes:
         print(f'{animal_name}, clips of {animal.anim_stem}')

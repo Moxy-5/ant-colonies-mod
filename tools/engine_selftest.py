@@ -9,6 +9,7 @@ Each test names the review finding it guards. Add a test here with every new che
 check must flag, then the real clip it must leave alone.
 """
 import copy
+import math
 import os
 import sys
 
@@ -572,6 +573,20 @@ def a_young_animal_meets_a_step_a_block_at_its_size():
         need(abs(animal.px - size / 16) < 1e-9, f'size {size}: a model pixel is {animal.px} blocks')
         scene = clip_check.Played(animal, 'step_up_1000').scene
         need(scene.step and abs(abs(scene.step[1]) - high) < 1e-6, f'size {size}: the step is {scene.step}, not {high} px')
+
+
+@test
+def the_scene_check_names_the_parts_and_reads_where_lions_lie_from_the_java():
+    """Idea 55: a point of one body inside another is named by both bones ("leg in chest"), and the full lions lying
+    by a kill are where the game's Java lays them (rank r at 5 + 0.6 r blocks, at r golden angles)."""
+    import clip_check
+    box = lambda x0, x1: [(x, y, z) for x in (x0, x1) for y in (0.0, 2.0) for z in (0.0, 2.0)]   # noqa: E731
+    chest = clip_check.Boxes([('chest', box(0.0, 4.0), None)])
+    into = chest.deepest_named([('leg', (1.0, 1.0, 1.0)), ('tail', (9.0, 1.0, 1.0))])
+    need(set(into) == {('leg', 'chest')} and abs(into[('leg', 'chest')] - 1.0) < 1e-9, f'named overlaps: {into}')
+    lying = clip_check.bystanders()
+    need(lying[0][0] == 0 and abs(lying[0][1] - 5.0) < 1e-9 and abs(lying[0][2]) < 1e-9, f'rank 0 lies at {lying[0]}')
+    need(abs(math.hypot(lying[1][1], lying[1][2]) - 5.6) < 1e-9, f'rank 1 lies {math.hypot(lying[1][1], lying[1][2])} out')
 
 
 @test
