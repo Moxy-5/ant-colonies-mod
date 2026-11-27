@@ -1246,8 +1246,12 @@ def check(model, clip, speed_bps=None, quiet=False):
             moves = [math.dist(gait.tips[i][k][::2], gait.tips[i + 1][k][::2]) for i in range(n)
                      if gait.down[k][i] and gait.down[k][i + 1]]
             if moves and max(moves) / dt > 1.5:
-                i = max(range(len(moves)), key=lambda j: moves[j])
-                out.append(('NOTE', f'foot {k} moves along the ground while standing ({max(moves) / dt:.1f} units a second)'))
+                # (review R12-24, tried 2026-11-26: as a fault over half a unit this flagged the approved grooming,
+                # clamp, head bang and falling clips, whose working or falling feet read as "down"; it stays a note,
+                # now with how far the foot went in all, until a clip can name the feet it works with.)
+                slid = sum(m for m in moves if m / dt > 1.5)
+                out.append(('NOTE', f'foot {k} moves along the ground while standing '
+                            f'({max(moves) / dt:.1f} units a second, {slid:.2f} units in all)'))
     # Sinking into the floor, clipping, loop seams, snaps: sampled through the clip.
     floor = gait.ground if model.feet else 0.0
     sunk = clipped = None
@@ -1287,6 +1291,17 @@ def check(model, clip, speed_bps=None, quiet=False):
         out.append(('BAD', f'{sunk[0]} sinks {sunk[2]:.2f} units into the floor at {sunk[1]:.3f} s'))
     if clipped:
         out.append(('BAD', f'{clipped[0]} passes through {clipped[1]} at {clipped[2]:.3f} s'))
+    # (review R12-21: the loop's seam is judged for a bone's place and size too; only its turn was read, so a body
+    # popping up or a part swelling where the loop starts again passed. My pick: 0.3 units, 0.03 of its size.)
+    if clip.loop:
+        for bone, chans in clip.bones.items():
+            for channel, limit, word in (('position', 0.3, 'units'), ('scale', 0.03, 'of its size')):
+                keys = chans.get(channel)
+                if keys and len(keys) > 1:
+                    first, last = sample_channel(keys, 0.0), sample_channel(keys, clip.length)
+                    gap = max(abs(a - b) for a, b in zip(first, last))
+                    if gap > limit:
+                        out.append(('BAD', f'{bone} jumps {gap:.2f} {word} ({channel}) where the loop starts again'))
     for bone, chans in clip.bones.items():
         rot = chans.get('rotation')
         if not rot:

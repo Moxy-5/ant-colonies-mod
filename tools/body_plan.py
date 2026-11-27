@@ -266,6 +266,53 @@ def geo_bones(model):
 
 
 # --- checking ---------------------------------------------------------------------------------------------------------
+def checks_problems(plan, bones):
+    """What is wrong with the names in a plan's "checks" (review R12-14: a misspelt bone or clip pattern did not fail,
+    it switched its check off for good: a knee check against no boxes, a jaw read as 0 degrees for ever). Bones are
+    the model's own names (or roles); clip patterns must match a clip of the animation file the checks read."""
+    import fnmatch
+    ck = plan.data.get('checks') or {}
+    if not ck:
+        return []
+    out = []
+    names = {b['name'] for b in bones} | set(plan.to_bone)
+    stem = ck.get('animations', plan.data['model'])
+    path = os.path.join(assets(stem), 'animations', 'entity', f'{stem}.animation.json')
+    clips = set(json.load(open(path, encoding='utf-8'))['animations']) if os.path.exists(path) else None
+
+    def bone(key, name):
+        if name is not None and name not in names:
+            out.append(f'checks.{key} names bone "{name}", the model has no such bone (its check would be switched off)')
+
+    def clip(key, pattern):
+        if clips is not None and not any(fnmatch.fnmatch(c, pattern) for c in clips):
+            out.append(f'checks.{key} names clip "{pattern}", no clip matches it (its check would be switched off)')
+
+    for key in ('body_bones', 'skip_bones', 'hide_in', 'hidden_at_rest'):
+        for name in ck.get(key, []):
+            bone(key, name)
+    for part in ck.get('feet_parts', []):
+        if not any(part in n for n in names):
+            out.append(f'checks.feet_parts names "{part}", no bone of the model has it in its name')
+    for name in (ck.get('hinge') or {}).get('bones', []):
+        bone('hinge.bones', name)
+    for key, fields in (('jaw', ('bone',)), ('carry', ('bone', 'jaw')), ('tail_drag', ('from', 'root'))):
+        for field in fields:
+            bone(f'{key}.{field}', (ck.get(key) or {}).get(field))
+    for key in ('reach', 'surface_marks'):
+        for row in ck.get(key, []):
+            bone(key, row.get('bone'))
+            if 'clip' in row:
+                clip(key, row['clip'])
+    for key in ('feet_free', 'tuck_ok', 'water', 'dig', 'wave', 'walk_clips', 'feet_up_ok', 'flight', 'on_ground', 'walks'):
+        for pattern in ck.get(key, []):      # (a list of patterns, or a table keyed by them)
+            clip(key, pattern)
+    for pair in ck.get('switches', []):
+        for pattern in pair[:2]:
+            clip('switches', pattern)
+    return out
+
+
 def problems(plan, bones):
     """What is wrong between a plan and its model's bones (a list of sentences; empty when all is well)."""
     out = []
@@ -434,6 +481,7 @@ def check_all():
             bad += 1
             continue
         found = problems(plan, geo_bones(model))
+        found += checks_problems(plan, geo_bones(model))
         found += [] if found else stale(plan)
         print(f'{model}: ' + ('OK' if not found else f'{len(found)} problem(s)'))
         for p in found:
