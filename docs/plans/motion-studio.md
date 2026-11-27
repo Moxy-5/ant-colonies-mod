@@ -170,19 +170,43 @@ plan"). The clips were the easy part of step 5; nearly every fault came from put
     a clip that depends on another animal's clip (the lioness's holds on the buffalo's death) says so when that clip
     changes. S.
 
+*Neon's small additions to G (2026-11-27, written on `neon/studio` after reading phases 0 to 3, folded in here):*
+57. **One shared feet rule in `tools/recording.py`** (fixes BUGS 456, 457): the replay page's foot contact and slide
+    rule, so `replay.py`, `replay_strips.py`, `pair_report.py` and `body_course.py` report the same planted and sliding
+    feet. S, Claude.
+58. **Every maker keeps the plan's other sections** (extends 56): `keep_gaits` grown into one helper every maker goes
+    through, keeping `gaits`, `spots`, `holds`, `strikes`, `checks.controller`, `checks.drawn_ahead`, `course`,
+    `verify` and added `switches`. S, Claude.
+59. **The young's gaits** (BUGS 378): `clip_check.py` at a young size, young gait slots in `Gaits` and the pace report,
+    so stride-matched calf and cub gaits can be made and checked against the young's real speeds. S, Claude.
+
+**H. Video review (Neon's phase 3c, part 1; added 2026-11-27).** Neon can watch an `.mp4` itself and judge timing and
+weight that fall between contact-sheet frames.
+60. **A recording to video** (`tools/replay_video.py` or `replay_strips.py --video`): several cameras in one frame,
+    1x and slow motion, a bar with tick, clip, play speed and a red mark for a sliding foot. M, Claude.
+61. **An offline clip to video:** the same from the clip files alone (a clip on a moving floor at its stride, a blend
+    of `--switches`, a `--pair` scene), in seconds, no game. M, Claude or Neon.
+62. **Real footage beside the clip** (`--ref <video>`, grows idea 47), cycle-matched. S-M, Claude.
+
+**I. Living motion (Neon's phase 3c, part 2; promotes 27 and 28).**
+63. **The spine bending into turns** from the body plan's chain, eased on `DrawClock`. M, Claude.
+64. **Start, stop and banked-turn weight** (`stop_pitch`, `turn_lean`, `accel_stride` in the plan, eased on
+    `DrawClock`), for runners and fliers. M, Claude.
+
 ## The order (my recommendation)
 - **Phase 0, eyes on the real hunt (a day or two, Claude):** 1, 2, 11, 12, 16, 14, plus the quick fixes 29 and 30.
   Then look at the films and the recording before changing anything ("find the cause before fixing jank").
 - **Phase 1, the lab shows the game (Neon's viewer):** 3, 5, 6, 7 on the phase 0 recordings. After this the user can
   study any real motion from any angle.
   **Built 2026-11-27 by Claude (Neon out of quota), `claude/motion-phase1`: "Phase 1, built" below.**
-- **Phase 2, one source of truth for motion:** 20, 21, 22, 23, 24, 25, 26. Each removes a copy or a hidden difference.
+- **Phase 2 (new, 2026-11-27, the user: "its a new phase delete the old one that was already completed"): the glue,**
+  51 to 56 with Neon's 57 to 59: `docs/plans/motion-studio-phase2.md`. (The first phase 2, ideas 20 to 26, one source
+  of truth for motion, was built 2026-11-25; its record is in `docs/HISTORY.md`.)
 - **Phase 3, partner moves (the lion and buffalo first):** 31, 32, then 36 and 37 offline, then 33 with 34 or 35 in
   the game (pick after seeing the phase 0 films), then 38, 40, 41. The hunt's oval and fixed ticks go.
   **Started 2026-11-26: its own plan and steps in `docs/plans/motion-studio-phase3.md` (step 1, the hold on the prey's body, built).**
-- **Phase 3b, the glue (my recommendation, 2026-11-26; not started):** 51, 52, 53 first, before the animations are
-  redone (the user plans to change them all later; each new clip goes through this glue), then 54 to 56. Check first
-  what the round 12 review's fixes already cover and do not work in the lion and engine code beside that chat.
+- **Phase 3b, the glue:** became the new phase 2 (above).
+- **Phase 3c (Neon's, 2026-11-27): video review and living motion,** 60 to 62, then 63 and 64. After phase 2.
 - **Phase 4, the replay key (9)** and the tests (43 to 46). **On hold (the user, 2026-11-26).** Its hold and strike
   tests would be written against the placement code that 51 replaces; the replay key loses nothing by waiting.
 

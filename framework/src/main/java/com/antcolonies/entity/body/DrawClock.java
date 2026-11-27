@@ -6,7 +6,7 @@ import java.util.WeakHashMap;
 import net.minecraft.world.entity.Entity;
 
 /**
- * The drawing's one clock (the Motion Studio, phase 2, step 4, 2026-11-25; {@code docs/plans/motion-studio-phase2.md}):
+ * The drawing's one clock (the Motion Studio, phase 2, step 4, 2026-11-25; the first phase 2, its record in {@code docs/HISTORY.md}):
  * game time, the animal's own ticks and the in-between time, as nanoseconds (50 ms a tick), for every ease a body draws
  * (the stance's tilt, the eyes and the head, the lion's neck, a move's hand over, the crocodile's, monitor's and hippo's
  * bends, legs and eyes, the frog's head). Before, each eased on the computer's clock ({@code System.nanoTime}): a frozen

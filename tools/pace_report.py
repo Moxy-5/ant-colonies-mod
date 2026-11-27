@@ -1,5 +1,5 @@
 """Each animal's gaits as the game really played them, from a film's recordings (the Motion Studio, phase 2, step 2,
-2026-11-25; docs/plans/motion-studio-phase2.md). Reads every body_*.jsonl.gz a film wrote with "record on 1 all" and,
+2026-11-25; the first phase 2, its record in docs/HISTORY.md). Reads every body_*.jsonl.gz a film wrote with "record on 1 all" and,
 for each animal whose body plan has gaits (its "gaits" section, the clip speeds in its "checks.walks"), reports per gait
 clip:
 
