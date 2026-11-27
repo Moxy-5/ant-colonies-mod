@@ -39,7 +39,7 @@ public final class BodyPlans {
      * to back) and how the body climbs.
      */
     public record Plan(String model, Map<String, String> bones, Set<String> headPlayer, List<Piece> spine, Climb climb,
-                       @Nullable Gaits gaits) {
+                       @Nullable Gaits gaits, @Nullable ClipMap clipMap) {
         /** The model's bone for a role (the role itself if the plan does not name it). */
         public String bone(String role) {
             return bones.getOrDefault(role, role);
@@ -171,6 +171,15 @@ public final class BodyPlans {
         return plan.gaits();
     }
 
+    /** A model's clip map from its plan's postures; the plan must have one (an animal asks only for its own). */
+    public static ClipMap clipMapOf(String model) {
+        Plan plan = PLANS.get(model);
+        if (plan == null || plan.clipMap() == null) {
+            throw new IllegalStateException("no postures in the body plan of '" + model + "'");
+        }
+        return plan.clipMap();
+    }
+
     /** The plan of a geo model by its file (geo/entity/worker_ant.geo.json), or null if it has none. */
     @Nullable
     public static Plan ofGeo(ResourceLocation geo) {
@@ -252,7 +261,7 @@ public final class BodyPlans {
                     c.has("into_wall") ? c.get("into_wall").getAsDouble() : Double.NaN);
         }
         return new Plan(model, Collections.unmodifiableMap(bones), Collections.unmodifiableSet(head), List.copyOf(spine), climb,
-                Gaits.read(json));
+                Gaits.read(json), ClipMap.read(json));
     }
 
     @Nullable

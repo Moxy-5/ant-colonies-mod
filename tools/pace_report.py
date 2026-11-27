@@ -4,6 +4,8 @@ for each animal whose body plan has gaits (its "gaits" section, the clip speeds 
 clip:
 
   time      seconds in the clip, and its size (calves and cubs are drawn smaller: their clips' feet move less)
+  young     (the Motion Studio, the new phase 2, step 6) for one drawn under 0.8 of its model (a calf): the clip speed its real pace needs (px a
+            second at size 1, as checks.walks) against the one its clip is made for, and at the end each young by size
   play      the clip's play speed: middle, lowest, highest; the share of time under 0.8 or over 1.25 (the clip looks
             hurried or dragged: a looks question, for the clip's maker) and at its plan's limits (there the play speed no
             longer follows the stride)
@@ -36,6 +38,8 @@ SLIDE = 0.2           # the feet are off by more than this share either way: a s
 HURRIED, DRAGGED = 1.25, 0.8
 GLIDE = 0.5 / 20.0    # blocks a tick: faster than this on a clip made in place shows as gliding
 QUICK_BACK = 20       # ticks: a gait changed back within this flickers
+YOUNG_BELOW = 0.8     # drawn under this share of its model: a young one playing grown clips small (a calf); grown ones
+                      # vary about 0.9 to 1.1, and a cub's own model is drawn near 1 (its clips made for its legs). My pick.
 
 
 def read(path):
@@ -60,6 +64,7 @@ class Clip:
         self.plays = []
         self.limit = 0
         self.ratios = []
+        self.paces = []
         self.moving = 0
 
 
@@ -74,7 +79,8 @@ def moments_of(plan):
 
 
 def gaits_of(plan):
-    """The plan's gaits: clip -> (its feet's speed, blocks a tick at size 1; min; max), or {}."""
+    """The plan's gaits: clip -> (its feet's speed, blocks a tick at size 1; min; max), or {}; a gait's young clip
+    (gaits.<gait>.young, the Motion Studio, the new phase 2, step 6) too, with its own limits or the grown gait's."""
     gaits = plan.get('gaits')
     walks = plan.get('checks', {}).get('walks', {})
     if not gaits:
@@ -84,6 +90,9 @@ def gaits_of(plan):
         if name in ('order', 'about') or name not in walks:
             continue
         out[name] = (walks[name] / 16.0 / 20.0, g['min'], g['max'])
+        young = g.get('young')
+        if young and young.get('clip') in walks:
+            out[young['clip']] = (walks[young['clip']] / 16.0 / 20.0, young.get('min', g['min']), young.get('max', g['max']))
     return out
 
 
@@ -128,6 +137,7 @@ def animal_report(path):
             continue                              # easing between two clips: neither one's feet
         feet, low, high = gait
         c.plays.append(play)
+        c.paces.append(speed / size)              # its pace per size (blocks a tick at size 1): what its clip must be made for
         if abs(play - low) < 1e-3 or abs(play - high) < 1e-3:
             c.limit += 1
         foot_speed = feet * size * play           # how fast the clip moves its feet past the body, drawn at its size
@@ -175,6 +185,15 @@ def lines_for(result):
     for c in sorted(gliders, key=lambda c: -c.moving):
         out.append(f'  {c.name:8} {c.moving / 20.0:6.1f} s moving faster than {GLIDE * 20:.1f} blocks a second on a clip made in place'
                    f' (of {c.ticks / 20.0:.1f} s)')
+    if scale < YOUNG_BELOW:
+        # the young (the Motion Studio, the new phase 2, step 6): the clip speed its real pace needs, against the clip's
+        for c in sorted(clips.values(), key=lambda c: -c.ticks):
+            if c.gait is None or not c.paces:
+                continue
+            needs = statistics.median(c.paces) * 16 * 20
+            made = c.gait[0] * 16 * 20
+            out.append(f'  young: {c.name} needs a clip made for {needs:.1f} px/s at size 1 to play at 1.0 '
+                       f'(its clip is made for {made:.1f}: played at {needs / made if made else float("nan"):.2f})')
     out.append(f'  gait changes {changes}, changed back within {QUICK_BACK / 20:.0f} s: {flickers}')
     for t, was, clip, into, at in changed:
         where = ('its clip time not recorded' if into is None
@@ -187,15 +206,29 @@ def report(folder):
     paths = sorted(glob.glob(os.path.join(folder, 'body.jsonl.gz')) + glob.glob(os.path.join(folder, 'body_*.jsonl.gz')))
     out = [f'Pace report: {folder}', '']
     found = 0
+    results = []
     for path in paths:
         result = animal_report(path)
         if result is None:
             continue
+        results.append(result)
         found += 1
         out += lines_for(result)
         out.append('')
     if not found:
         out.append('(no recorded animal whose body plan has gaits)')
+    young = sorted((r for r in results if r[2] < YOUNG_BELOW), key=lambda r: (r[1], r[2]))
+    if young:
+        # each young by size: the gait clip it played most, its play speed, the clip speed its real pace needs
+        out.append('The young by size (the clip each played most, its play speed, the clip speed its pace needs):')
+        for name, entity, scale, clips, *_ in young:
+            gaits = [c for c in clips.values() if c.gait is not None and c.paces]
+            if not gaits:
+                continue
+            c = max(gaits, key=lambda c: c.ticks)
+            out.append(f'  {entity} size {scale:.2f} ({name}): {c.name} played at {statistics.median(c.plays):.2f}, '
+                       f'its pace needs a clip made for {statistics.median(c.paces) * 320:.1f} px/s (made for {c.gait[0] * 320:.1f})')
+        out.append('')
     out += ['play: the clip\'s play speed (1.0 as made). hurried/dragged: over 1.25 or under 0.8. feet: the ground\'s',
             'speed under the body against the clip\'s feet (1.0 they stay put); off: more than a fifth either way.']
     text = '\n'.join(out)

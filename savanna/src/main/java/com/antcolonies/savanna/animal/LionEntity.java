@@ -10,6 +10,7 @@ import com.antcolonies.animal.Attention;
 import com.antcolonies.animal.HasLife;
 import com.antcolonies.animal.HitChain;
 import com.antcolonies.entity.body.BodyPlans;
+import com.antcolonies.entity.body.ClipMap;
 import com.antcolonies.entity.body.GaitShift;
 import com.antcolonies.entity.body.Gaits;
 import com.antcolonies.entity.body.Placement;
@@ -155,6 +156,11 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
      * a little off).
      */
     public final Gaits gaits = BodyPlans.gaitsOf(form.clips);
+    /**
+     * Its clip map: its clips lying, sitting and standing and the ways between (its body plan's postures: the Motion
+     * Studio, the new phase 2, step 5; before, each goal wrote its own "lying: up first", BUGS 376).
+     */
+    final ClipMap clipMap = BodyPlans.clipMapOf(form.clips);
     /** The gait drawn (client): a change waits for the stride's matching moment. */
     private final GaitShift gaitShift = new GaitShift();
 
@@ -366,6 +372,49 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
     /** How long a one-shot doing lasts (ticks, its blend in); 0 for calm and the loops. */
     int doingTicks(byte doing) {
         return oneShot(doing) ? oneShotTicks(doing) + BLEND : 0;
+    }
+
+    /** Whether the one-shot playing has played out (a loop never has: it goes on until it is changed). */
+    boolean playedOut() {
+        byte d = doing();
+        return oneShot(d) && doingFor() >= doingTicks(d);
+    }
+
+    /** A one-shot played out gives way to what it leads into (its clip map's: lying after lying down, standing after getting up). */
+    private void endPlayedOut() {
+        if (playedOut()) {
+            setDoing(doingOf(clipMap.after(clipOf(doing()))));
+        }
+    }
+
+    /**
+     * Plays on toward a doing: its clip map's way there first (up, then down: lying down into a feed, up from it to
+     * roar), then the doing itself, nothing between and nothing skipped; whether it plays it now. A goal asks each tick.
+     */
+    boolean toward(byte want) {
+        byte d = doing();
+        boolean out = playedOut();
+        String next = clipMap.toward(clipOf(d), out, clipOf(want));
+        byte n = next.equals(clipOf(want)) ? want : doingOf(next);
+        if (n != d || out) {
+            setDoing(n);
+        }
+        return n == want;
+    }
+
+    /** On its feet, getting up first from lying or sitting (its clip map's way up); whether it stands now (any standing clip). */
+    boolean upright() {
+        byte d = doing();
+        String way = clipMap.way(clipOf(d), playedOut(), ClipMap.STANDING);
+        if (way == null) {
+            endPlayedOut();                             // (up: idle at once, not a tick of its way up held)
+            return true;
+        }
+        byte n = doingOf(way);
+        if (n != d) {
+            setDoing(n);
+        }
+        return false;
     }
 
     /** The doing whose clip this is (-1: none). */
@@ -826,9 +875,7 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
         if (d == ROAR && clipTick() == (isCub() ? 5 : 10)) {
             roarSound();
         }
-        if (oneShot(d) && doingFor() >= doingTicks(d)) {
-            setDoing(d == REST_DOWN || d == GROOM ? REST : d == SIT_DOWN ? SIT : CALM);
-        }
+        endPlayedOut();
         if (tickCount % 5 == 0) {
             byte now = mood(), want = workOutMood();
             if (want != now && (urgency(want) > urgency(now) || tickCount - moodSince >= MOOD_HOLD)) {
@@ -1148,8 +1195,10 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
             // matching footfall when the old gait can carry the speed (GaitShift); turning in place: a slow walk at half
             // its pace, its feet never skating (its stride still holds the last run's speed: a turn is judged by its own)
             boolean turning = tickCount - movedTick > WALK_HOLD;
-            double s = turning ? 0.5 * gaits.of("walk").madeFor() : Gaits.perSize(stride, getScale());
-            Gaits.Gait gait = gaitShift.shown(turning ? gaits.of("walk") : gaits.pick(s), s, player);
+            // (a cub plays a gait's young clip where its plan names one: Gait.at)
+            Gaits.Gait walk = gaits.of("walk").at(getScale());
+            double s = turning ? 0.5 * walk.madeFor() : Gaits.perSize(stride, getScale());
+            Gaits.Gait gait = gaitShift.shown(turning ? walk : gaits.pick(s).at(getScale()), s, player);
             player.setAnimationSpeed(gait.rate(s));
             return state.setAndContinue(gait.loop());
         }

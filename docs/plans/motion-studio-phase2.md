@@ -96,3 +96,20 @@ full run), the four reviewers, their fixes, the notes, commit, push, `C:\Ant Mod
   Minecraft never pushes a rider and its mount); the crocodile's and the otter's catches are seated by it, so a buffalo
   in a crocodile's jaws is now drawn crosswise as it is placed, not along the crocodile (a looks fix). `land` and `river`
   167 of 167.
+- **Step 5.** `framework/.../entity/body/ClipMap`, from each body plan's new `postures` (the lion, the lioness, the cub:
+  lying with `rest`, its way down `rest_down`, its ways up `rest_up` and `rest_stretch_up`, its clips `groom` and
+  `feed`; sitting; the buffalo: lying and held). The lion asks `toward(doing)` (the way there, then the clip, nothing
+  between) and `upright()` (up first); its two `onFeet`, its `getUp`, the hunt's lying down, the feast's lying down into
+  the feed, the chorus's, the answer's, the waking's and the cub's hide's "lying: up first" and both animals' one-shot
+  end tables are the map's now. Small changes, all the same rule: a grooming lion called up gets up at once (it waited
+  out the groom before in two places), and a feeding lion's goals see it lying (one `onFeet` did not). `clip_check.py
+  --switches` checks the map's changes with the plan's own list (`body_plan.posture_switches`): 5 more a lion form, 2
+  for the buffalo; the buffalo's `held_sink -> rest_up` (let go while going down) is flagged, the same 3.1 px tail flick
+  as `held_down -> rest_up` had: BUGS 466. `ClipMapTest`, a self-test; `land` 45 of 45.
+- **Step 6.** A gait may name a young clip (`gaits.<gait>.young`: its clip, the size it plays under, its own limits and
+  change moments), which `Gait.at(size)` gives the lion and the buffalo (none named yet: the calf's and cub's clips are
+  for the animation rework). `clip_check.py --size s` checks clips at a young size (a model pixel s times the blocks; a
+  step or bank raised to a block at that size: a calf at 0.5 playing the grown step-up plows 8 to 13 px into it).
+  `pace_report.py` reports each animal drawn under 0.8 of its model by size: the lion hunt film's calf (0.36) trots at
+  1.79 times its clip's speed, its pace needing a trot made for 41.6 px/s against the grown 22.2 (BUGS 378's numbers;
+  the play change is not in this step). `body_plan.py check` checks a young clip's name and speed; a self-test.

@@ -362,16 +362,12 @@ public final class LionGoals {
                 roarAt = -1;
                 return false;
             }
-            if (d == LionEntity.REST || d == LionEntity.REST_DOWN) {
-                l.setDoing(LionEntity.REST_UP);
-                return true;
+            if (!l.upright()) {
+                return true;                                    // up first: it roars standing
             }
-            if (d == LionEntity.SIT || d == LionEntity.SIT_DOWN) {
-                l.setDoing(LionEntity.SIT_UP);
-                return true;
-            }
+            d = l.doing();
             if (d != LionEntity.CALM && d != LionEntity.MOOD_FLEHMEN) {
-                return l.oneShot(d) && (d == LionEntity.REST_UP || d == LionEntity.SIT_UP);
+                return false;
             }
             l.getNavigation().stop();
             trip.drop();
@@ -395,18 +391,10 @@ public final class LionGoals {
                     answering = null;
                     return false;
                 }
-                if (d == LionEntity.REST_UP || d == LionEntity.SIT_UP || d == LionEntity.CUB_GROOM) {
-                    return true;
+                if (d == LionEntity.CUB_GROOM || !l.upright()) {
+                    return true;                                // (grooming it, or up first)
                 }
-                if (d == LionEntity.REST || d == LionEntity.REST_DOWN) {
-                    l.setDoing(LionEntity.REST_UP);
-                    return true;
-                }
-                if (d == LionEntity.SIT || d == LionEntity.SIT_DOWN) {
-                    l.setDoing(LionEntity.SIT_UP);
-                    return true;
-                }
-                if (d == LionEntity.CALM) {
+                if (l.doing() == LionEntity.CALM) {
                     if (l.faceYaw(yawTo(l.position(), answering.position()), LionEntity.MAX_TURN)) {
                         l.setDoing(LionEntity.CUB_GROOM);
                         answering = null;
@@ -445,7 +433,7 @@ public final class LionGoals {
                     return;                                     // lying or sitting on until its turn
                 }
                 boolean down = d == LionEntity.REST || d == LionEntity.SIT;
-                if (!down && !getUp(d)) {
+                if (!down && !getUp()) {
                     return;                                     // lying or sitting it first sees where it goes: it may be there
                 }
                 if (!choosePlace(now)) {
@@ -461,7 +449,7 @@ public final class LionGoals {
                 if (dist <= arriveDone()) {
                     arrive(now);                               // already at its place (its goal started again)
                 } else {
-                    getUp(d);
+                    getUp();
                 }
                 return;
             }
@@ -481,16 +469,12 @@ public final class LionGoals {
             }
         }
 
-        /** Gets up from lying or sitting; whether it is on its feet (calm) now. */
-        private boolean getUp(byte d) {
-            if (d == LionEntity.REST || d == LionEntity.REST_DOWN) {
-                l.setDoing(LionEntity.REST_UP);
+        /** Gets up from lying or sitting (its clip map's way up); whether it is on its feet and calm now (a mood ends). */
+        private boolean getUp() {
+            if (!l.upright()) {
                 return false;
             }
-            if (d == LionEntity.SIT || d == LionEntity.SIT_DOWN) {
-                l.setDoing(LionEntity.SIT_UP);
-                return false;
-            }
+            byte d = l.doing();
             if (d == LionEntity.MOOD_FLEHMEN || d == LionEntity.MOOD_ALERT || d == LionEntity.MOOD_ANGRY) {
                 l.setDoing(LionEntity.CALM);
             }
@@ -940,11 +924,7 @@ public final class LionGoals {
                         l.setDoing(LionEntity.STRETCH_UP);     // a slow feline wake-up, a yawn, on its feet
                         return;
                     }
-                    if (d == LionEntity.SIT || d == LionEntity.SIT_DOWN) {
-                        l.setDoing(LionEntity.SIT_UP);
-                        return;
-                    }
-                    if (!getUp(d)) {
+                    if (!getUp()) {
                         return;
                     }
                     wake = 1;
@@ -1486,18 +1466,9 @@ public final class LionGoals {
             return false;
         }
 
-        /** Gets up from lying or sitting; whether it is on its feet (calm, or in a mood clip) now. */
+        /** Gets up from lying or sitting (its clip map's way up); whether it is on its feet (calm, or in a mood clip) now. */
         private boolean onFeet() {
-            byte d = l.doing();
-            if (d == LionEntity.REST || d == LionEntity.REST_DOWN || d == LionEntity.GROOM) {
-                l.setDoing(LionEntity.REST_UP);
-                return false;
-            }
-            if (d == LionEntity.SIT || d == LionEntity.SIT_DOWN) {
-                l.setDoing(LionEntity.SIT_UP);
-                return false;
-            }
-            return d != LionEntity.REST_UP && d != LionEntity.SIT_UP && d != LionEntity.STRETCH_UP;
+            return l.upright();
         }
 
         /** WATCH: it stands and faces the player; ends when they are no longer noticed or at {@link #WATCH_TICKS}. */
@@ -1799,10 +1770,7 @@ public final class LionGoals {
         private void hide() {
             Call c = call();
             if (c == null || c.stage() != Temper.HIDE) {           // hidden as long as the danger lasts
-                byte d = l.doing();
-                if (d == LionEntity.REST || d == LionEntity.REST_DOWN) {
-                    l.setDoing(LionEntity.REST_UP);
-                }
+                l.upright();                                    // (it gets up from where it hid)
                 end();
                 return;
             }
@@ -1824,20 +1792,13 @@ public final class LionGoals {
                 at = by.position().add(side.scale(s));
             }
             byte d = l.doing();
-            if (d == LionEntity.REST || d == LionEntity.REST_DOWN) {
-                if (HomeGroup.flat(l.position(), at.x, at.z) <= 1.5) {
-                    return;                                     // flat on the ground by her
-                }
-                l.setDoing(LionEntity.REST_UP);
-                return;
+            if ((d == LionEntity.REST || d == LionEntity.REST_DOWN) && HomeGroup.flat(l.position(), at.x, at.z) <= 1.5) {
+                return;                                         // flat on the ground by her
             }
-            if (d == LionEntity.REST_UP || d == LionEntity.SIT_UP || d == LionEntity.STRETCH_UP) {
-                return;
+            if (!l.upright()) {
+                return;                                         // up first, to go to her
             }
-            if (d == LionEntity.SIT || d == LionEntity.SIT_DOWN) {
-                l.setDoing(LionEntity.SIT_UP);
-                return;
-            }
+            d = l.doing();
             if (HomeGroup.flat(l.position(), at.x, at.z) > 1.0) {
                 if (d == LionEntity.MOOD_ANGRY || d == LionEntity.MOOD_CURIOUS) {
                     l.setDoing(LionEntity.CALM);
@@ -1853,7 +1814,7 @@ public final class LionGoals {
             if (d == LionEntity.CALM) {
                 l.setDoing(LionEntity.MOOD_ANGRY);             // the kitten's spit-hiss
             } else if (d == LionEntity.MOOD_ANGRY && l.doingFor() > 40) {
-                l.setDoing(LionEntity.REST_DOWN);              // then flat
+                l.toward(LionEntity.REST);                     // then flat
             }
         }
 

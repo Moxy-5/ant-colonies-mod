@@ -4,7 +4,7 @@ frog_check.py; their every check lives on here, rule 8). CLAUDE.md's hard rule: 
 the game draws it, then in the game frame by frame.
 
     python tools/clip_check.py <animal> [clip or pattern ...] [--model <geo>] [--times 0,0.5,1] [--views side,three,front]
-                               [--switches] [--out <folder>]
+                               [--switches] [--size <s>] [--out <folder>]
 
   <animal>     a body plan's name (assets/.../body_plans/<animal>.json). Everything about the animal comes from its plan
                (its "checks" section, documented in tools/body_plan.py's top comment); no animal is known by name here.
@@ -17,7 +17,12 @@ the game draws it, then in the game frame by frame.
                foot slides), and a red frame round a picture taken within a frame of a flagged jump or joint snap.
   --fresh      judges every clip and clip change again (without it, one judged before is read back from
                run-film/clip_cache/clip_check/ while its keys, the model, the plan and these tools are unchanged)
-  --switches   also (or, with no clip named, only) checks the clip changes the plan lists, GeckoLib's blend between
+  --size s     (the Motion Studio, the new phase 2, step 6, 2026-11-27) checks the clips as a young animal of size s
+               plays them (a calf 0.5, a cub 0.4): a model pixel s times as many blocks, so speeds are its own blocks a
+               second and a step or bank made for a grown one is raised to a block at its size (a cub stepping up a
+               block lifts its legs over twice its own height's share). Its own cache and strips folder (<animal>_size<s>).
+  --switches   also (or, with no clip named, only) checks the clip changes the plan lists and those its clip map makes
+               (its "postures": the ways between lying, sitting and standing), GeckoLib's blend between
                them played as the game plays it (the blend length read from the animal's Java code), and draws each
                blend as a strip (sw_<from>_<to>.png) with --times.
   --gait-changes [--write]  (the Motion Studio, phase 2, step 3, 2026-11-25) for each change between two of the plan's
@@ -99,8 +104,9 @@ GRAVITY = 32.0          # Minecraft's fall, blocks a second squared (0.08 a tick
 class Animal:
     """An animal as its body plan and the game's files describe it."""
 
-    def __init__(self, name, model=None):
+    def __init__(self, name, model=None, size=1.0):
         self.name = name
+        self.size = size              # (--size: a young animal, its model drawn this much smaller; 1 grown)
         self.plan_data = json.load(open(body_plan.plan_path(name), encoding='utf-8'))
         self.checks = self.plan_data.get('checks', {})
         self.model_name = model or self.plan_data['model']
@@ -111,7 +117,7 @@ class Animal:
         self.legs = self.plan_data.get('legs', {})
         self.wings = self.plan_data.get('wings', {})
         self.feet = {k: chain[-1] for k, chain in self.legs.items()}
-        self.px = self.checks.get('px', 1 / 16)          # a model pixel in blocks in the game (a grown animal of size 1)
+        self.px = self.checks.get('px', 1 / 16) * size   # a model pixel in blocks in the game (at its size)
 
     def kind(self, clip):
         """'water', 'dig', 'air', 'perch' or 'land' (the plan's lists of patterns; land when none matches)."""
@@ -239,7 +245,17 @@ class Scene:
         # a block in this clip's model pixels: the step's height, or (Minecraft's water: one block deep, its surface 8/9
         # of the way up) the surface over the bottom; else the plan's grown animal of size 1
         self.block = 1.0 / animal.px
-        if self.step:
+        if animal.size != 1.0 and (self.step or self.bank):
+            # --size: a young animal plays the grown clip at its size, so a block is taller in its own pixels: the step
+            # and the bank made for a grown one are raised to a block at its size (their places along the way kept)
+            made = abs(self.step[1]) if self.step else (self.surface - self.bank['bottom']) * 9 / 8
+            k = self.block / made
+            if self.step:
+                self.step = (self.step[0], self.step[1] * k)
+            else:
+                self.bank = dict(self.bank, top=self.bank['top'] * k, bottom=self.bank['bottom'] * k)
+                self.surface *= k
+        elif self.step:
             self.block = abs(self.step[1])
         elif self.bank:
             self.block = (self.surface - self.bank['bottom']) * 9 / 8
@@ -493,14 +509,14 @@ def cache_base(animal):
         for spec in (animal.checks.get('controller'), (animal.checks.get('drawn_ahead') or {}).get('java')):
             if spec:
                 files.append(os.path.join(PROJECT, spec))
-        _BASE[animal.name] = _digest(animal.plan_data, animal.model_name,
+        _BASE[animal.name] = _digest(animal.plan_data, animal.model_name, animal.size,
                                      *[open(f, 'rb').read() for f in files if os.path.exists(f)])
     return _BASE[animal.name]
 
 
 def cached(animal, kind, name, key, make):
     """make() only when its key is new; otherwise what it gave last time (plain JSON data; never committed)."""
-    path = os.path.join(CACHE_DIR, animal.name, f'{kind}_{name}.json')
+    path = os.path.join(CACHE_DIR, animal.name + ('' if animal.size == 1.0 else f'_size{animal.size:g}'), f'{kind}_{name}.json')
     try:
         held = json.load(open(path, encoding='utf-8'))
         if held.get('key') == key:
@@ -1194,8 +1210,12 @@ def gait_changes(animal, write):
 
 
 def pairs(animal, names):
+    """The clip changes to check: the plan's own list, then the ones its clip map makes (body_plan.posture_switches,
+    the Motion Studio, the new phase 2, step 5: the game's ways between lying, sitting and standing)."""
     out = []
-    for a_pat, b_pat in animal.checks.get('switches', []):
+    listed = [tuple(p[:2]) for p in animal.checks.get('switches', [])]
+    listed += [tuple(p) for p in body_plan.posture_switches(animal.plan_data) if tuple(p) not in listed]
+    for a_pat, b_pat in listed:
         As = [n for n in names if fnmatch.fnmatch(n, a_pat)]
         Bs = [n for n in names if fnmatch.fnmatch(n, b_pat)]
         sized = '*' in a_pat and '*' in b_pat
@@ -1824,7 +1844,7 @@ def main(argv):
     times, views, model, out_dir, names, switches = None, ('side', 'three', 'front'), None, None, [], False
     changes, write, fresh = False, False, False
     hold, angles = None, [90.0, 25.0, 155.0]
-    pair_with, spots_wanted = None, []
+    pair_with, spots_wanted, size = None, [], 1.0
     i = 0
     while i < len(args):
         a = args[i]
@@ -1864,11 +1884,14 @@ def main(argv):
         elif a == '--spots':
             spots_wanted = args[i + 1].split(',')
             i += 2
+        elif a == '--size':
+            size = float(args[i + 1])
+            i += 2
         else:
             names.append(a)
             i += 1
-    animal = Animal(animal_name, model)
-    out_dir = out_dir or os.path.join(PROJECT, 'references', 'anim_lab', animal_name)
+    animal = Animal(animal_name, model, size)
+    out_dir = out_dir or os.path.join(PROJECT, 'references', 'anim_lab', animal_name + ('' if size == 1.0 else f'_size{size:g}'))
     if pair_with:
         return run_pairs(animal, pair_with, names, spots_wanted, times, views, out_dir)
     every = list(animal.data)
@@ -1881,7 +1904,8 @@ def main(argv):
     if names and not chosen:
         print(f'no clip of {animal.anim_stem} matches {" ".join(names)}')
         return 1
-    print(f'{animal_name} on model {animal.model_name}, clips of {animal.anim_stem} (a model pixel {animal.px:.4f} blocks)')
+    print(f'{animal_name} on model {animal.model_name}, clips of {animal.anim_stem} (a model pixel {animal.px:.4f} blocks'
+          + (f' at size {size:g}: a young one, a step or bank a block at that size' if size != 1.0 else '') + ')')
     hid = hidden_at_rest(animal)
     if hid:
         print(hid)

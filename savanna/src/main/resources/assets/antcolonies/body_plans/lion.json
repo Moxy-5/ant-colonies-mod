@@ -646,5 +646,30 @@
    "stalk_leap_bite": 16,
    "jump_smack": 7
   }
+ },
+ "postures": {
+  "about": "The clip map (the Motion Studio, the new phase 2, step 5, 2026-11-27; framework entity/body/ClipMap): the clips it plays in each posture, the clip that takes it down into one from standing ('down') and the clips back up ('up': the first is the map's own, the others a goal picks), its other clips there ('clips'). A goal asks for the clip it wants and the map walks the way there (up first, then down, then the clip, nothing between); a one-shot ends in the 'hold' of the posture it leaves it in. A clip it does not name is played standing. tools/clip_check.py --switches checks the clip changes it makes.",
+  "standing": {
+   "hold": "idle"
+  },
+  "lying": {
+   "hold": "rest",
+   "down": "rest_down",
+   "up": [
+    "rest_up",
+    "rest_stretch_up"
+   ],
+   "clips": [
+    "groom",
+    "feed"
+   ]
+  },
+  "sitting": {
+   "hold": "sit",
+   "down": "sit_down",
+   "up": [
+    "sit_up"
+   ]
+  }
  }
 }

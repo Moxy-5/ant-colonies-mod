@@ -540,6 +540,41 @@ def feet_rule_sees_a_carried_foot_slide_and_leaves_a_still_or_lifted_one_alone()
 
 # --- one film at a time (tools/film_run.py) ----------------------------------------------------------------------------
 @test
+def the_clip_maps_ways_are_checked_with_the_plans_own_list():
+    """Idea 52: the clip changes a plan's clip map makes (lying down straight into the feed, a way down turned back by
+    its way up, each lying clip cut by getting up, each way up into standing) are among those --switches checks, and a
+    plan whose postures name a clip its file lacks is a problem."""
+    import json
+    import body_plan
+    import clip_check
+    data = json.load(open(body_plan.plan_path('lioness'), encoding='utf-8'))
+    made = [tuple(p) for p in body_plan.posture_switches(data)]
+    for pair in (('idle', 'rest_down'), ('rest_down', 'feed'), ('rest_down', 'rest_up'), ('feed', 'rest_up'),
+                 ('groom', 'rest_up'), ('rest', 'rest_stretch_up'), ('rest_stretch_up', 'idle'), ('sit_down', 'sit_up')):
+        need(pair in made, f'the map makes no {pair[0]} -> {pair[1]}')
+    animal = clip_check.Animal('lioness')
+    checked = clip_check.pairs(animal, list(animal.data))
+    need(('rest_down', 'rest_up') in checked and ('groom', 'rest_up') in checked, '--switches leaves the map out')
+    plan = body_plan.load('lioness')
+    plan.data = copy.deepcopy(plan.data)
+    plan.data['postures']['lying']['clips'] = ['groom', 'no_such_clip']
+    found = body_plan.checks_problems(plan, body_plan.geo_bones('lioness'))
+    need(any('no_such_clip' in p for p in found), f'a missing posture clip is no problem: {found}')
+
+
+@test
+def a_young_animal_meets_a_step_a_block_at_its_size():
+    """Idea 59: --size s makes a model pixel s times as many blocks and raises a step made for a grown animal to a
+    block at that size (a calf at 0.5: twice as many of its pixels); at size 1 the step is the clip's own."""
+    import clip_check
+    for size, high in ((1.0, 16.0), (0.5, 32.0)):
+        animal = clip_check.Animal('buffalo', size=size)
+        need(abs(animal.px - size / 16) < 1e-9, f'size {size}: a model pixel is {animal.px} blocks')
+        scene = clip_check.Played(animal, 'step_up_1000').scene
+        need(scene.step and abs(abs(scene.step[1]) - high) < 1e-6, f'size {size}: the step is {scene.step}, not {high} px')
+
+
+@test
 def film_lock_refuses_a_second_film_and_takes_over_a_dead_one():
     """R12-46: with a live process holding the lock a second film stops with a line naming it; a lock whose process
     is gone is taken over; a tool lets go only of its own lock."""

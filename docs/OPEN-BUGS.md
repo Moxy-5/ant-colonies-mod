@@ -11,7 +11,7 @@ for the number there).
 |---|---|
 | In the game: A, it breaks play | 1 |
 | In the game: B, it looks or plays wrong | 15 |
-| In the game: C, small or rare | 34 |
+| In the game: C, small or rare | 35 |
 | Waiting for your call | 19 |
 | Behind the scenes (code review) | 168 |
 | Tool faults | 6 |
@@ -43,7 +43,7 @@ A player will likely see it, and the game goes on.
 - **R6-20** Likely, not proven: one block you put in a Matabele nest's chimney (a torch) makes the colony lose all its rooms.
 - **R8-3** Likely, not proven: with a biome mod that is a data pack (Terralith, say) its biomes may not appear at all.
 
-## C: small or rare (34)
+## C: small or rare (35)
 
 Hard to notice, or it needs an unusual case.
 
@@ -64,6 +64,7 @@ Hard to notice, or it needs an unusual case.
 - **453** After some attacks the raid waits 30 seconds for stung termite soldiers nobody can reach, and a rescuer can chase a hurt ant that is already walking home.
 - **461** A raid that was on its way out when you left the game starts from the nest again when you come back, usually runs out of time and walks home without reaching the termites.
 - **462** Walk away from a raid in the middle of its attack and the attack can last half a minute longer than its limit before the ants turn home.
+- **466** When lions let a buffalo go, its tail and ears snap to a new place in a moment as it starts to get up.
 - **R3-10** Big fights cost the server more than they need: a fighter with no foe near still looks round once a second. *(half fixed)*
 - **R3-30** Some ants lose one try (a short pause) when they set off to go in, wait at the nest or follow the queen. *(half fixed)*
 - **R4-13** Fly clouds go silent after F3+T or a new sound device, until you walk 48 blocks away and back.

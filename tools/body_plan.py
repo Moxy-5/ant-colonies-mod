@@ -316,6 +316,66 @@ def checks_problems(plan, bones):
     for pair in ck.get('switches', []):
         for pattern in pair[:2]:
             clip('switches', pattern)
+    for name, posture in (plan.data.get('postures') or {}).items():
+        if not isinstance(posture, dict):
+            continue                                    # ("about")
+        for key in ('hold', 'down'):
+            if key in posture:
+                clip(f'postures.{name}.{key}', posture[key])
+        for key in ('up', 'clips'):
+            for c in posture.get(key, []):
+                clip(f'postures.{name}.{key}', c)
+    for name, gait in (plan.data.get('gaits') or {}).items():
+        young = gait.get('young') if isinstance(gait, dict) else None
+        if young:
+            # a gait's young clip (the Motion Studio, the new phase 2, step 6): the game plays it under its size, at its
+            # own speed from checks.walks (Gaits.read fails without one)
+            clip(f'gaits.{name}.young', young.get('clip', ''))
+            if young.get('clip') not in ck.get('walks', {}):
+                out.append(f'gaits.{name}.young names clip "{young.get("clip")}" with no speed in checks.walks (the game would not start)')
+            if not 0 < young.get('below', 0) <= 1:
+                out.append(f'gaits.{name}.young.below should be a size between 0 and 1 (the young play it under it)')
+    if plan.data.get('postures') and 'standing' not in plan.data['postures']:
+        out.append('postures has no "standing" (every way starts and ends there; the game would not read the plan)')
+    return out
+
+
+def posture_switches(data):
+    """The clip changes a plan's clip map makes in the game (the Motion Studio, the new phase 2, step 5, 2026-11-27;
+    the framework's ClipMap walks them): for each posture, standing's hold into its way down; the way down played out
+    straight into each of its clips (no calm tick), and turned back by its way up; each clip of it into its first way
+    up (any of them is cut by getting up), and its hold into the other ways up (a goal's pick, as a wake-up's stretch);
+    each way up into standing's hold; its hold into each of its own clips and each back to its hold (a one-shot's end).
+    clip_check.py --switches checks these with the plan's own list."""
+    postures = data.get('postures') or {}
+    stand = (postures.get('standing') or {}).get('hold', 'idle')
+    out = []
+
+    def add(a, b):
+        if a != b and [a, b] not in out:
+            out.append([a, b])
+
+    for name, p in postures.items():
+        if name == 'standing' or not isinstance(p, dict):
+            continue
+        hold, down, ups, clips = p['hold'], p.get('down'), p.get('up', []), p.get('clips', [])
+        inside = [hold] + clips
+        if down:
+            add(stand, down)
+            for c in inside:
+                add(down, c)
+            if ups:
+                add(down, ups[0])
+        for c in inside:
+            if ups:
+                add(c, ups[0])
+        for u in ups[1:]:
+            add(hold, u)
+        for u in ups:
+            add(u, stand)
+        for c in clips:
+            add(hold, c)
+            add(c, hold)
     return out
 
 

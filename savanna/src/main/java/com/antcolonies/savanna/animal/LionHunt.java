@@ -749,7 +749,7 @@ public final class LionHunt {
             l.getNavigation().stop();
             byte d = l.doing();
             if (d == LionEntity.STALK || d == LionEntity.FREEZE || d == LionEntity.CALM) {
-                l.setDoing(LionEntity.REST_DOWN);
+                l.toward(LionEntity.REST);
             }
             s.to(Stage.WAIT, now);
             s.killAt = null;
@@ -889,20 +889,12 @@ public final class LionHunt {
             }
         }
 
-        /** Whether it is on its feet, getting up first from lying or sitting (a sniff or a stare ends). */
+        /** Whether it is on its feet, getting up first from lying or sitting (its clip map's way up; a sniff or a stare ends). */
         private boolean onFeet() {
+            if (!l.upright()) {
+                return false;
+            }
             byte d = l.doing();
-            if (d == LionEntity.REST || d == LionEntity.REST_DOWN || d == LionEntity.GROOM || d == LionEntity.FEED) {
-                l.setDoing(LionEntity.REST_UP);
-                return false;
-            }
-            if (d == LionEntity.SIT || d == LionEntity.SIT_DOWN) {
-                l.setDoing(LionEntity.SIT_UP);
-                return false;
-            }
-            if (d == LionEntity.REST_UP || d == LionEntity.SIT_UP || d == LionEntity.STRETCH_UP) {
-                return false;
-            }
             if (d == LionEntity.MOOD_FLEHMEN || d == LionEntity.MOOD_ALERT) {
                 l.setDoing(LionEntity.CALM);
             }
@@ -1184,7 +1176,7 @@ public final class LionHunt {
             l.getNavigation().stop();
             byte d = l.doing();
             if (d == LionEntity.CALM || d == LionEntity.MOOD_FLEHMEN || d == LionEntity.MOOD_ALERT) {
-                l.setDoing(LionEntity.REST_DOWN);
+                l.toward(LionEntity.REST);
             }
         }
 
@@ -1257,7 +1249,7 @@ public final class LionHunt {
             // deadline: it lies down where it got to and feeds there)
             s.lyingAt = true;
             s.feedSettle = there ? com.antcolonies.entity.body.Strikes.Ride.from(l, l.yBodyRot, null, 0) : null;
-            l.setDoing(LionEntity.REST_DOWN);
+            l.toward(LionEntity.FEED);                          // (lying down first: the clip map's way)
         }
 
         /**
@@ -1267,7 +1259,6 @@ public final class LionHunt {
          * tug, once {@link #BITE_EVERY} has passed.
          */
         private void feedLying(RemainsEntity carcass, Place place, int now) {
-            byte d = l.doing();
             Vec3 to = l.position();
             float yaw = l.yBodyRot;
             if (s.feedSettle != null) {
@@ -1277,12 +1268,11 @@ public final class LionHunt {
             }
             double ground = groundAt(l.level(), to.x, to.z, l.getY());
             l.placement.place(new Vec3(to.x, Double.isNaN(ground) ? l.getY() : ground, to.z), yaw);   // (lying where it got to: there)
-            if (d == LionEntity.REST || d == LionEntity.REST_DOWN && l.doingFor() >= l.doingTicks(d)) {
-                l.setDoing(LionEntity.FEED);                    // (before its lying down ends by itself into the rest clip)
-                return;
+            if (!l.toward(LionEntity.FEED)) {
+                return;                                         // (lying down still: the feed the tick it is down, no rest between)
             }
             var bite = l.spots().hold(FEED_CLIP);
-            if (d != LionEntity.FEED || bite == null || !bite.bitesAt(l.clipTick()) || now - s.lastBite < BITE_EVERY) {
+            if (bite == null || !bite.bitesAt(l.clipTick()) || now - s.lastBite < BITE_EVERY) {
                 return;
             }
             s.lastBite = now;

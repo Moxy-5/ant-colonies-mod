@@ -86,6 +86,16 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
     /** Each doing's clip, by its number. */
     private static final String[] DOING_CLIPS = {"idle", "graze", "drink", "rest_down", "rest", "rest_up", "ear_flutter", "shake_off",
             "snort", "bellow", "paw_ground", "mood_alert", "mood_angry", "headbutt", "gore", "charge_headbutt", "held_sink", "held_down"};
+
+    /** The doing whose clip this is (calm: a clip that is none of them). */
+    static byte doingOf(String clip) {
+        for (byte d = 0; d < DOING_CLIPS.length; d++) {
+            if (DOING_CLIPS[d].equals(clip)) {
+                return d;
+            }
+        }
+        return CALM;
+    }
     /**
      * Its clips as its clip file says them: each one's length and whether it loops (the Motion Studio, the new phase 2,
      * step 3: before, a table of lengths typed here from the file by hand). Calves play the grown model's.
@@ -127,6 +137,8 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
      * a second at size 1, between the paces below), and each clip's play-speed limits. Calves share the grown model's.
      */
     final Gaits gaits = BodyPlans.gaitsOf("buffalo");
+    /** Its clip map: its clips lying, held down and standing and the ways between (its body plan's postures, the new phase 2, step 5). */
+    final com.antcolonies.entity.body.ClipMap clipMap = BodyPlans.clipMapOf("buffalo");
     /** The gait drawn (client): a change waits for the stride's matching moment. */
     private final GaitShift gaitShift = new GaitShift();
     /**
@@ -764,10 +776,10 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
             }
             d = doing();
         }
-        // a one-shot clip played out: lying down goes on into lying, going down under lions into struggling there, the
-        // rest back to calm
+        // a one-shot clip played out: what its clip map says it leads into (lying down goes on into lying, going down
+        // under lions into struggling there, the rest back to calm)
         if (oneShot(d) && doingFor() >= doingTicks(d)) {
-            setDoing(d == REST_DOWN ? REST : d == HELD_SINK ? HELD_DOWN : CALM);
+            setDoing(doingOf(clipMap.after(DOING_CLIPS[d])));
         }
     }
 
@@ -1140,7 +1152,7 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
             // its gait by how fast it goes, each clip's pace following its stride so its hooves never slide (in the water
             // too: the walk, at its swimming pace)
             double s = Gaits.perSize(stride, getScale());
-            Gaits.Gait gait = gaitShift.shown(gaits.pick(s), s, player);
+            Gaits.Gait gait = gaitShift.shown(gaits.pick(s).at(getScale()), s, player);   // (a calf's own clip where its plan names one)
             player.setAnimationSpeed(gait.rate(s));
             return state.setAndContinue(gait.loop());
         }
