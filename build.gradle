@@ -67,15 +67,9 @@ def checkBugNumbers = tasks.register('checkBugNumbers') {
 }
 tasks.named('check') { dependsOn checkBugNumbers }
 
-// The list of code review findings (docs/CODE-REVIEW-BUGS.md) is written by tools/review_bugs.py from the review
-// files; this fails when a finding or a status line was added there and the list not written again.
-def checkReviewBugs = tasks.register('checkReviewBugs', Exec) {
-    commandLine 'python', 'tools/review_bugs.py', '--check'
-}
-tasks.named('check') { dependsOn checkReviewBugs }
-
-// The list of every bug left in the game (docs/OPEN-BUGS.md) is written by tools/open_bugs.py from the tags in
-// docs/BUGS.md and the "In play" lines of the review files; this fails when one changed and the list was not written again.
+// The one list of every bug left (docs/OPEN-BUGS.md, the code review's findings included since 2026-11-27) and the
+// test flakes (docs/TEST-FLAKES.md) are written by tools/open_bugs.py from the tags in docs/BUGS.md and the review
+// files; this fails when an entry, a tag, a finding or a status line changed and the two were not written again.
 def checkOpenBugs = tasks.register('checkOpenBugs', Exec) {
     commandLine 'python', 'tools/open_bugs.py', '--check'
 }

@@ -933,6 +933,8 @@ leave a request there.
 
 ### R9-39 (B, likely): the mid-climb tests fail now and then because the monitor's own idle goals take it off the test's route (BUGS 255, 290, 292)
 
+**In play (2026-11-27):** flake. A test that fails now and then: listed with the test flakes (BUGS 255).
+
 **What was looked for.** A climb that can neither finish nor fall back, a switch left on, the animal left inside a
 block. On the tests' ground (flat stone, one stone step) none was found: the only state of a move is the synced
 play, and every way out clears it; the box is on the lower level until its front reaches the face and then on top,

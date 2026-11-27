@@ -46,7 +46,7 @@ Branch `claude/engine-every-animal` (not yet in `C:\Ant Mod`, which holds anothe
 Savanna loading step 4 (mounds made with the world itself), the test revamp, moving house, polish (M8.5), the animals (M9: the animal kit, then the savanna animals), flying queens (M9.5), more species.
 
 ## Open bugs
-**The current list is `docs/OPEN-BUGS.md`** (2026-11-27: every bug left in the game graded A, B, C, then the flaky tests and the tool faults); the lines below are old notes.
+**The current list is `docs/OPEN-BUGS.md`** (2026-11-27: every bug left, the game's graded A, B, C, the code review's included; the flaky tests apart in `docs/TEST-FLAKES.md`); the lines below are old notes.
 
 **Savanna lag (2026-11-04):** about 50 ms a tick with 1-second spikes; fix built on `claude/perf-far-colonies` (colonies with no player within 64 blocks live as numbers, brains spread over the second), not tried in-game yet; the Matabele joined the far rule with away raids (3f, 2026-11-05).
 Only rare test flakes (`docs/BUGS.md`); in play: the raid column freezing just out of a dead mound (in-game test 5, to be fixed in the raid rework). 2026-11-04: the raid test's crash (BUGS 95) and the messy column, recruits left home and attacks running on till dusk (BUGS 96) fixed on `claude/m8-raid-fixes-31ac6f`, not tried in-game yet. 2026-11-05: raiders milling on the mound top and Matabele sealed in by termites fixed (BUGS 101, 102), not tried in-game yet; next to plan: termite soldiers swarming raiders, still ants when idle.

@@ -148,10 +148,13 @@ part, with Minecraft's own tick readout and profiler and the mod's perf scenes. 
 - **Never deleted, only marked.** Every finding keeps its number for good (`R7-3` is round 7's third). A fix session
   never removes or rewrites a finding; it adds a status line under it: **fixed** (the commit and the test), **open**
   (why), or **not a fault after all** (what was checked).
-- **One list of them all: `docs/CODE-REVIEW-BUGS.md` (the user, 2026-11-26, "a separate bugs file for only the code
-  review bugs").** What is left on top (grade A first), what is done at the bottom, the counts above. It is written
-  by `python tools/review_bugs.py` from the review files and never edited by hand, so it cannot disagree with them;
-  `./gradlew build` fails when it is behind (`checkReviewBugs`). So that the list reads right, **the newest status
+- **One list of them all: `docs/OPEN-BUGS.md` (the user, 2026-11-27, "combine everything"; from 2026-11-26 to 11-27
+  they had their own file, `docs/CODE-REVIEW-BUGS.md`).** The findings a player can meet (an `**In play (date):**` line
+  under the heading) are graded with the game's other bugs, the calls waiting for the user have their own part, the
+  rest are "behind the scenes", and the review's progress and done findings are at the bottom; findings about flaky
+  tests go to `docs/TEST-FLAKES.md`. Both are written by `python tools/open_bugs.py` (or `tools/review_bugs.py`) from
+  the review files and `docs/BUGS.md`, never edited by hand, so they cannot disagree with them; `./gradlew build`
+  fails when they are behind (`checkOpenBugs`). So that the list reads right, **the newest status
   line under a finding begins with one of four words: `fixed`, `half fixed` (then what is left), `open` (then why),
   `not a bug`.** Run the tool after writing findings or status lines, and commit the list with them.
 - **Findings that wait for the user (the user, 2026-11-26: "a separate part of the list of open bugs that take my
