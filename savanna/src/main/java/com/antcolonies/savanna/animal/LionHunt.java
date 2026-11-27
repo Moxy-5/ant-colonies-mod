@@ -10,6 +10,7 @@ import javax.annotation.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.GroundTop;
+import com.antcolonies.entity.body.Placement;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -430,11 +431,7 @@ public final class LionHunt {
             l.strikeWord(l.settle.word());
         }
         double ground = groundAt(l.level(), at.x, at.z, prey.getY());
-        move.accept(l, at.x, Double.isNaN(ground) ? l.getY() : ground, at.z);
-        float yaw = l.settle.yaw(f, p.yaw());
-        l.setYRot(yaw);
-        l.yBodyRot = yaw;
-        l.yHeadRot = yaw;
+        Placement.seat(l, move, at.x, Double.isNaN(ground) ? l.getY() : ground, at.z, l.settle.yaw(f, p.yaw()));
         return true;
     }
 
@@ -1134,7 +1131,6 @@ public final class LionHunt {
                 return;
             }
             l.setHoldSpot(s.holdSpot);
-            l.getNavigation().stop();
             Place p = placeOn(l, prey, s.holdSpot);
             if (p == null || !roomAt(l, prey, p) || !l.level().noBlockCollision(l, l.getBoundingBox().deflate(0.05))) {
                 s.holding = false;                              // no room at its spot or where its strike took it: it lets go (and stands where it is)
@@ -1265,21 +1261,22 @@ public final class LionHunt {
         }
 
         /**
-         * Lying at its feeding spot: set onto its place as it lies down (so its jaw at its bite is on the spot), then the
+         * Lying at its feeding spot: set onto its place as it lies down (so its jaw at its bite is on the spot; placed, the
+         * framework's {@link Placement}: nothing pushes it off, nothing of its walk moves it on), then the
          * feed clip with no calm tick before it or between its rounds (BUGS 376), a meat bite at the clip's own bite, the
          * tug, once {@link #BITE_EVERY} has passed.
          */
         private void feedLying(RemainsEntity carcass, Place place, int now) {
             byte d = l.doing();
+            Vec3 to = l.position();
+            float yaw = l.yBodyRot;
             if (s.feedSettle != null) {
                 double f = s.feedSettle.along(null, 0, l.doingTicks(LionEntity.REST_DOWN));
-                Vec3 to = s.feedSettle.at(f, place.at());
-                float yaw = s.feedSettle.yaw(f, place.yaw());
-                l.setPos(to.x, l.getY(), to.z);
-                l.setYRot(yaw);
-                l.yBodyRot = yaw;
-                l.yHeadRot = yaw;
+                to = s.feedSettle.at(f, place.at());
+                yaw = s.feedSettle.yaw(f, place.yaw());
             }
+            double ground = groundAt(l.level(), to.x, to.z, l.getY());
+            l.placement.place(new Vec3(to.x, Double.isNaN(ground) ? l.getY() : ground, to.z), yaw);   // (lying where it got to: there)
             if (d == LionEntity.REST || d == LionEntity.REST_DOWN && l.doingFor() >= l.doingTicks(d)) {
                 l.setDoing(LionEntity.FEED);                    // (before its lying down ends by itself into the rest clip)
                 return;

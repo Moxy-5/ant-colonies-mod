@@ -12,6 +12,7 @@ import com.antcolonies.animal.HitChain;
 import com.antcolonies.entity.body.BodyPlans;
 import com.antcolonies.entity.body.GaitShift;
 import com.antcolonies.entity.body.Gaits;
+import com.antcolonies.entity.body.Placement;
 import com.antcolonies.entity.body.SteadyController;
 import com.antcolonies.savanna.registry.SavannaEntities;
 
@@ -581,6 +582,8 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
 
     /** Its hunt's state (lion step 2; kept on the lion, so a short interruption resumes it). */
     final LionHunt.State hunt = new LionHunt.State();
+    /** Set on a place by its hunt (lying at its feeding spot), or carried by its prey (a hold): the framework's rule for both. */
+    final Placement placement = new Placement(this);
 
     /** Whether it is creeping crouched (and moving): a buffalo with its head up sees it within 12. */
     public boolean stalking() {
@@ -789,6 +792,7 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
     @Override
     public void tick() {
         super.tick();
+        placement.afterTick();                          // (placed by its hunt this tick: there, after the game's physics)
         if (!isPassenger()) {
             settle = null;
         } else if (!level().isClientSide && getVehicle() instanceof BuffaloEntity prey && (!hunt.holding() || !prey.isAlive())) {
@@ -876,17 +880,20 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
         return FLOAT_DEPTH * getScale() * (isCub() ? 0.5 : 1.0);
     }
 
-    /** Lions never shove each other (a pride lies touching, in a row; a shove slid them off their beds). */
-    /** Lying at its feeding spot nothing shoves it off (the dead calf's mother standing by): no other's push finds it. */
+    /**
+     * Placed (lying at its feeding spot, clinging to its prey: the framework's {@link Placement}) nothing shoves it off,
+     * the dead calf's mother standing by, nor does it shove anything.
+     */
     @Override
     public boolean isPushable() {
-        return !hunt.lyingAt && super.isPushable();
+        return !placement.placed() && super.isPushable();
     }
 
+    /** Lions never shove each other (a pride lies touching, in a row; a shove slid them off their beds). */
     @Override
     protected void doPush(Entity other) {
-        if (!hunt.lyingAt && !(other instanceof LionEntity) && !(other instanceof BuffaloEntity && holding())) {
-            super.doPush(other);                        // nor does a lion clinging to prey shove it about
+        if (!placement.placed() && !(other instanceof LionEntity)) {
+            super.doPush(other);
         }
     }
 

@@ -78,3 +78,21 @@ full run), the four reviewers, their fixes, the notes, commit, push, `C:\Ant Mod
 
 ## Results
 (Filled in step by step.)
+- **Steps 1 and 2 (2026-11-27, commit 901f1577).** `body_plan.keep_sections` keeps every section, check and list entry
+  of the plan on disk that a maker's plan lacks (both plan writers call it; a self-test). The lion maker marks each hold
+  and feed clip with the buffalo table's print it was made against (`made_against` notes), and `tools/spots.py --check`
+  fails when the prey's table moves on. One feet rule in `tools/recording.py`: the page draws what `replay.py` packs
+  (43,690 of 43,692 foot moments as before, the 2 others on the 0.15 px line); `pair_report.py` and `body_course.py`
+  judge feet through it. BUGS 456 and 457 fixed.
+- **Step 3 (commit 76a205eb).** `framework/.../entity/body/Clips` reads each clip's length and loop from the animal's own
+  clip file (a stream read, two values a clip). The lion's and the buffalo's hand tables are gone; `ClipsTest` pins the
+  very numbers they had. `land` 45 of 45.
+- **Step 4.** `framework/.../entity/body/Placement`: an animal placed by its own game code (`place`, each tick) is set
+  there after the game's physics (`afterTick`, at the end of its tick); one carried by a mount that does not seat it is
+  set by the mount (`seat`, from its `positionRider`). Either way it pushes nothing and nothing pushes it, its route,
+  steering and speed are cleared, and its body and head face its heading; the shared renderer (`BoneMeshRenderer`) draws
+  any such rider at its own heading (GeckoLib turns every rider to its mount, never asking `shouldRiderSit`). The lion's
+  holds and feeding go through it (its `lyingAt` push guards, its renderer's turn fix and the buffalo's push guard went:
+  Minecraft never pushes a rider and its mount); the crocodile's and the otter's catches are seated by it, so a buffalo
+  in a crocodile's jaws is now drawn crosswise as it is placed, not along the crocodile (a looks fix). `land` and `river`
+  167 of 167.

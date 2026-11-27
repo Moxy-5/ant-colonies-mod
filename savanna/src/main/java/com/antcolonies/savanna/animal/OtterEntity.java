@@ -12,6 +12,7 @@ import com.antcolonies.animal.HitChain;
 import com.antcolonies.entity.body.BlockMoves;
 import com.antcolonies.entity.body.MoveRider;
 import com.antcolonies.entity.body.SteadyController;
+import com.antcolonies.entity.body.Placement;
 import com.antcolonies.savanna.SavannaMod;
 
 import net.minecraft.core.BlockPos;
@@ -1121,13 +1122,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     protected void positionRider(Entity passenger, Entity.MoveFunction callback) {
         Vec3 jaws = jawPoint();
         double down = doing() == EAT ? 0.25 * getScale() : 0.0;        // the head down over the catch as it eats
-        callback.accept(passenger, jaws.x, jaws.y - passenger.getBbHeight() * 0.5 - down, jaws.z);
-        if (passenger instanceof LivingEntity living) {
-            float across = yBodyRot + 90.0F;
-            living.setYRot(across);
-            living.yBodyRot = across;
-            living.yHeadRot = across;
-        }
+        Placement.seat(passenger, callback, jaws.x, jaws.y - passenger.getBbHeight() * 0.5 - down, jaws.z, yBodyRot + 90.0F);
     }
 
     @Override

@@ -8,7 +8,9 @@ import org.joml.Matrix4f;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 import software.bernie.geckolib.animatable.GeoAnimatable;
 import software.bernie.geckolib.cache.object.GeoBone;
@@ -48,6 +50,22 @@ public class BoneMeshRenderer<T extends Entity & GeoAnimatable> extends GeoEntit
 
     public BoneMeshRenderer(EntityRendererProvider.Context context, GeoModel<T> model) {
         super(context, model);
+    }
+
+    /**
+     * An animal carried by a mount that does not seat it (a lion on its prey, a catch in a crocodile's jaws; the
+     * framework's {@link com.antcolonies.entity.body.Placement}) is drawn at its own heading, which its mount set. GeckoLib
+     * turns every rider to its mount's heading (within 50 degrees exactly the mount's, it never asks the mount's
+     * {@code shouldRiderSit}), so a lioness faced in at a calf's flank was drawn along the calf, her jaw 1.4 to 1.8 blocks
+     * off its body (the hunt film, 2026-11-26), and a buffalo in a crocodile's jaws drawn along the crocodile.
+     */
+    @Override
+    protected void applyRotations(T entity, PoseStack poseStack, float ageInTicks, float rotationYaw, float partialTick,
+            float nativeScale) {
+        if (entity instanceof LivingEntity living && com.antcolonies.entity.body.Placement.carried(entity)) {
+            rotationYaw = Mth.rotLerp(partialTick, living.yBodyRotO, living.yBodyRot);
+        }
+        super.applyRotations(entity, poseStack, ageInTicks, rotationYaw, partialTick, nativeScale);
     }
 
     /** The in-between time this kind is drawn at in a film (the insects have their own: {@link AntRenderer}). */
