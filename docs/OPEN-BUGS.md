@@ -10,7 +10,7 @@ for the number there).
 | Part | Left |
 |---|---|
 | In the game: A, it breaks play | 1 |
-| In the game: B, it looks or plays wrong | 17 |
+| In the game: B, it looks or plays wrong | 15 |
 | In the game: C, small or rare | 31 |
 | Waiting for your call | 19 |
 | Behind the scenes (code review) | 185 |
@@ -23,7 +23,7 @@ Something a player meets goes wrong in a way that matters: a crash, a freeze, a 
 
 - **306** The raids were rewritten from scratch (2026-11-24) because they did not work reliably in play. The rewrite is built but not proven yet: a long unattended run and you watching raids are left.
 
-## B: it looks or plays wrong (17)
+## B: it looks or plays wrong (15)
 
 A player will likely see it, and the game goes on.
 
@@ -33,10 +33,8 @@ A player will likely see it, and the game goes on.
 - **237** A Nile monitor diving off a bank 2 blocks high: its tail stands straight up the bank's face for about a second.
 - **253** The bullfrog's feet jump at the start of its hops, its hind feet sink into the ground when it sits, and its walk flickers in between hops.
 - **256** Young crocodiles draw their tails and heads deep inside blocks at steps and banks.
-- **313** A raid's leader can stand still 30 seconds on a ridge before the raid goes on (found by a test).
 - **361** Matabele majors that chase termites deep into their tunnels during an attack can still be left with no way back to the column: they stand 30 seconds, then walk home alone (a major walled in by the termites now bites its way out). *(half fixed)* *(half fixed)*
 - **378** A buffalo calf's feet slide when it runs with the herd.
-- **411** A raid's leader can end up in a pond with no way out and stand there 30 seconds (found by a test that fails alone 4 runs in 9).
 - **416** Ants and termites cannot step onto a low flat piece (a lying mud-crust plate, a carpet, a bottom slab) that hangs a block over the ground; raiders told to stand on one stand 30 seconds.
 - **427** The bullfrog's feet and hands whip the long way round when it climbs out of the water or starts to swim.
 - **R3-38** A Matabele that lost a leg has all six again after it goes into the nest out of sight and comes out. *(half fixed)*
