@@ -237,7 +237,7 @@ multiplayer.
   `framework/.../GuardPlaceGoal.java:41-49`): made with a see-off distance of 0 and a test that is always false, it
   still runs its search each check. Skip the search when the distance is 0. (C)
 
-**Status (2026-11-26, `claude/review-fix-b5-bc1153`): half fixed: a hungry frog that saw nothing to eat looks again a second later, in a box 3 high (`BullfrogGoals`, `lookAgain`), and a guard told to see nobody off searches for nobody (`GuardPlaceGoal`). Open: a courtship that ends on its timer away from the laying spot (how often is not known; to watch in play first).**
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): half fixed: the hungry frog's search box is 3 high, not as high as it is wide, and a guard told to see nobody off searches for nobody (`GuardPlaceGoal`). Tried and taken out again: a one-second wait after a look that found nothing; in the full run it let hungry frogs sit 45 ticks with a snail in sight, past the 2 seconds `hungryBullfrogsHuntSnailsOnThePondBed` allows, and the search is harmless at the cap of 4 frogs. Open: a courtship that ends on its timer away from the laying spot (how often is not known; to watch in play first).**
 
 ### R10-11 (C, proven): frog and tadpole small things
 
