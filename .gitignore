@@ -48,6 +48,8 @@ run-flight/
 __pycache__/
 references/anim_lab/
 references/viewer_shots/
+# replay pages built from a film's recordings (tools/replay.py; several MB each, made again from run-film/)
+references/replay/
 run-film/
 
 # raw in-game film frames (2026-11-20): kept locally only; their contact sheets beside them are committed
