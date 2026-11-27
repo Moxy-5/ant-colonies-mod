@@ -187,5 +187,6 @@
   "front_end": 13.04,
   "rear_end": 19.81,
   "tightest_curve": 8.87
- }
+ },
+  "checks": {"working_feet": {"groom_antenna_l": ["l1"], "groom_antenna_r": ["r1"], "groom_antenna_both": ["l1", "r1"]}}
 }

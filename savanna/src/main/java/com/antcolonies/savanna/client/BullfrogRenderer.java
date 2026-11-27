@@ -190,8 +190,8 @@ public class BullfrogRenderer extends BoneMeshRenderer<BullfrogEntity> {
     }
 
     @Override
-    public void render(BullfrogEntity frog, float yaw, float partialTick, PoseStack poseStack, MultiBufferSource buffers, int packedLight) {
-        super.render(frog, yaw, partialTick, poseStack, buffers, packedLight);
+    protected void draw(BullfrogEntity frog, float yaw, float partialTick, PoseStack poseStack, MultiBufferSource buffers, int packedLight) {
+        super.draw(frog, yaw, partialTick, poseStack, buffers, packedLight);
         if (frog.action() != BullfrogEntity.TONGUE) {
             return;
         }

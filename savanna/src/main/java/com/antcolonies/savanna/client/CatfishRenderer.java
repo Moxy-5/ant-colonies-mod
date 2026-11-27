@@ -98,9 +98,9 @@ public class CatfishRenderer extends BoneMeshRenderer<CatfishEntity> {
     private boolean preySeen;
 
     @Override
-    public void render(CatfishEntity fish, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight) {
+    protected void draw(CatfishEntity fish, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight) {
         preySeen = false;
-        super.render(fish, entityYaw, partialTick, poseStack, bufferSource, packedLight);
+        super.draw(fish, entityYaw, partialTick, poseStack, bufferSource, packedLight);
         TilapiaEntity prey = preySeen ? fish.heldDrawn() : null;
         if (prey == null) {
             return;
@@ -118,7 +118,7 @@ public class CatfishRenderer extends BoneMeshRenderer<CatfishEntity> {
         // lying flat between the jaws, on the side the catfish came at it from
         poseStack.mulPose(Axis.ZP.rotationDegrees(fish.heldOnRight() ? ON_RIGHT : -ON_RIGHT));
         poseStack.translate(0, -TILAPIA_MID / 16.0F * drawn, 0);        // turned about its own mid line
-        entityRenderDispatcher.getRenderer(prey).render(prey, 0, partialTick, poseStack, bufferSource, packedLight);
+        drawHeld(prey, partialTick, poseStack, bufferSource, packedLight);
         poseStack.popPose();
     }
 

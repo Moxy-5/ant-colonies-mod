@@ -14,7 +14,8 @@ Every tool that launches the film camera (`./gradlew runFilm`) does it through `
     from film_run import run
     code = run(['tools/film/a.film', 'tools/film/b.film'], PROJECT, stdout=log)
 
-Not here: an open watch session (tools/film.sh watch) is not counted and has no idle limit.
+Not here: an open watch session (tools/film.sh watch) is not counted; it closes itself after 30 minutes with
+nothing asked of it (FilmWatch, review R12-46).
 """
 import json
 import os

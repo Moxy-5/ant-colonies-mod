@@ -269,11 +269,21 @@ final class FilmStep {
         ticks.setFrozenTicksToRun(marked ? 1 : 0);
     }
 
+    /**
+     * Whether the client tick just ended moved the animals: the game not paused (a paused game skips the tick rate's
+     * own tick, so runsNormally() keeps an old answer) and running or stepping (runsNormally() is set at the tick's
+     * start for the whole tick). The one rule for "a tick the animals moved in": the steps counted here and the
+     * recorder's clock (BodyRecorder) both ask it.
+     */
+    static boolean animalsTicked(Minecraft mc) {
+        return mc.level != null && !mc.isPaused() && mc.level.tickRateManager().runsNormally();
+    }
+
     /** Counts this side's stepped ticks, before the camera's own tick looks at them. */
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
-        stepping = waiting && mc.level != null && mc.level.tickRateManager().runsNormally();
+        stepping = waiting && animalsTicked(mc);
         if (stepping) {
             ran++;
         }
@@ -281,8 +291,11 @@ final class FilmStep {
 
     @SubscribeEvent
     public static void onMessage(ClientChatReceivedEvent.System event) {
+        if (!FilmDirector.active()) {
+            return;                                     // normal play: nothing read (review R12-54)
+        }
         String text = event.getMessage().getString();
-        if (FilmDirector.active() && text.startsWith(MARK)) {
+        if (text.startsWith(MARK)) {
             String[] parts = text.substring(MARK.length()).trim().split(" ");
             markStepSeen = Integer.parseInt(parts[0]);
             markTickSeen = Integer.parseInt(parts[1]);

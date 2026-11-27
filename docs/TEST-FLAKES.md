@@ -6,7 +6,7 @@ from the list of bugs (`docs/OPEN-BUGS.md`) on purpose. **This file is written b
 `python tools/open_bugs.py`; never edit it by hand.** Each number is an entry in `docs/BUGS.md` tagged
 `[flake]`, one per test: a new failure of a listed test is a line on its entry.
 
-**48 flaky tests.**
+**49 flaky tests.**
 
 - **62** The fallen tree up a bowl fails beside other tests (`aFallenTreeLiesOnTheSlopeUphill`)
 - **75** The minors at the holes test failed once beside the fight tests (`minorsGuardTheHolesAndLineTheForagersTrailThenGoInLast`)
@@ -55,4 +55,5 @@ from the list of bugs (`docs/OPEN-BUGS.md`) on purpose. **This file is written b
 - **445** The test `aScoutOutAsNumbersIsShownWhenAWatcherComesNear` failed beside others
 - **446** The test `twoFedOttersPlayAboutAHungryPairDoesNot` fails now and then beside others, "the bout never ended"
 - **447** The test `holesTakeTurnsNearFoodFirstAndMoreInTheRain` fails now and then beside others, "with the switch off the colony did not go back to its 2 holes"
+- **448** The test `aCrocodileAfloatClimbsOverAnUnderwaterLedge` fails now and then beside others, "the crocodile never got over the ledge onto the bank"
 - **R9-39** The mid-climb tests fail now and then because the monitor's own idle goals take it off the test's route (BUGS 255, 290, 292) *(code review; half fixed)*

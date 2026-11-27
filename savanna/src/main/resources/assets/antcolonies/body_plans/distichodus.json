@@ -31,6 +31,7 @@
   "checks": {
     "px": 0.0625,
     "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/DistichodusEntity.java",
+    "blends": {"find": "transitionLength\\(action == BOLT \\|\\| action == LEAP \\? (\\d+)", "clips": ["bolt", "leap"]},
     "water": [
       "idle",
       "swim",

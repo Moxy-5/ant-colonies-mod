@@ -253,6 +253,32 @@ public final class FilmDirector {
         return drawPartial - FilmStep.ranSoFar();
     }
 
+    /** Whether the game stands still for the camera's takes (frozen, stepped tick by tick). */
+    private static boolean frozen() {
+        Minecraft mc = Minecraft.getInstance();
+        return mc.level != null && mc.level.tickRateManager().isFrozen();
+    }
+
+    /**
+     * The in-between time an insect is drawn at while filming: the camera's own in a frozen take and for any picture
+     * (a frozen game's own one jitters, and a picture's moment must be the same every run), the game's own while the
+     * game runs with no picture due (code review R12-49: it stayed at the last take's, so a running scene drew and
+     * recorded every frame of a tick at one moment).
+     */
+    static float insectPartial(float gamePartial) {
+        return frozen() || pendingShot != null ? drawPartial() : gamePartial;
+    }
+
+    /**
+     * The in-between time any other animal is drawn at while filming: the game's own (a frozen game draws the tick's
+     * end, as every film of one picture a tick was approved), but with "frames n" in a frozen take the n moments up to
+     * the tick's end, the last the game's (code review R12-43: only the insects were drawn at the camera's time, so
+     * "frames 4" gave an animal four pictures of one moment).
+     */
+    static float animalPartial(float gamePartial) {
+        return framesPerTick > 1 && frozen() ? drawPartial() + 1.0F / framesPerTick : gamePartial;
+    }
+
     /** The "scene" step: the last scene's log and checks written, then everything set back for the next one. */
     private static void startScene(String name) {
         endScene();
@@ -291,7 +317,7 @@ public final class FilmDirector {
         if (checks.isEmpty()) {
             return;
         }
-        java.util.List<String> lines = checks.report(framesPerTick);
+        java.util.List<String> lines = checks.report();
         String summary = sceneName + ": " + lines.get(lines.size() - 1);
         LOG.info("Film checks, {}", summary);
         summaries.append(summary).append(System.lineSeparator());
@@ -698,7 +724,8 @@ public final class FilmDirector {
         models.add(event.getRenderer().getGeoModel());
         if (pendingShot != null) {
             try {
-                checks.record(event.getEntity(), event.getModel(), event.getPartialTick(), pendingShot);
+                checks.record(event.getEntity(), event.getModel(), event.getPartialTick(), pendingShot,
+                        BoneMeshRenderer.heldFrame(), BoneMeshRenderer.heldAt());
             } catch (RuntimeException e) {
                 LOG.warn("Film: cannot check {}", event.getEntity(), e);
             }
@@ -1016,14 +1043,14 @@ public final class FilmDirector {
     private static final java.util.Map<Integer, String> clipTimes = new java.util.HashMap<>();
 
     /**
-     * Called by {@code AntRenderer} after drawing an insect while filming: works out where in its clip the insect was
+     * Called by {@code AntRenderer} after drawing an insect while filming (at that in-between time): works out where in its clip the insect was
      * drawn (GeckoLib keeps that inside, so it is read by reflection; development only), for {@code times.txt}.
      */
-    public static void noteRendered(AbstractAntEntity ant, GeoModel<?> model) {
+    public static void noteRendered(AbstractAntEntity ant, GeoModel<?> model, float partial) {
         models.add(model);
         if (pendingShot != null) {
             try {
-                checks.record(ant, model, drawPartial, pendingShot);
+                checks.record(ant, model, partial, pendingShot);
             } catch (RuntimeException e) {
                 LOG.warn("Film: cannot check {}", ant, e);
             }
@@ -1045,10 +1072,10 @@ public final class FilmDirector {
             double seconds = (ticks % anim.length()) / 20.0;
             // then the tick it was drawn at and the waist bend it was drawn with, to set beside the log
             StringBuilder time = new StringBuilder(String.format(java.util.Locale.ROOT, "%s %.4f drawn %d waist %.1f", anim.name(),
-                    seconds, ant.tickCount, ant.getWaistPitch(drawPartial)));
+                    seconds, ant.tickCount, ant.getWaistPitch(partial)));
             // a longer spine (a termite's soft abdomen): every piece's bend
             for (int p = 1; p < ant.getSpinePieces(); p++) {
-                time.append(String.format(java.util.Locale.ROOT, " %.1f", ant.getSpinePitch(p, drawPartial)));
+                time.append(String.format(java.util.Locale.ROOT, " %.1f", ant.getSpinePitch(p, partial)));
             }
             clipTimes.put(ant.getId(), time.toString());
         } catch (ReflectiveOperationException | RuntimeException e) {

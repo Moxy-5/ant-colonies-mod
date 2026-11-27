@@ -35,6 +35,7 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import software.bernie.geckolib.animatable.GeoAnimatable;
 import software.bernie.geckolib.animation.AnimationController;
 import software.bernie.geckolib.cache.object.BakedGeoModel;
@@ -57,18 +58,35 @@ import software.bernie.geckolib.util.RenderUtil;
  * drawn is recorded, each into its own file beside the walker's, {@code body_<its name or kind and number>.jsonl.gz}
  * (a lion and the buffalo it holds, the herd round them). Lines are written as they come, so a long hunt never piles up
  * in memory. An animal is recorded only while it is drawn (in the camera's view).
+ * <p>
+ * The blocks are written wherever the animal goes (code review R12-48, 2026-11-27): the first line has those round
+ * its first place, and each time it has gone half that far a line {@code {"more":1,"blocks":[...],"water":[...]}}
+ * adds the ones round its new place not yet written (a lioness first drawn 40 blocks from the kill had no ground
+ * under the hold). An animal drawn by its holder (a fish in a jaw) is written where it was really drawn, in its
+ * holder's frame, its lines marked {@code "held":1} (R12-45).
+ * <p>
+ * Every moment carries {@code "ft"}, the game tick shared by every animal of the scene (the Motion Studio, phase 1,
+ * 2026-11-27: before, only animals with a mind's facts had it; since then the overworld's game time, which stands still
+ * while the game is frozen, read with the facts from one tick), and {@code "ct"}, the client's own count of the ticks
+ * the animals moved in ({@link #clientTicks}): {@code tools/replay.py} lays the files on {@code ct}, which goes on a tick
+ * at a time through a frozen burst stepped several ticks a picture, where {@code ft} jumps at each step's end.
  */
 @EventBusSubscriber(modid = ColonyFrameworkMod.MODID, value = Dist.CLIENT)
 public final class BodyRecorder {
     private static final Logger LOG = LogUtils.getLogger();
-    /** How far round the walker the blocks are written down when recording starts (blocks, each way; up and down less). */
+    /** How far round the animal the blocks are written down (blocks, each way; up and down less) ... */
     private static final int AROUND = 16, BELOW = 5, ABOVE = 10;
+    /** ... and how far it goes from where they were last written before they are written again (sideways; up or down). */
+    private static final int AGAIN = AROUND / 2, AGAIN_UP = 3;
 
     /** One animal's file: open while recording, its moments written so far. */
     private static final class Track {
         final Path file;
         final Writer out;
         final Set<String> moments = new HashSet<>();
+        /** The blocks written so far, and the middle of the last writing. */
+        final Set<Long> ground = new HashSet<>();
+        BlockPos groundAt;
         int lines;
 
         Track(Path file) throws IOException {
@@ -86,8 +104,21 @@ public final class BodyRecorder {
     private static final Map<Integer, Track> tracks = new java.util.HashMap<>();
     private static final Set<String> fileNames = new HashSet<>();
     private static final Set<BakedGeoModel> tracked = new HashSet<>();
+    /**
+     * The client's ticks in which the animals moved (the game not frozen, or a frozen step running), counted while
+     * recording: every animal drawn in one frame reads the same count, and it goes on one a tick through a frozen burst
+     * stepped several ticks a picture, where the game tick "ft" waits for the step's end (the Motion Studio, phase 1).
+     */
+    private static long clientTicks;
 
     private BodyRecorder() {
+    }
+
+    @SubscribeEvent
+    public static void onClientTick(ClientTickEvent.Post event) {
+        if (folder != null && FilmStep.animalsTicked(Minecraft.getInstance())) {
+            clientTicks++;
+        }
     }
 
     /**
@@ -97,6 +128,7 @@ public final class BodyRecorder {
     static void start(Path into, int samplesPerTick, boolean everyAnimal) {
         stop();
         folder = into;
+        clientTicks = 0;                    // counted from each recording's start, so a refilmed scene reads the same
         perTick = Math.max(1, samplesPerTick);
         all = everyAnimal;
         LOG.info("Film: recording {} into {} ({} a tick)", all ? "every animal drawn" : "the walker's body", into, perTick);
@@ -150,7 +182,10 @@ public final class BodyRecorder {
             tracks.put(entity.getId(), track);
         }
         float partial = event.getPartialTick();
-        String moment = entity.tickCount + "/" + (int) Math.min(perTick - 1, partial * perTick);
+        // the n-th part of a tick the moment falls in, counted from the game's start so that a tick's end and the next
+        // tick's start are one moment (the camera's "frames n" draws an animal at 1/n, 2/n ... 1, and between two takes
+        // holds it at the last one, which is the next tick's 0: that frame took the next take's first place)
+        String moment = Long.toString((long) Math.ceil((entity.tickCount + (double) partial) * perTick - 1.0e-4));
         if (!track.moments.add(moment)) {
             return;
         }
@@ -158,11 +193,17 @@ public final class BodyRecorder {
         model.topLevelBones().forEach(bone -> collect(bone, bones));
         try {
             if (track.lines == 0) {
-                track.out.write(header(entity, bones));
+                track.out.write(header(entity, bones, track));
                 track.out.write('\n');
                 track.lines++;
             }
-            track.out.write(moment(entity, partial, bones));
+            BlockPos at = entity.blockPosition();
+            if (Math.abs(at.getX() - track.groundAt.getX()) > AGAIN || Math.abs(at.getZ() - track.groundAt.getZ()) > AGAIN
+                    || Math.abs(at.getY() - track.groundAt.getY()) > AGAIN_UP) {
+                track.out.write("{\"more\":1," + ground(at, track) + "}");
+                track.out.write('\n');
+            }
+            track.out.write(moment(entity, partial, bones, BoneMeshRenderer.heldFrame(), BoneMeshRenderer.heldAt()));
             track.out.write('\n');
             track.lines++;
         } catch (IOException e) {
@@ -201,7 +242,7 @@ public final class BodyRecorder {
      * The first line: the animal's kind, each bone (its parent, and its boxes as 8 corners in the bone's own frame:
      * each box's own turn already in), and the blocks round it (their collision boxes and water heights).
      */
-    private static String header(Entity entity, List<GeoBone> bones) {
+    private static String header(Entity entity, List<GeoBone> bones, Track track) {
         StringBuilder s = new StringBuilder("{\"header\":1,\"entity\":\"")
                 .append(BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType())).append('"');
         s.append(",\"id\":").append(entity.getId()).append(",\"uuid\":\"").append(entity.getUUID()).append('"');
@@ -242,12 +283,24 @@ public final class BodyRecorder {
             }
             s.append("]}");
         }
-        s.append("],\"blocks\":[");
+        s.append("],").append(ground(entity.blockPosition(), track)).append('}');
+        return s.toString();
+    }
+
+    /**
+     * The blocks round this place not yet written for this animal, as {@code "blocks":[...],"water":[...]}: their
+     * collision boxes and water heights.
+     */
+    private static String ground(BlockPos at, Track track) {
+        track.groundAt = at.immutable();
+        StringBuilder s = new StringBuilder("\"blocks\":[");
         var level = Minecraft.getInstance().level;
-        BlockPos at = entity.blockPosition();
         boolean first = true;
         StringBuilder water = new StringBuilder();
         for (BlockPos pos : BlockPos.betweenClosed(at.offset(-AROUND, -BELOW, -AROUND), at.offset(AROUND, ABOVE, AROUND))) {
+            if (!track.ground.add(pos.asLong())) {
+                continue;
+            }
             BlockState state = level.getBlockState(pos);
             float fluid = state.getFluidState().is(FluidTags.WATER) ? state.getFluidState().getHeight(level, pos) : 0.0F;
             if (fluid > 0.0F) {
@@ -269,7 +322,7 @@ public final class BodyRecorder {
             }
             s.append(']');
         }
-        s.append("],\"water\":[").append(water).append("]}");
+        s.append("],\"water\":[").append(water).append(']');
         return s.toString();
     }
 
@@ -295,13 +348,17 @@ public final class BodyRecorder {
     /**
      * One moment: the tick and in-between time, where it was drawn, its body's turn, how it moved, on the ground or in
      * water, its clips, then each bone's matrix (12 numbers, the rows of a 3x4: a point in the bone's frame times it is
-     * the point's place relative to where the animal was drawn), or 0 for a bone not drawn.
+     * the point's place relative to where the animal was drawn), or 0 for a bone not drawn. An animal drawn by its
+     * holder ({@link BoneMeshRenderer#heldFrame}) is written from where the holder was drawn, in the holder's frame.
      */
-    private static String moment(Entity entity, float partial, List<GeoBone> bones) {
-        Vec3 at = entity.getPosition(partial);
+    private static String moment(Entity entity, float partial, List<GeoBone> bones, Matrix4f heldFrame, Vec3 heldAt) {
+        Vec3 at = heldAt != null ? heldAt : entity.getPosition(partial);
         Vec3 v = entity.getDeltaMovement();
         float bodyYaw = entity instanceof LivingEntity living ? living.getPreciseBodyRotation(partial) : entity.getYRot();
         StringBuilder s = new StringBuilder("{\"t\":").append(entity.tickCount).append(",\"pt\":").append(num(partial));
+        if (heldAt != null) {
+            s.append(",\"held\":1");
+        }
         s.append(",\"pos\":[").append(num(at.x)).append(',').append(num(at.y)).append(',').append(num(at.z)).append(']');
         s.append(",\"yaw\":").append(num(bodyYaw)).append(",\"pitch\":").append(num(entity.getViewXRot(partial)));
         s.append(",\"v\":[").append(num(v.x)).append(',').append(num(v.y)).append(',').append(num(v.z)).append(']');
@@ -324,10 +381,14 @@ public final class BodyRecorder {
             }
         }
         s.append("},\"play\":{").append(play).append('}');
-        Map<String, Object> facts = FilmFactsBoard.of(entity.getUUID());
+        FilmFactsBoard.Board board = FilmFactsBoard.snapshot();         // the facts and their tick, from one tick
+        Map<String, Object> facts = board.facts().getOrDefault(entity.getUUID(), Map.of());
         if (!facts.isEmpty()) {
-            s.append(",\"facts\":").append(FilmFactsBoard.json(facts)).append(",\"ft\":").append(FilmFactsBoard.tick());
+            s.append(",\"facts\":").append(FilmFactsBoard.json(facts));
         }
+        // the game tick shared by every animal, written for each (the Motion Studio, phase 1, 2026-11-27): an animal
+        // with no mind's facts (a carcass) had none, so the replay page could not put it on the scene's clock
+        s.append(",\"ft\":").append(board.tick()).append(",\"ct\":").append(clientTicks);
         s.append(",\"b\":[");
         for (int i = 0; i < bones.size(); i++) {
             GeoBone bone = bones.get(i);
@@ -338,7 +399,8 @@ public final class BodyRecorder {
             }
             PoseStack pose = new PoseStack();
             // GeckoLib's "local space" matrix has the do-nothing matrix added to it, taken back off (as FilmChecks)
-            pose.last().pose().set(new Matrix4f(bone.getLocalSpaceMatrix()).sub(new Matrix4f()));
+            Matrix4f local = new Matrix4f(bone.getLocalSpaceMatrix()).sub(new Matrix4f());
+            pose.last().pose().set(heldFrame == null ? local : new Matrix4f(heldFrame).mul(local));
             RenderUtil.translateAwayFromPivotPoint(pose, bone);
             Matrix4f m = pose.last().pose();
             s.append('[').append(num(m.m00())).append(',').append(num(m.m10())).append(',').append(num(m.m20())).append(',').append(num(m.m30()))

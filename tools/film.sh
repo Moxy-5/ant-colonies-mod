@@ -44,8 +44,10 @@ summary() {
     echo "Shoot took $(field took) s (reload: $(field reload) ms)."
     local err
     err=$(field error)
-    [ -n "$err" ] && echo "ERROR: $err"
     [ -f run-film/screenshots/checks.txt ] && cat run-film/screenshots/checks.txt
+    # a failed reload filmed the scene with the old files: say so last and fail, so a calling script stops (R12-53)
+    if [ -n "$err" ]; then echo "ERROR: $err"; return 1; fi
+    return 0
 }
 
 # Waits for the session to answer request $1 (or, with no id, for its first shoot), up to 15 minutes.
@@ -54,9 +56,9 @@ wait_for() {
     while [ $((SECONDS - start)) -lt 900 ]; do
         if [ -f "$STATUS" ]; then
             if [ -n "$id" ]; then
-                case ",$(field answered)," in *",$id,"*) echo "Pictures ready after $((SECONDS - start)) s."; summary; return 0 ;; esac
+                case ",$(field answered)," in *",$id,"*) echo "Pictures ready after $((SECONDS - start)) s."; summary; return $? ;; esac
             elif [ "$(field state)" = ready ]; then
-                echo "Pictures ready after $((SECONDS - start)) s (launch included)."; summary; return 0
+                echo "Pictures ready after $((SECONDS - start)) s (launch included)."; summary; return $?
             fi
             if [ $((SECONDS - start)) -gt 20 ] && ! alive; then
                 echo "The film session stopped (see $LOG)."; return 1

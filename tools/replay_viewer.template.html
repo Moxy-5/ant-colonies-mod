@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game Replay</title>
+<style>
+  :root { --bg: #f1efe8; --panel: #fdfcf8; --ink: #2a2a22; --muted: #6a675a; --line: #d9d4c4; --accent: #8a6a1e; --warn: #b5402a; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1a1a16; --panel: #23231e; --ink: #ecebe2; --muted: #a5a291; --line: #3a3930; --accent: #e0b850; --warn: #f07a5e; }
+  }
+  :root[data-theme="dark"] { --bg: #1a1a16; --panel: #23231e; --ink: #ecebe2; --muted: #a5a291; --line: #3a3930; --accent: #e0b850; --warn: #f07a5e; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  header { padding: 14px 16px 6px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); max-width: 90ch; }
+  #wrap { position: relative; height: 64vh; min-height: 320px; margin: 10px 16px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  canvas#c { display: block; width: 100%; height: 100%; }
+  #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag { position: absolute; transform: translate(-50%, -100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+         padding: 1px 6px; font-size: 12px; font-weight: 600; white-space: nowrap; opacity: 0.92; }
+  .tag.sel { border-color: var(--accent); color: var(--accent); }
+  #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--muted); font-size: 16px; }
+  #stamp { position: absolute; left: 10px; bottom: 8px; padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,0.85); color: #222;
+           font: 12px/1.4 ui-monospace, Consolas, monospace; pointer-events: none; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 10px; padding: 0 16px 8px; align-items: center; }
+  .controls > b { min-width: 5.5em; }
+  .readout { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .readout.gap { color: var(--warn); }
+  button { font: inherit; padding: 5px 11px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  button.off { opacity: 0.5; text-decoration: line-through; }
+  #chartRow { margin: 0 16px 8px; }
+  canvas#chart { display: block; width: 100%; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; touch-action: none; }
+  .chartFoot { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; justify-content: space-between; padding-top: 4px; }
+  .pair { display: inline-flex; margin: 0 6px 4px 0; }
+  .pair button:first-child { border-radius: 8px 0 0 8px; }
+  .pair button.hide { border-radius: 0 8px 8px 0; border-left: none; font-size: 12px; padding: 5px 8px; color: var(--muted); }
+  button .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+  #scrubRow { padding: 0 16px 6px; }
+  #scrub { width: 100%; margin: 0; }
+  .info { margin: 0 16px 10px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 14px; }
+  .info h3 { margin: 0 0 4px; font-size: 15px; }
+  .info .grid { display: grid; grid-template-columns: max-content 1fr; gap: 1px 12px; }
+  .info .k { color: var(--muted); }
+  .info .warn { color: var(--warn); font-weight: 600; }
+  .note { margin: 0 16px 10px; color: var(--muted); font-size: 14px; max-width: 90ch; }
+  .note.warn { color: var(--warn); }
+  @media (max-width: 600px) { #wrap { height: 52vh; } .controls > b { min-width: 0; width: 100%; } }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Replay</h1>
+  <p>The game's own recording of a film scene, played back: every animal exactly as the game drew it, moment by moment,
+     on the ground the game recorded (squares a block wide, so a sliding foot shows). Drag to turn, scroll to zoom,
+     right-drag to slide; click an animal to read its clips and its mind (click the ground to let it go). Keys: space
+     plays, the arrows step a moment (with Shift ten), F follows the picked animal, Esc lets it go. The page's address
+     always holds the moment, the animal and the camera: copy it to come back to exactly this view.</p>
+</header>
+<div id="wrap"><canvas id="c"></canvas><div id="labels"></div><div id="stamp"></div><div id="loading">Unpacking the recording...</div></div>
+<div class="controls">
+  <button id="back" title="One moment back (left arrow; Shift: ten)">&#9664; 1</button>
+  <button id="play" title="Play or pause (space)">Play</button>
+  <button id="fwd" title="One moment on (right arrow; Shift: ten)">1 &#9654;</button>
+  <span id="speedBtns"></span>
+  <span id="when" class="readout"></span>
+</div>
+<div id="scrubRow"><input id="scrub" type="range" min="0" max="0" step="1" value="0" aria-label="Moment"></div>
+<div id="chartRow">
+  <canvas id="chart" aria-label="Footfall chart: the picked animal's clip and each foot, moment by moment"></canvas>
+  <div class="chartFoot"><span id="chartNote" class="readout"></span>
+    <button id="chartSpan" title="The chart over the whole recording, or a few seconds round now">Whole recording</button></div>
+</div>
+<div class="controls"><b>Animals</b><span id="animalBtns"></span></div>
+<div class="controls"><b>Camera</b><span id="camBtns"></span><button id="followBtn" title="Keep the camera on the picked animal (F)">Follow</button>
+  <button id="labelsBtn">Labels</button><button id="pieces">Show the pieces</button></div>
+<div class="controls"><b>Traces</b><span id="ghostBtns"></span>
+  <button id="pathsBtn" title="Each foot's path over the last 1.5 seconds: grey lifted, dark on the ground, red on the ground and sliding">Foot paths</button></div>
+<div class="info" id="info"></div>
+<p class="note" id="notes"></p>
+<!--VIEWER-->
+<script>
+const DATA = /*DATA*/null;
+document.getElementById('title').textContent = 'Replay: ' + DATA.title;
+document.title = DATA.title + ' Replay';
+const $ = id => document.getElementById(id);
+const wrap = $('wrap');
+const settings = Viewer.settingsFromHash({m: 0, at: -1, pick: '', follow: 0, cam: '', speed: 1, play: 0, labels: 1, pieces: 0, hide: '',
+                                          ghosts: 0, paths: 0, whole: 0});
+let st, sun;
+try {
+  st = Viewer.stage({canvas: $('c'), wrap, labels: $('labels'), fog: [70, 170], shadow: 12});
+  st.camera.far = 600; st.camera.updateProjectionMatrix();
+  sun = st.scene.children.find(o => o.isDirectionalLight);
+  st.scene.add(sun.target);
+} catch (e) {                                   // no 3D drawing in this browser (WebGL off): say so, and to tools
+  $('loading').textContent = 'This browser cannot draw 3D here (WebGL is off or missing): ' + e;
+  window.Replay = {error: String(e)};
+  throw e;
+}
+
+// --- unpacking: base64 -> bytes -> the browser's own zlib ----------------------------------------------------------
+function bytesOf(b64) {
+  const s = atob(b64), u = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+  return u;
+}
+async function inflate(b64) {
+  const stream = new Blob([bytesOf(b64)]).stream().pipeThrough(new DecompressionStream('deflate'));
+  return new Response(stream).arrayBuffer();
+}
+
+// --- the ground: every recorded block's collision boxes, squares a block wide --------------------------------------
+function buildGround(blocks, water) {
+  const tops = new Map();                       // each column's highest block (its top drawn in the grass colour)
+  blocks.forEach(([x, y, z]) => { const k = x + ',' + z; if (!tops.has(k) || tops.get(k) < y) tops.set(k, y); });
+  const boxes = [];
+  blocks.forEach(([x, y, z, ...bs]) => bs.forEach(b => boxes.push([x, y, z, b])));
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial(), boxes.length);
+  const m = new THREE.Matrix4(), c = new THREE.Color();
+  boxes.forEach(([x, y, z, b], i) => {
+    const col = x + ',' + z;                    // each column's block tops, for the feet
+    if (!groundTops.has(col)) groundTops.set(col, []);
+    groundTops.get(col).push(y + b[4]);
+    const w = Math.max(b[3] - b[0], 0.01), h = Math.max(b[4] - b[1], 0.01), d = Math.max(b[5] - b[2], 0.01);
+    m.makeScale(w, h, d).setPosition(x + (b[0] + b[3]) / 2, y + (b[1] + b[4]) / 2, z + (b[2] + b[5]) / 2);
+    mesh.setMatrixAt(i, m);
+    const even = ((x + z) & 1) === 0, top = tops.get(x + ',' + z) === y;
+    c.set(top ? (even ? '#8f9670' : '#7c835f') : (even ? '#7a6448' : '#6a573f'));
+    if (b[4] - b[1] < 0.99) c.offsetHSL(0, -0.1, 0.06);          // a slab, a step, a fence: a little paler
+    mesh.setColorAt(i, c);
+  });
+  mesh.receiveShadow = true;
+  st.prop(mesh);
+  if (water.length) {
+    const wm = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({color: '#3f7fb5', transparent: true, opacity: 0.45, depthWrite: false}), water.length);
+    water.forEach(([x, y, z, h], i) => { m.makeScale(1, h, 1).setPosition(x + 0.5, y + h / 2, z + 0.5); wm.setMatrixAt(i, m); });
+    st.prop(wm);
+  }
+}
+
+// --- the animals: each bone's boxes from their 8 recorded corners (bit 0 x, bit 1 y, bit 2 z), drawn through the
+// --- bone's recorded matrix each moment -----------------------------------------------------------------------------
+const QUADS = [[0, 4, 6, 2], [1, 3, 7, 5], [0, 1, 5, 4], [2, 6, 7, 3], [0, 2, 3, 1], [4, 5, 7, 6]];
+function boneGeometry(cubes) {
+  const pos = [];
+  cubes.forEach(c => QUADS.forEach(([a, b, cc, d]) => [a, b, cc, a, cc, d].forEach(k => pos.push(c[k * 3], c[k * 3 + 1], c[k * 3 + 2]))));
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+}
+const TINTS = ['#e8a33d', '#4f9fd8', '#e05d5d', '#5fbf6a', '#b57be0', '#e0d24f', '#46c4b8', '#d97aa6'];
+
+// the matrices: each value's moments written as changes, bone by bone (tools/replay.py pack); rebuilt here moment
+// by moment, bone by bone, so one moment's twelve numbers a bone lie together
+function unpack(a, all) {
+  const n = a.n, B = a.B, src = new Int16Array(all.buffer, all.byteOffset + a.offset * 2, n * B * 12);
+  const M = new Int16Array(n * B * 12);
+  let k = 0;
+  for (let b = 0; b < B; b++) for (let e = 0; e < 12; e++) {
+    let prev = 0;
+    for (let i = 0; i < n; i++) { prev = (prev + src[k++]) << 16 >> 16; M[(i * B + b) * 12 + e] = prev; }
+  }
+  return M;
+}
+
+let animals = [], timeline = [], now = 0, playing = false, clock = 0, speed = 1, picked = null, follow = false, ready = false;
+// each moment's game tick, and the game ticks that ran unrecorded just before it (a film's "wait" and "until" steps
+// run the game on while the client draws nothing, or draws none of these animals); more than GAP is called a gap (a
+// tick or two is the noise of reading the server's tick live while the client draws)
+let tickAt = [], gapBefore = [];
+const GAP = 3;
+
+function buildAnimal(a, i, all) {
+  a.index = i;
+  a.M = unpack(a, all);
+  a.on = true;
+  a.group = new THREE.Group();
+  a.mat = new THREE.MeshLambertMaterial({color: a.colour, side: THREE.DoubleSide});
+  a.meshes = a.bones.map((b, bi) => {
+    if (!b.cubes.length) return null;
+    const mesh = new THREE.Mesh(boneGeometry(b.cubes), a.mat);
+    mesh.matrixAutoUpdate = false;
+    mesh.castShadow = true;
+    mesh.userData = {animal: a, bone: b.name, mat: a.mat, tint: new THREE.MeshLambertMaterial({color: TINTS[bi % TINTS.length], side: THREE.DoubleSide})};
+    a.group.add(mesh);
+    return mesh;
+  });
+  st.scene.add(a.group);
+  a.anchor = new THREE.Object3D();
+  a.anchor.visible = false;
+  st.tag(a.name, a.anchor, () => (a.height || 1) * 1.05);
+  a.tag = st.tags[st.tags.length - 1].el;
+}
+
+// each animal's moment at every moment of the scene: its own at that clock value, or its last one less than a client
+// tick before (a film recording several moments a tick, an animal first drawn part way through a tick), else none
+function lineUp(a, slotOf) {
+  a.frameAt = new Int32Array(timeline.length).fill(-1);
+  let j = -1;
+  for (let t = 0; t < timeline.length; t++) {
+    while (j + 1 < a.n && a.key[j + 1] <= timeline[t]) j++;
+    if (j >= 0 && timeline[t] - a.key[j] < 1) a.frameAt[t] = j;
+  }
+  a.slot = a.key.map(k => slotOf.get(k));      // each of its moments' place on the scene's line
+}
+
+// a bone the game did not draw (its matrix written as 0)
+const hidden = (M, o) => !M[o] && !M[o + 1] && !M[o + 2] && !M[o + 4] && !M[o + 5] && !M[o + 6] && !M[o + 8] && !M[o + 9] && !M[o + 10];
+// one animal at the scene's moment t (a timeline index): its moment, or hidden when the game did not draw it then
+function place(a, t) {
+  const j = a.frameAt[t];
+  a.now = j;
+  const shown = j >= 0 && a.on;
+  a.group.visible = shown;
+  a.anchor.visible = shown && !!settings.labels;
+  if (!shown) return;
+  pose(a, a.meshes, j);
+  const p = a.pos[j];
+  a.anchor.position.set(p[0], p[1], p[2]);
+  const clip = (a.clipTable[a.clips[j]].body || '').split(' ')[0];
+  a.tag.textContent = a.name + (clip ? ' · ' + clip : '');
+  a.tag.classList.toggle('sel', a === picked);
+}
+
+// --- the scene's clock -------------------------------------------------------------------------------------------
+function show(t) {
+  const was = picked && picked.now >= 0 ? picked.pos[picked.now] : null;
+  now = Math.max(0, Math.min(timeline.length - 1, t));
+  animals.forEach(a => place(a, now));
+  $('scrub').value = now;
+  const ref = picked && picked.now >= 0 ? picked : animals.find(a => a.now >= 0);
+  const pt = ref ? ref.pt[ref.now] : 0;
+  const secs = ((timeline[now] - timeline[0]) / 20).toFixed(2);
+  const text = `moment ${now + 1} of ${timeline.length} · game tick ${tickAt[now]}` +
+    (pt ? ` (+${pt})` : '') + ` · ${secs} s recorded` +
+    (gapBefore[now] > GAP ? ` · after ${gapBefore[now]} game ticks not recorded` : '');
+  $('when').textContent = text;
+  $('when').classList.toggle('gap', gapBefore[now] > GAP);
+  $('stamp').textContent = DATA.title + ' · ' + text;
+  // follow: the camera moves with the picked animal's own place (not its drawn box, which bobs with the legs)
+  if (follow && was && picked.now >= 0) {
+    const p = picked.pos[picked.now], d = new THREE.Vector3(p[0] - was[0], p[1] - was[1], p[2] - was[2]);
+    st.camera.position.add(d); st.controls.target.add(d);
+  }
+  placeGhosts();
+  placePaths();
+  drawChartNow();
+  info();
+  writeState();
+  if (!playing) writeAddress();
+}
+
+// what tools (tools/replay_strips.py) and a curious reader can ask the page; moments count from 1, as on the page
+function writeState() {
+  const state = {moment: now + 1, index: now, of: timeline.length, clock: timeline[now], tick: tickAt[now],
+    gapBefore: gapBefore[now], pick: picked ? picked.name : null, playing, follow, cam: settings.cam || null, speed,
+    ghosts, paths, feet: feetNow(picked),
+    animals: animals.map(a => ({name: a.name, drawn: a.now >= 0, shown: a.now >= 0 && a.on,
+      tick: a.now >= 0 ? a.ft[a.now] : null, clip: a.now >= 0 ? (a.clipTable[a.clips[a.now]].body || '').split(' ')[0] : null}))};
+  let el = $('viewer-state');
+  if (!el) { el = document.createElement('pre'); el.id = 'viewer-state'; el.hidden = true; document.body.appendChild(el); }
+  el.textContent = JSON.stringify(state);
+  window.viewerState = state;
+}
+// the page's address says what is shown (the moment, the pick, its camera, follow), so a copied link opens it again
+function writeAddress() {
+  if (!ready) return;
+  const parts = [`m=${now + 1}`];
+  if (picked) parts.push('pick=' + encodeURIComponent(picked.name));
+  if (settings.cam) parts.push('cam=' + settings.cam);
+  if (follow) parts.push('follow=1');
+  if (speed !== 1) parts.push('speed=' + speed);
+  if (ghosts) parts.push('ghosts=' + ghosts);
+  if (paths) parts.push('paths=1');
+  if (chartWhole) parts.push('whole=1');
+  const off = animals.filter(a => !a.on).map(a => a.name);
+  if (off.length) parts.push('hide=' + off.map(encodeURIComponent).join(','));
+  try { history.replaceState(null, '', '#' + parts.join('&')); } catch (e) { /* a page opened from a file may refuse */ }
+}
+
+// --- the picked animal's clips and facts --------------------------------------------------------------------------
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c])); }
+function info() {
+  const a = picked;
+  if (!a) { $('info').innerHTML = 'Click an animal (or its button) to read its clips and its mind at this moment.'; return; }
+  const j = a.now;
+  let h = `<h3>${esc(a.name)} <span class="k">(${esc(a.entity)})</span></h3>`;
+  if (j < 0) {
+    $('info').innerHTML = h + '<span class="warn">Not drawn at this moment</span> (out of the camera\'s view in the film, ' +
+      'or not yet born or already gone): the game recorded nothing of it here.';
+    return;
+  }
+  const rows = [];
+  const clips = a.clipTable[a.clips[j]], play = a.play[j] || {};
+  Object.keys(clips).forEach(k => {
+    const [name, state] = clips[k].split(' ');
+    const p = play[k] || [];
+    rows.push([`clip (${esc(k)})`, `<b>${esc(name)}</b> ${esc(state || '')}` + (p[0] !== undefined && p[0] !== null ? `, played at ${(+p[0]).toFixed(2)}` : '') +
+      (p[1] !== null && p[1] !== undefined ? `, ${(+p[1]).toFixed(1)} clip ticks in` : '')]);
+  });
+  const v = a.v[j], sp = Math.hypot(v[0], v[2]) * 20;
+  rows.push(['moving', `${sp.toFixed(2)} blocks a second` + (Math.abs(v[1]) > 0.09 ? `, ${(v[1] * 20).toFixed(1)} up` : '') +
+    `, facing ${(((a.yaw[j] % 360) + 360) % 360).toFixed(0)}°`]);
+  rows.push(['standing', a.held[j] ? 'held, drawn by its holder' : a.water[j] ? `in water (${a.fluid[j]} deep)` : a.ground[j] ? 'on the ground' : '<span class="warn">in the air</span>']);
+  const facts = a.facts[j] || {};
+  Object.keys(facts).forEach(k => rows.push([esc(k), esc(JSON.stringify(facts[k]).replace(/^"|"$/g, ''))]));
+  const o = DATA.origin || [0, 0, 0];
+  rows.push(['place', a.pos[j].map((x, i) => (x + o[i]).toFixed(2)).join(' ')]);
+  $('info').innerHTML = h + '<div class="grid">' + rows.map(([k, v]) => `<span class="k">${k}</span><span>${v}</span>`).join('') + '</div>';
+}
+
+function pick(a, look) {
+  picked = a;
+  animals.forEach(x => x.btn && x.btn.classList.toggle('on', x === a));
+  show(now);
+  if (look && a && a.now >= 0) camera(settings.cam || 'three-quarter');
+}
+
+// --- cameras -----------------------------------------------------------------------------------------------------
+// the picked animal's drawn box, from the parts drawn now (a bone the game hid keeps an old place: left out)
+function centreOf(a) {
+  const box = new THREE.Box3();
+  a.group.updateMatrixWorld(true);
+  a.meshes.forEach(m => m && m.visible && box.expandByObject(m));
+  return box.isEmpty() ? null : {c: box.getCenter(new THREE.Vector3()), size: box.getSize(new THREE.Vector3()).length()};
+}
+// the whole scene: everyone drawn now (or everyone's first place)
+function sceneView() {
+  const box = new THREE.Box3();
+  animals.forEach(a => { if (a.group.visible) { const at = centreOf(a); if (at) box.expandByPoint(at.c); } });
+  if (box.isEmpty()) animals.forEach(a => box.expandByPoint(new THREE.Vector3(...a.pos[0])));
+  const c = box.getCenter(new THREE.Vector3()), s = Math.max(8, box.getSize(new THREE.Vector3()).length() * 1.4);
+  st.camera.position.set(c.x + s * 0.6, c.y + s * 0.55, c.z + s * 0.8);
+  st.controls.target.copy(c); st.controls.update();
+}
+// the picked animal from one side: its own left (Minecraft: facing (-sin yaw, cos yaw), left (cos yaw, sin yaw));
+// with nothing picked, or the pick not drawn now, the whole scene
+const CAMS = [['three-quarter', 'Three quarters'], ['side', 'Side'], ['front', 'Front'], ['behind', 'Behind'], ['above', 'Above'], ['wide', 'Wide']];
+function camera(name) {
+  name = String(name || '').toLowerCase();
+  if (!CAMS.some(([k]) => k === name)) name = 'three-quarter';
+  const a = picked, at = a && a.now >= 0 ? centreOf(a) : null;
+  if (!at) { settings.cam = ''; camBtns(null); sceneView(); writeState(); writeAddress(); return; }
+  settings.cam = name;
+  camBtns(name);
+  const yaw = a.yaw[a.now] * Math.PI / 180;
+  const fwd = new THREE.Vector3(-Math.sin(yaw), 0, Math.cos(yaw)), left = new THREE.Vector3(Math.cos(yaw), 0, Math.sin(yaw));
+  const d = Math.max(2.5, at.size * 1.5);
+  const dir = {side: left.clone(), front: fwd.clone(), behind: fwd.clone().negate(),
+               above: new THREE.Vector3(0.02, 1, 0.02), 'three-quarter': fwd.clone().add(left).normalize().add(new THREE.Vector3(0, 0.45, 0)),
+               wide: fwd.clone().add(left).normalize().add(new THREE.Vector3(0, 0.8, 0))}[name];
+  const dist = name === 'wide' ? d * 3.5 : name === 'above' ? d * 1.2 : d;
+  dir.normalize();
+  st.camera.position.copy(at.c).addScaledVector(dir, dist);
+  if (name === 'side' || name === 'front' || name === 'behind') st.camera.position.y = at.c.y + at.size * 0.12;
+  st.controls.target.copy(at.c);
+  st.controls.update();
+  writeState();
+  writeAddress();
+}
+// the sun's shadow box goes with the view, every frame (the shadows show whether the feet touch the ground)
+function sunToView() {
+  const t = st.controls.target;
+  sun.position.set(t.x + 6, t.y + 18, t.z + 10); sun.target.position.copy(t); sun.target.updateMatrixWorld();
+}
+
+// --- feet: on the ground or lifted, and sliding, measured from the recording (the Motion Studio, idea 6) -----------
+// Each foot is the last bone of a leg in the animal's body plan, with the toes and claws below it (as the offline
+// checker, tools/clip_check.py, takes them). Its lowest point says whether it stands. Whether it slides is judged on
+// the very corners that touch the ground at both moments: how far those same corners moved. A paw rolling off its
+// heel or onto its toes keeps its touching corners still and does not count; its middle moves, which is why the
+// middle is not used (it read every lift and landing as a slide). Nothing of the game's rules: only where the game
+// drew the foot, against the recorded blocks.
+const TOUCH = 0.03;       // a foot (a corner of it) this near the ground under it touches it (blocks; my pick, measured
+                          // on the lion hunt: standing paws and hooves sit 0.008 to 0.010 over the block top, a lifting
+                          // paw passes 0.03 within a tick or two; tools/pair_report.py's 0.1 took a paw lifting off
+                          // its toes as standing, and its forward swing as a slide)
+const SLIDE = 0.03;       // a standing foot moving more than this a tick slides (blocks; my pick: under a sixth of a
+                          // lion's walking pace, a third of the smallest slide the phase 0 films found, 0.10)
+const groundTops = new Map();                   // each column's block tops (filled with the ground)
+function groundUnder(x, y, z) {
+  const tops = groundTops.get(Math.floor(x) + ',' + Math.floor(z));
+  let best = null;
+  if (tops) for (const t of tops) if (t <= y + 0.5 && (best === null || t > best)) best = t;
+  return best;
+}
+// l1 r1 l2 r2 ... (front to back): front and hind for four legs, front, middle and hind for six, numbers past that
+function legLabel(key, rows) {
+  const side = key[0] === 'l' ? 'left' : key[0] === 'r' ? 'right' : '';
+  const n = parseInt(key.slice(1), 10);
+  const row = rows === 2 ? ['front', 'hind'][n - 1] : rows === 3 ? ['front', 'middle', 'hind'][n - 1] : 'leg ' + n;
+  return ((row || key) + ' ' + side).trim();
+}
+// the animal's feet and, for every moment, each foot's state (0 lifted, 1 on the ground, 2 on the ground and
+// sliding, -1 no ground recorded under it, -2 not drawn), slide (blocks a tick, NaN when not judged) and middle
+function feetOf(a) {
+  if (a.feet) return a.feet;
+  const index = new Map(a.bones.map((b, i) => [b.name, i]));
+  const kids = new Map();
+  a.bones.forEach((b, i) => { if (b.parent) { if (!kids.has(b.parent)) kids.set(b.parent, []); kids.get(b.parent).push(i); } });
+  const below = i => { const out = [i]; for (let k = 0; k < out.length; k++) (kids.get(a.bones[out[k]].name) || []).forEach(c => out.push(c)); return out; };
+  const legs = Object.entries(a.legs || {}).filter(([, chain]) => chain && chain.length && index.has(chain[chain.length - 1]));
+  const rows = new Set(legs.map(([k]) => k.slice(1))).size;
+  const order = k => (parseInt(k.slice(1), 10) || 0) * 2 + (k[0] === 'r' ? 1 : 0);
+  legs.sort((x, y) => order(x[0]) - order(y[0]));
+  const n = a.n, B = a.B, M = a.M;
+  a.feet = legs.map(([key, chain]) => {
+    const bone = index.get(chain[chain.length - 1]), parts = below(bone);
+    const corners = parts.reduce((sum, bi) => sum + a.bones[bi].cubes.length * 8, 0);
+    const foot = {key, name: legLabel(key, rows), bone, parts,
+                  state: new Int8Array(n), slide: new Float32Array(n).fill(NaN), mid: new Float32Array(n * 3)};
+    // every corner of the foot at this moment and the one before (x, y, z; NaN for a part not drawn), and which of
+    // them touched the ground
+    let now3 = new Float32Array(corners * 3), was3 = new Float32Array(corners * 3);
+    let touch = new Uint8Array(corners), touched = new Uint8Array(corners);
+    for (let j = 0; j < n; j++) {
+      const p = a.pos[j];
+      let lowY = Infinity, lx = 0, lz = 0, sx = 0, sz = 0, cnt = 0, q = 0;
+      for (const bi of parts) {
+        const o = (j * B + bi) * 12, s = a.turn[bi], v = a.move[bi], off = hidden(M, o);
+        for (const c of a.bones[bi].cubes) for (let k = 0; k < 24; k += 3, q++) {
+          if (off) { now3[q * 3] = NaN; continue; }
+          const x = c[k], y = c[k + 1], z = c[k + 2];
+          const wx = (M[o] * x + M[o + 1] * y + M[o + 2] * z) * s + M[o + 3] * v + p[0];
+          const wy = (M[o + 4] * x + M[o + 5] * y + M[o + 6] * z) * s + M[o + 7] * v + p[1];
+          const wz = (M[o + 8] * x + M[o + 9] * y + M[o + 10] * z) * s + M[o + 11] * v + p[2];
+          now3[q * 3] = wx; now3[q * 3 + 1] = wy; now3[q * 3 + 2] = wz;
+          if (wy < lowY) { lowY = wy; lx = wx; lz = wz; }
+          if (bi === bone) { sx += wx; sz += wz; cnt++; }
+        }
+      }
+      touch.fill(0);
+      if (lowY === Infinity) foot.state[j] = -2;
+      else {
+        foot.mid[j * 3] = cnt ? sx / cnt : lx; foot.mid[j * 3 + 1] = lowY; foot.mid[j * 3 + 2] = cnt ? sz / cnt : lz;
+        const g = groundUnder(lx, lowY, lz);
+        if (g === null) foot.state[j] = -1;
+        else {
+          foot.state[j] = lowY - g < TOUCH ? 1 : 0;
+          for (let i = 0; i < corners; i++) touch[i] = now3[i * 3 + 1] - g < TOUCH ? 1 : 0;   // NaN: not
+          // its slide since its moment before: the corners touching at both moments, how far they moved (only when
+          // that moment was at most two ticks before and no ticks went unrecorded between)
+          const dt = j > 0 ? a.key[j] - a.key[j - 1] : 0;
+          if (foot.state[j] === 1 && foot.state[j - 1] >= 1 && dt > 0 && dt <= 2 && !(gapBefore[a.slot[j]] > GAP)) {
+            let sum = 0, both = 0;
+            for (let i = 0; i < corners; i++) {
+              if (!touch[i] || !touched[i]) continue;
+              sum += Math.hypot(now3[i * 3] - was3[i * 3], now3[i * 3 + 2] - was3[i * 3 + 2]);
+              both++;
+            }
+            if (both) {                         // (none in common: it changed the part it stands on; not judged)
+              foot.slide[j] = sum / both / dt;
+              if (foot.slide[j] > SLIDE) foot.state[j] = 2;
+            }
+          }
+        }
+      }
+      [now3, was3] = [was3, now3];
+      [touch, touched] = [touched, touch];
+    }
+    return foot;
+  });
+  return a.feet;
+}
+function feetNow(a) {
+  const j = a ? a.now : -1;
+  return j < 0 ? [] : feetOf(a).map(f => ({name: f.name, planted: f.state[j] >= 1, sliding: f.state[j] === 2,
+    groundKnown: f.state[j] !== -1, slide: isNaN(f.slide[j]) ? null : +f.slide[j].toFixed(3)}));
+}
+
+// --- the footfall chart: the picked animal's clip and each foot, moment by moment (idea 6) -----------------------
+const CLOSE = 60;                               // the close view: this many moments each side of now (6 s)
+let chartWhole = false, chartHover = -1, chartCache = null;
+const LANE = 18, LEFT = 104, TOP = 4, AXIS = 18;
+function cssVar(name, fallback) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback; }
+function clipColour(name) { let h = 7; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return `hsl(${h % 360}, 42%, 64%)`; }
+function chartSpan() {
+  if (chartWhole) return [0, timeline.length - 1];
+  const t1 = Math.min(timeline.length - 1, Math.max(now + CLOSE, 2 * CLOSE));
+  return [Math.max(0, t1 - 2 * CLOSE), t1];
+}
+// draws the chart of moments t0..t1 into a canvas this many css pixels wide; the picked animal's lanes, the gaps and
+// the game ticks along the bottom (no cursor: drawChartNow adds it)
+function drawChart(canvas, t0, t1, width, dpr) {
+  const a = picked, feet = a ? feetOf(a) : [];
+  const lanes = 1 + feet.length, H = TOP + lanes * LANE + AXIS;
+  canvas.width = Math.round(width * dpr); canvas.height = Math.round(H * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const ink = cssVar('--ink', '#2a2a22'), muted = cssVar('--muted', '#6a675a'), line = cssVar('--line', '#d9d4c4'),
+        warn = cssVar('--warn', '#b5402a'), panel = cssVar('--panel', '#fdfcf8');
+  ctx.fillStyle = panel; ctx.fillRect(0, 0, width, H);
+  const cw = (width - LEFT - 4) / (t1 - t0 + 1), x = t => LEFT + (t - t0) * cw, w = Math.max(cw + 0.6, 1);   // (a little over a column: no seams between them)
+  ctx.font = '12px system-ui, sans-serif'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = muted;
+  ctx.fillText(a ? 'clip' : 'pick an animal', 6, TOP + LANE / 2);
+  feet.forEach((f, i) => ctx.fillText(f.name, 6, TOP + (i + 1.5) * LANE));
+  const hatch = (px, y) => { ctx.fillStyle = line; for (let k = 0; k < w; k += 4) ctx.fillRect(px + k, y + 3, Math.min(1.5, w), LANE - 6); };
+  if (a) {
+    let runStart = t0, runClip;
+    const label = (from, to, name) => {          // a clip's name over its run, when it fits
+      if (name && ctx.measureText(name).width + 6 < x(to + 1) - x(from)) { ctx.fillStyle = ink; ctx.fillText(name, x(from) + 3, TOP + LANE / 2); }
+    };
+    for (let t = t0; t <= t1; t++) {
+      const j = a.frameAt[t], px = x(t);
+      const clip = j < 0 ? null : (a.clipTable[a.clips[j]].body || '-').split(' ')[0];
+      if (t === t0) runClip = clip;
+      if (clip !== runClip) { label(runStart, t - 1, runClip); runStart = t; runClip = clip; }
+      if (j < 0) { for (let i = 0; i < lanes; i++) hatch(px, TOP + i * LANE); continue; }
+      ctx.fillStyle = clipColour(clip); ctx.fillRect(px, TOP + 2, w, LANE - 4);
+      feet.forEach((f, i) => {
+        const s = f.state[j], y = TOP + (i + 1) * LANE;
+        if (s === -2) { hatch(px, y); return; }
+        ctx.fillStyle = s === 2 ? warn : s === 1 ? ink : s === -1 ? '#c9b07a' : line;
+        ctx.fillRect(px, y + 4, w, LANE - 8);
+      });
+    }
+    label(runStart, t1, runClip);
+  }
+  ctx.fillStyle = warn;                         // the game ticks not recorded
+  for (let t = t0 + 1; t <= t1; t++) if (gapBefore[t] > GAP) ctx.fillRect(x(t) - 1, TOP, 2, lanes * LANE);
+  ctx.fillStyle = muted; ctx.textBaseline = 'top';
+  let lastX = -1e9;
+  for (let t = t0; t <= t1; t++) {              // the game ticks along the bottom
+    if (x(t) - lastX < 76) continue;
+    ctx.fillRect(x(t), TOP + lanes * LANE, 1, 4);
+    ctx.fillText('tick ' + tickAt[t], x(t) + 2, TOP + lanes * LANE + 4);
+    lastX = x(t);
+  }
+  return {t0, t1, x, cw, H, lanes};
+}
+function drawChartNow() {
+  const canvas = $('chart'), width = canvas.clientWidth || 800, dpr = window.devicePixelRatio || 1;
+  const [t0, t1] = chartSpan();
+  const key = [picked ? picked.index : -1, t0, t1, width, dpr, cssVar('--panel', '')].join('|');
+  if (!chartCache || chartCache.key !== key) {
+    const base = document.createElement('canvas');
+    chartCache = {key, base, ...drawChart(base, t0, t1, width, dpr)};
+  }
+  const c = chartCache;
+  canvas.width = c.base.width; canvas.height = c.base.height; canvas.style.height = c.H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(c.base, 0, 0);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const mark = (t, colour, wide) => { if (t >= c.t0 && t <= c.t1) { ctx.fillStyle = colour; ctx.fillRect(c.x(t) + c.cw / 2 - wide / 2, 0, wide, TOP + c.lanes * LANE + 2); } };
+  if (chartHover >= 0) mark(chartHover, cssVar('--muted', '#888'), 1);
+  mark(now, cssVar('--accent', '#8a6a1e'), 2);
+  chartText(chartHover >= 0 ? chartHover : now);
+}
+// the chart's line of words: a moment's clip and feet (the one under the pointer, else now), or the key to it
+function chartText(t) {
+  const a = picked;
+  if (!a) { $('chartNote').textContent = 'Pick an animal to see its footfall. Red lines: game ticks not recorded.'; return; }
+  const j = a.frameAt[t];
+  if (j < 0) { $('chartNote').textContent = `moment ${t + 1}: ${a.name} not drawn`; return; }
+  const feet = feetOf(a), clip = (a.clipTable[a.clips[j]].body || '-').split(' ')[0];
+  const words = feet.map(f => f.name + ' ' + (f.state[j] === 2 ? `slides ${f.slide[j].toFixed(2)}` : f.state[j] === 1 ? 'down' :
+    f.state[j] === 0 ? 'up' : f.state[j] === -1 ? '(no ground recorded)' : '-'));
+  $('chartNote').textContent = `moment ${t + 1}, tick ${tickAt[t]}: ${clip}` + (words.length ? ' · ' + words.join(', ') : '') +
+    (feet.length ? '  (dark: on the ground; red: on the ground and sliding over ' + SLIDE + ' blocks a tick; light: lifted)' : '');
+}
+function chartAt(e) {
+  if (!chartCache) return -1;
+  const r = $('chart').getBoundingClientRect(), px = e.clientX - r.left;
+  if (px < LEFT) return -1;
+  return Math.max(chartCache.t0, Math.min(chartCache.t1, chartCache.t0 + Math.floor((px - LEFT) / chartCache.cw)));
+}
+
+// --- ghosts: see-through copies of the picked animal a few moments back, to see arcs and jerks (idea 7) -----------
+const GHOST_STEP = 2;                           // moments between ghosts (a tenth of a second at one a tick)
+let ghosts = 0;
+function ghostSet(a, k) {
+  a.ghostSets = a.ghostSets || [];
+  if (!a.ghostSets[k]) {
+    const group = new THREE.Group();
+    const mat = new THREE.MeshLambertMaterial({color: a.colour, transparent: true, depthWrite: false, side: THREE.DoubleSide});
+    const meshes = a.meshes.map(m => {
+      if (!m) return null;
+      const g = new THREE.Mesh(m.geometry, mat);
+      g.matrixAutoUpdate = false;
+      group.add(g);
+      return g;
+    });
+    st.scene.add(group);
+    a.ghostSets[k] = {group, mat, meshes};
+  }
+  return a.ghostSets[k];
+}
+// a set of meshes in the pose of moment j (the same numbers the animal itself is drawn with)
+function pose(a, meshes, j) {
+  const M = a.M, B = a.B, base = j * B * 12, p = a.pos[j];
+  for (let b = 0; b < B; b++) {
+    const mesh = meshes[b];
+    if (!mesh) continue;
+    const o = base + b * 12, s = a.turn[b], v = a.move[b];
+    if (hidden(M, o)) { mesh.visible = false; continue; }
+    mesh.visible = true;
+    mesh.matrix.set(M[o] * s, M[o + 1] * s, M[o + 2] * s, M[o + 3] * v + p[0],
+                    M[o + 4] * s, M[o + 5] * s, M[o + 6] * s, M[o + 7] * v + p[1],
+                    M[o + 8] * s, M[o + 9] * s, M[o + 10] * s, M[o + 11] * v + p[2],
+                    0, 0, 0, 1);
+    mesh.matrixWorldNeedsUpdate = true;
+  }
+}
+function placeGhosts() {
+  animals.forEach(a => (a.ghostSets || []).forEach(g => g && (g.group.visible = false)));
+  const a = picked;
+  if (!ghosts || !a || !a.on || a.now < 0) return;
+  for (let k = 0; k < ghosts; k++) {
+    const t = now - (k + 1) * GHOST_STEP;
+    if (t < 0) break;
+    const j = a.frameAt[t];
+    if (j < 0 || j === a.now) continue;
+    const g = ghostSet(a, k);
+    g.mat.opacity = 0.38 * (1 - k / (ghosts + 1));
+    g.mat.color.set(settings.pieces ? '#ffffff' : a.colour);
+    pose(a, g.meshes, j);
+    g.group.visible = true;
+  }
+}
+
+// --- foot paths: each foot's middle over the last 1.5 seconds (30 moments), coloured by its state ----------------
+const PATH = 30;
+const pathGroup = new THREE.Group();
+st.scene.add(pathGroup);
+let paths = false;
+function placePaths() {
+  pathGroup.visible = false;
+  const a = picked;
+  if (!paths || !a || a.now < 0) return;
+  const feet = feetOf(a);
+  const ink = new THREE.Color('#1d1d18'), red = new THREE.Color('#e0442a'), up = new THREE.Color('#9a9a90');
+  feet.forEach((f, i) => {
+    let line = pathGroup.children[i];
+    if (!line) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array((PATH + 1) * 3), 3));
+      g.setAttribute('color', new THREE.BufferAttribute(new Float32Array((PATH + 1) * 3), 3));
+      line = new THREE.Line(g, new THREE.LineBasicMaterial({vertexColors: true, depthTest: false}));
+      line.renderOrder = 20; line.frustumCulled = false;
+      pathGroup.add(line);
+    }
+    const pos = line.geometry.attributes.position, col = line.geometry.attributes.color;
+    let n = 0;
+    for (let t = Math.max(0, now - PATH); t <= now; t++) {
+      const j = a.frameAt[t];
+      if (j < 0 || f.state[j] === -2) continue;
+      pos.setXYZ(n, f.mid[j * 3], f.mid[j * 3 + 1] + 0.02, f.mid[j * 3 + 2]);
+      const c = f.state[j] === 2 ? red : f.state[j] === 1 ? ink : up;
+      col.setXYZ(n, c.r, c.g, c.b);
+      n++;
+    }
+    line.geometry.setDrawRange(0, n);
+    pos.needsUpdate = true; col.needsUpdate = true;
+    line.visible = n > 1;
+  });
+  pathGroup.children.forEach((l, i) => { if (i >= feet.length) l.visible = false; });
+  pathGroup.visible = true;
+}
+
+// --- controls (none answer before the recording is unpacked) ------------------------------------------------------
+const SPEEDS = [[0.1, '1/10'], [0.25, '1/4'], [0.5, '1/2'], [1, '1'], [2, '2']];
+const speedBtns = Viewer.buttons($('speedBtns'), SPEEDS.map(([v, l]) => [v, l + 'x', 'Play at ' + l + ' of the game\'s speed']),
+  v => { speed = v; speedBtns(v); writeState(); writeAddress(); });
+const camBtns = Viewer.buttons($('camBtns'), CAMS.map(([k, l]) => [k, l, 'The picked animal from here (nothing picked: the whole scene)']),
+  k => ready && camera(k));
+function setPlaying(on) {
+  if (!ready) return;
+  playing = on;
+  if (on && now >= timeline.length - 1) show(0);
+  clock = timeline[now];
+  lastFrame = performance.now();
+  $('play').textContent = on ? 'Pause' : 'Play';
+  $('play').classList.toggle('on', on);
+  writeState();
+  if (!on) writeAddress();
+}
+function setFollow(on) { follow = on; $('followBtn').classList.toggle('on', on); writeState(); writeAddress(); }
+function step(n) { if (!ready) return; setPlaying(false); show(now + n); }
+$('play').onclick = () => setPlaying(!playing);
+$('back').onclick = e => step(e.shiftKey ? -10 : -1);
+$('fwd').onclick = e => step(e.shiftKey ? 10 : 1);
+$('scrub').oninput = () => { if (!ready) return; setPlaying(false); show(+$('scrub').value); };
+$('followBtn').onclick = () => setFollow(!follow);
+$('labelsBtn').onclick = () => { settings.labels = settings.labels ? 0 : 1; $('labelsBtn').classList.toggle('on', !!settings.labels); if (ready) show(now); };
+$('pieces').onclick = () => {
+  settings.pieces = settings.pieces ? 0 : 1;
+  $('pieces').classList.toggle('on', !!settings.pieces);
+  animals.forEach(a => a.meshes.forEach(m => m && (m.material = settings.pieces ? m.userData.tint : m.userData.mat)));
+};
+document.addEventListener('keydown', e => {
+  if (!ready || e.ctrlKey || e.altKey || e.metaKey) return;     // the browser's own keys (Ctrl+F finds, Alt+Left goes back)
+  if (e.target.tagName === 'INPUT' && e.target.type !== 'range') return;
+  if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) setPlaying(!playing); }
+  else if (e.code === 'ArrowLeft') { e.preventDefault(); step(e.shiftKey ? -10 : -1); }
+  else if (e.code === 'ArrowRight') { e.preventDefault(); step(e.shiftKey ? 10 : 1); }
+  else if (e.code === 'KeyF' && !e.repeat) setFollow(!follow);
+  else if (e.code === 'Escape') pick(null);
+});
+// traces: ghosts (off, 4 or 8 a tenth of a second apart) and the foot paths, both of the picked animal
+const ghostBtns = Viewer.buttons($('ghostBtns'), [[0, 'No ghosts'], [4, '4 ghosts'], [8, '8 ghosts']].map(([k, l]) =>
+  [k, l, 'See-through copies of the picked animal a tenth of a second apart, back from now: arcs and jerks show']),
+  k => { ghosts = k; ghostBtns(k); if (ready) show(now); });
+$('pathsBtn').onclick = () => { paths = !paths; $('pathsBtn').classList.toggle('on', paths); if (ready) show(now); };
+$('chartSpan').onclick = () => {
+  chartWhole = !chartWhole;
+  $('chartSpan').textContent = chartWhole ? 'A few seconds round now' : 'Whole recording';
+  if (ready) { drawChartNow(); writeAddress(); }
+};
+// the chart: press or drag to go to a moment; the pointer over it says that moment's clip and feet
+let chartDrag = false;
+$('chart').addEventListener('pointerdown', e => {
+  const t = chartAt(e);
+  if (!ready || t < 0) return;
+  chartDrag = true; $('chart').setPointerCapture(e.pointerId);
+  setPlaying(false); show(t);
+});
+$('chart').addEventListener('pointermove', e => {
+  if (!ready) return;
+  const t = chartAt(e);
+  if (chartDrag && t >= 0 && t !== now) { show(t); return; }
+  if (t !== chartHover) { chartHover = t; drawChartNow(); }
+});
+$('chart').addEventListener('pointerup', () => { chartDrag = false; });
+$('chart').addEventListener('pointerleave', () => { if (chartHover >= 0) { chartHover = -1; if (ready) drawChartNow(); } });
+st.onResize.push(() => { if (ready) drawChartNow(); });
+// a left click (not a drag) on an animal picks it; on the ground, lets the pick go
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+let down = null;
+st.renderer.domElement.addEventListener('pointerdown', e => { down = e.button === 0 ? [e.clientX, e.clientY] : null; });
+st.renderer.domElement.addEventListener('pointerup', e => {
+  if (!ready || !down || e.button !== 0 || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
+  const r = st.renderer.domElement.getBoundingClientRect();
+  mouse.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
+  ray.setFromCamera(mouse, st.camera);
+  const meshes = [];
+  animals.forEach(a => a.group.visible && a.meshes.forEach(m => m && m.visible && meshes.push(m)));
+  const hit = ray.intersectObjects(meshes, false)[0];
+  pick(hit ? hit.object.userData.animal : null);
+});
+// turning the view by hand: no camera button is lit any more
+st.controls.addEventListener('start', () => { if (ready && settings.cam) { settings.cam = ''; camBtns(null); writeAddress(); } });
+// playing: the scene's clock runs at the game's 20 ticks a second times the speed; the moment shown is the last one
+// whose clock value has been reached (never one in between: the game drew none)
+// (its own time between frames, not the stage's: the stage caps a frame at 0.1 s, so a slow computer played slow)
+let lastFrame = performance.now();
+st.onFrame.push(() => {
+  const t0 = performance.now(), dt = Math.min(0.5, (t0 - lastFrame) / 1000);
+  lastFrame = t0;
+  if (ready) sunToView();
+  if (!playing) return;
+  clock += dt * 20 * speed;
+  let t = now;
+  while (t + 1 < timeline.length && timeline[t + 1] <= clock) t++;
+  if (t !== now) show(t);
+  if (now >= timeline.length - 1) setPlaying(false);
+});
+
+// --- start -------------------------------------------------------------------------------------------------------
+(async () => {
+  const [metaBuf, matBuf] = await Promise.all([inflate(DATA.meta), inflate(DATA.mats)]);
+  const meta = JSON.parse(new TextDecoder().decode(metaBuf));
+  DATA.origin = meta.origin;
+  const all = new Int16Array(matBuf);
+  animals = meta.animals;
+  animals.forEach((a, i) => buildAnimal(a, i, all));
+  buildGround(meta.blocks, meta.water);
+  const keys = new Set();
+  animals.forEach(a => a.key.forEach(k => keys.add(k)));
+  timeline = [...keys].sort((x, y) => x - y);
+  $('scrub').max = timeline.length - 1;
+  const slotOf = new Map(timeline.map((k, t) => [k, t]));
+  animals.forEach(a => lineUp(a, slotOf));
+  // a moment's game tick: the earliest its animals read (the server's tick is read live while the client draws, so a
+  // server sprinting through an "until" can be a few ticks on between the first animal drawn and the last), then no
+  // later than the next moment's less the client ticks between (a frozen step of k ticks runs on the server before
+  // the client draws its first tick: all k moments read the step's end)
+  const whole = k => Math.floor(k + 1e-6);
+  tickAt = new Array(timeline.length).fill(Infinity);
+  animals.forEach(a => a.key.forEach((k, j) => { const t = a.slot[j]; if (a.ft[j] !== null && a.ft[j] < tickAt[t]) tickAt[t] = a.ft[j]; }));
+  for (let t = timeline.length - 2; t >= 0; t--) tickAt[t] = Math.min(tickAt[t], tickAt[t + 1] - (whole(timeline[t + 1]) - whole(timeline[t])));
+  tickAt = tickAt.map((v, t) => isFinite(v) ? v : (t ? tickAt[t - 1] : 0));
+  // the ticks not recorded before a moment: the game's ticks since the moment before, or the client's (a tick none of
+  // these animals was drawn in), whichever is more, less the one tick between two moments in a row
+  gapBefore = tickAt.map((v, t) => t ? Math.max(0, Math.max(v - tickAt[t - 1], whole(timeline[t]) - whole(timeline[t - 1])) - 1) : 0);
+  // the animal buttons: the name picks it (and looks at it), Hide hides or shows it
+  animals.forEach(a => {
+    const b = document.createElement('button');
+    b.innerHTML = `<span class="dot" style="background:${a.colour}"></span>${esc(a.name)}`;
+    b.title = 'Pick it: its clips and mind below, the camera looks at it';
+    b.onclick = () => ready && pick(a, true);
+    const h = document.createElement('button');
+    h.className = 'hide'; h.textContent = 'Hide'; h.title = 'Hide or show ' + a.name;
+    h.onclick = () => { if (!ready) return; a.on = !a.on; h.textContent = a.on ? 'Hide' : 'Show'; b.classList.toggle('off', !a.on); show(now); };
+    const pair = document.createElement('span'); pair.className = 'pair';
+    pair.append(b, h);
+    $('animalBtns').appendChild(pair);
+    a.btn = b; a.hideBtn = h;
+  });
+  (settings.hide ? String(settings.hide).split(',') : []).forEach(n => {
+    const a = animals.find(x => x.name === n);
+    if (a) { a.on = false; a.btn.classList.add('off'); a.hideBtn.textContent = 'Show'; }
+  });
+  const notes = [...(DATA.notes || []), ...(DATA.skipped || []).map(s => 'Not shown: ' + s)];
+  notes.push(`From ${DATA.scene}: ${animals.length} animals, ${timeline.length} moments. The recording has no paint: each kind is one plain colour.`);
+  $('notes').innerHTML = notes.map(esc).join('<br>');
+  $('when').title = 'Moment: the recording\'s pictures, counted from 1. Game tick: the game\'s clock then; (+0.2): the ' +
+    'picture was drawn a fifth of the way into that tick. Seconds recorded leave out the ticks not recorded.';
+  // where to start: #m=moment (from 1), or #at=game tick, else the first moment
+  let start = 0;
+  if (settings.m >= 1) start = Math.round(settings.m) - 1;
+  else if (settings.at >= 0) {                  // the first moment at or after that game tick
+    const t = tickAt.findIndex(v => v >= settings.at);
+    start = t >= 0 ? t : timeline.length - 1;
+  }
+  picked = animals.find(a => a.name === settings.pick) || null;
+  if (picked) picked.btn.classList.add('on');
+  speed = SPEEDS.some(([v]) => v === settings.speed) ? settings.speed : 1; speedBtns(speed);
+  follow = !!settings.follow; $('followBtn').classList.toggle('on', follow);
+  ghosts = [0, 4, 8].includes(settings.ghosts) ? settings.ghosts : 0; ghostBtns(ghosts);
+  paths = !!settings.paths; $('pathsBtn').classList.toggle('on', paths);
+  chartWhole = !!settings.whole; $('chartSpan').textContent = chartWhole ? 'A few seconds round now' : 'Whole recording';
+  $('labelsBtn').classList.toggle('on', !!settings.labels);
+  if (settings.pieces) { settings.pieces = 0; $('pieces').onclick(); }
+  st.start();
+  show(start);
+  if (picked && picked.now < 0 && settings.m < 1 && settings.at < 0) {
+    show(picked.slot[0]);                        // picked, no moment asked, not drawn at the start: its first moment
+  }
+  ready = true;
+  camera(settings.cam || 'three-quarter');      // the picked animal, or the whole scene
+  sunToView();
+  if (settings.play) setPlaying(true);
+  writeAddress();
+  $('loading').style.display = 'none';
+  // what tools may call (moments are indexes from 0 here; the page and #m count from 1)
+  window.Replay = {show: t => { setPlaying(false); show(t); }, pick: n => pick(animals.find(a => a.name === n) || null),
+                   camera, follow: setFollow, play: setPlaying, moments: () => timeline.length, ready: true};
+})().catch(e => { $('loading').textContent = 'Could not unpack the recording: ' + e; window.Replay = {error: String(e)}; console.error(e); });
+</script>
+</body>
+</html>

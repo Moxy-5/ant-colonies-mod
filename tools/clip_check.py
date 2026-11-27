@@ -138,6 +138,11 @@ class Animal:
         if not src:
             return self.checks.get('blend', 4), 'the plan (no controller named)'
         text = open(os.path.join(PROJECT, src), encoding='utf-8').read()
+        # a blend changed while playing (R12-10) must be named in the plan ("blends"), or it is checked at the wrong length
+        if 'transitionLength(' in text and 'blends' not in self.checks:
+            raise SystemExit(f'{self.name}: {src} changes its blend while playing (transitionLength) and the plan '
+                             'names no checks.blends ({"find": a pattern with the number as its one group, "clips": '
+                             '[the clips blended into at that length]})')
         m = re.search(r'new SteadyController<>\(this,\s*"body",\s*([\w.]+)', text) or \
             re.search(r'new AnimationController<>\(this,\s*"body",\s*([\w.]+)', text)
         if not m:
@@ -158,6 +163,20 @@ class Animal:
         # nothing readable is a stop, never a quiet guess (the plan's "blend" is only for a plan with no controller)
         raise SystemExit(f'{self.name}: the body controller\'s blend "{word}" in {src} cannot be read as a number')
 
+
+    def blend_into(self, clip):
+        """The blend into this clip: the controller's own, or for the clips the plan's "blends" lists the length the
+        Java sets while playing for them (R12-10: the distichodus cuts into its bolt and leap in 3 ticks, not its 6),
+        read from the Java by the plan's pattern, never a copy."""
+        ticks, source = self.blend_ticks()
+        spec = self.checks.get('blends')
+        if not spec or clip not in spec.get('clips', []):
+            return ticks, source
+        src = spec.get('java', self.checks.get('controller'))
+        m = re.search(spec['find'], open(os.path.join(PROJECT, src), encoding='utf-8').read())
+        if not m:
+            raise SystemExit(f'{self.name}: "{spec["find"]}" not found in {src} (the checks.blends of its plan)')
+        return int(m.group(1)), f'{os.path.basename(src)} (set while playing)'
 
     def drawn_ahead(self):
         """How far toward its head the game draws its model (model px; the plan's "drawn_ahead": a "find" pattern
@@ -248,6 +267,15 @@ class Scene:
         if self.land(z):
             return min(b['top'] - y, abs(z - b['edge'])) if y < b['top'] else 0.0
         return max(0.0, b['bottom'] - y)
+
+    def lip(self):
+        """The jutting edge of the step or the bank, as (y, z): a line across the animal's way (None on flat ground
+        and in open water)."""
+        if self.kind == 'step':
+            return max(self.step[1], 0.0), self.step[0]
+        if self.kind == 'water':
+            return self.bank['top'], self.bank['edge']
+        return None
 
     def floor(self, z):
         """The ground's height under z (the bank's top or the bottom in the water)."""
@@ -390,6 +418,29 @@ def body_depth(p, boxes):
     return max((box_depth(p, cs) for cs in boxes), default=-99.0)
 
 
+# A step's or bank's jutting edge inside a box counts from a model pixel deep (code review R12-5; the same in the
+# course; the camera's checks, which do not know a foot from a belly, from two): no point of the box itself shows a lip
+# taken into one of its faces. Measured 2026-11-27 on every step and bank clip: body parts at most 0.7 px (the hippo's
+# hips), feet up to 1.9 (the hippo's, standing on the lip).
+LIP_OK = 1.0
+
+
+def lip_depth(sc, boxes):
+    """How deep (px) the scene's jutting edge lies inside any of these boxes (8 corners each; 0 when in none)."""
+    lip = sc.lip()
+    if lip is None:
+        return 0.0
+    best = 0.0
+    for i in range(0, len(boxes), 8):
+        cs = boxes[i:i + 8]
+        if not min(c[2] for c in cs) < lip[1] < max(c[2] for c in cs):
+            continue
+        xs = [c[0] for c in cs]
+        lo, hi = min(xs), max(xs)
+        best = max(best, max(box_depth((lo + (hi - lo) * j / 8, lip[0], lip[1]), cs) for j in range(9)))
+    return best
+
+
 EDGES = [(i, j) for i in range(8) for j in range(i + 1, 8) if bin(i ^ j).count('1') == 1]    # a box's 12 edges
 
 
@@ -523,8 +574,15 @@ def check_clip(animal, name, flagged):
                     if d > 0.5:
                         tail_hits[b] = max(tail_hits.get(b, (0, 0)), (d, t))
                     continue
-                if any(f in b for f in feet_parts) and d <= 1.05:
-                    continue
+                if any(f in b for f in feet_parts):
+                    if d <= 1.05:
+                        continue
+                else:
+                    # the lip of the step or bank inside a body part (a foot stands on a lip, a dragged tail lies
+                    # over it: their own rules above judge them)
+                    lipped = lip_depth(sc, cs)
+                    if lipped > LIP_OK:
+                        d = max(d, lipped)
                 if d > 0.4:
                     key = round(t, 3)
                     hits.setdefault(key, {})
@@ -1769,13 +1827,16 @@ def main(argv):
             todo = [(a, b) for a, b in todo if a in chosen or b in chosen]
         print(f'== clip changes (GeckoLib\'s blend: {ticks} ticks, from {source}; {len(todo)} changes)')
         for a, b in todo:
-            (lines, flag, phase), _ = (check_switch(animal, a, b, ticks), False) if fresh else cached(
-                animal, 'change', f'{a}__{b}', _digest(cache_base(animal), animal.data[a], animal.data[b], ticks),
-                lambda: list(check_switch(animal, a, b, ticks)))
+            into, into_source = animal.blend_into(b)
+            if into != ticks:
+                print(f'  (into {b}: a blend of {into} ticks, from {into_source})')
+            (lines, flag, phase), _ = (check_switch(animal, a, b, into), False) if fresh else cached(
+                animal, 'change', f'{a}__{b}', _digest(cache_base(animal), animal.data[a], animal.data[b], into),
+                lambda: list(check_switch(animal, a, b, into)))
             bad += flag
             print('\n'.join(lines))
             if times or flag:
-                png = switch_strip(animal, a, b, ticks, views, os.path.join(out_dir, f'sw_{a}_{b}.png'), phase)
+                png = switch_strip(animal, a, b, into, views, os.path.join(out_dir, f'sw_{a}_{b}.png'), phase)
                 print('    drew', png)
         print(f'  {bad} change(s) flagged')
     # the count every caller reads (R12-3): exit 0 nothing flagged, 2 something flagged (1: a mistake in the call, a crash)

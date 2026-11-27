@@ -17,6 +17,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
@@ -32,7 +33,9 @@ import software.bernie.geckolib.util.RenderUtil;
  * of each filmed insect (and, since 2026-11-25, any animal drawn with GeckoLib) was really drawn (the corners of every box of the model, in the world), so that Claude only has
  * to look at the pictures where something went wrong:
  * <ul>
- * <li><b>inside</b>: a body part drawn inside a solid block (deeper than {@link #INSIDE} blocks), with the block;</li>
+ * <li><b>inside</b>: a body part drawn inside a solid block (deeper than {@link #INSIDE} blocks), with the block; or
+ * a block's jutting edge (a step's or a bank's lip) drawn inside a body part, which no point of the part's own shows
+ * (code review R12-5, 2026-11-27);</li>
  * <li><b>jump</b>: a body part that moves far more from one picture to the next than just before and after it, and
  * than its own big moves in the rest of the scene (a pop:
  * a clip changing at the wrong moment, a bend piling up, a turn snapping), measured against the insect itself, so its
@@ -71,9 +74,16 @@ final class FilmChecks {
     static final int TAKE_GAP = 8;
     /** How many points along each side of a box are tested for being inside a block (3: corners, edge middles, ...). */
     private static final int GRID = 3;
+    /** How many points along a block's jutting edge are tested for being inside a box. */
+    private static final int LIP_POINTS = 9;
+    /** A box reaching over more blocks than this is not tested against their edges (a guard, never met by a model). */
+    private static final int LIP_BLOCKS = 512;
 
-    /** One insect's part in one picture: its box corners relative to the insect, and how deep it was in a block. */
-    private record Sample(String picture, int tick, List<Vec3> corners, double depth, String block, Vec3 at) {
+    /**
+     * One insect's part in one picture: its box corners relative to the insect, how deep it was in a block, and the
+     * moment it was drawn at (game ticks, the in-between time included).
+     */
+    private record Sample(String picture, int tick, double time, List<Vec3> corners, double depth, String block, Vec3 at) {
     }
 
     /** Each insect's parts in picture order (insect id, then bone name), and the moment last recorded for each insect. */
@@ -91,15 +101,17 @@ final class FilmChecks {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     void record(AbstractAntEntity ant, GeoModel model, float partial, String picture) {
-        record(ant, model.getBakedModel(model.getModelResource(ant)), partial, picture);
+        record(ant, model.getBakedModel(model.getModelResource(ant)), partial, picture, null, null);
     }
 
     /**
      * The same for any animal drawn with GeckoLib (the Motion Studio, phase 0, 2026-11-25: until then only the insects
      * were checked, the land and river animals filmed unchecked): called right after it is drawn, at the in-between
-     * time it was drawn at.
+     * time it was drawn at. An animal drawn by its holder (a fish in a jaw) comes with its frame in the holder's and
+     * where the holder was drawn ({@link BoneMeshRenderer#heldFrame}; code review R12-45: GeckoLib's own matrices
+     * leave the jaw out, so it was checked upright at its own place); both null for any other.
      */
-    void record(Entity animal, BakedGeoModel baked, float partial, String picture) {
+    void record(Entity animal, BakedGeoModel baked, float partial, String picture, Matrix4f heldFrame, Vec3 heldAt) {
         if (tracked.add(baked)) {
             baked.topLevelBones().forEach(FilmChecks::trackMatrices);
             return;                             // the matrices are filled from the next frame on
@@ -110,17 +122,28 @@ final class FilmChecks {
         }
         pictures++;
         names.put(animal.getId(), animal.getType().toShortString() + (animal.getCustomName() == null ? "" : " " + animal.getCustomName().getString()));
-        Vec3 origin = animal.getPosition(partial);
+        Vec3 origin = heldAt != null ? heldAt : animal.getPosition(partial);
+        double time = animal.tickCount + partial;
         Map<String, List<Sample>> parts = tracks.computeIfAbsent(animal.getId(), id -> new LinkedHashMap<>());
         if (!baked.topLevelBones().isEmpty()) {
             // a model pixel as drawn: the root bone's scale (its matrix's first column) over 16
-            Matrix4f root = new Matrix4f(baked.topLevelBones().get(0).getLocalSpaceMatrix()).sub(new Matrix4f());   // (GeckoLib adds the do-nothing matrix)
+            Matrix4f root = drawn(baked.topLevelBones().get(0), heldFrame);
             double px = Math.sqrt(root.m00() * root.m00() + root.m01() * root.m01() + root.m02() * root.m02()) / 16.0;
             limits.put(animal.getId(), Math.max(INSIDE, Double.isFinite(px) ? px : 0.0));
         }
         for (GeoBone bone : baked.topLevelBones()) {
-            sample(bone, origin, picture, animal.tickCount, parts);
+            sample(bone, heldFrame, origin, picture, animal.tickCount, time, limits.getOrDefault(animal.getId(), INSIDE), parts);
         }
+    }
+
+    /**
+     * A bone's matrix as drawn, relative to where the animal (or its holder) was drawn. GeckoLib's own "local space"
+     * matrix has the do-nothing matrix added to it (its translateMatrix adds a whole matrix, not just the shift), so
+     * it is taken back off.
+     */
+    private static Matrix4f drawn(GeoBone bone, Matrix4f heldFrame) {
+        Matrix4f local = new Matrix4f(bone.getLocalSpaceMatrix()).sub(new Matrix4f());
+        return heldFrame == null ? local : new Matrix4f(heldFrame).mul(local);
     }
 
     private static void trackMatrices(GeoBone bone) {
@@ -128,7 +151,8 @@ final class FilmChecks {
         bone.getChildBones().forEach(FilmChecks::trackMatrices);
     }
 
-    private void sample(GeoBone bone, Vec3 origin, String picture, int tick, Map<String, List<Sample>> parts) {
+    private void sample(GeoBone bone, Matrix4f heldFrame, Vec3 origin, String picture, int tick, double time, double limit,
+            Map<String, List<Sample>> parts) {
         if (!bone.isHidden() && !bone.getCubes().isEmpty()) {
             List<Vec3> corners = new ArrayList<>();
             double depth = 0.0;
@@ -136,9 +160,7 @@ final class FilmChecks {
             Vec3 at = null;
             for (GeoCube cube : bone.getCubes()) {
                 PoseStack pose = new PoseStack();
-                // GeckoLib's own "local space" matrix has the do-nothing matrix added to it (its translateMatrix adds a
-                // whole matrix, not just the shift), so it is taken back off
-                pose.last().pose().set(new Matrix4f(bone.getLocalSpaceMatrix()).sub(new Matrix4f()));
+                pose.last().pose().set(drawn(bone, heldFrame));
                 RenderUtil.translateAwayFromPivotPoint(pose, bone);
                 RenderUtil.translateToPivotPoint(pose, cube);
                 RenderUtil.rotateMatrixAroundCube(pose, cube);
@@ -160,6 +182,16 @@ final class FilmChecks {
                 }
                 if (lo[0] > hi[0]) {
                     continue;
+                }
+                Lip lip = lipInside(pose.last().pose(), lo, hi, origin);
+                // (counted from twice as deep as a part's own points: the camera does not know a foot from a belly,
+                // and a foot stands on a step's lip up to about two model pixels deep; the course, which knows the
+                // animal's feet, judges body parts from one)
+                if (lip != null && lip.depth() > Math.max(depth, 2.0 * limit)) {
+                    depth = lip.depth();
+                    block = "the edge of " + Minecraft.getInstance().level.getBlockState(lip.pos()).getBlock().getName().getString()
+                            + " at " + lip.pos().getX() + " " + lip.pos().getY() + " " + lip.pos().getZ();
+                    at = lip.at();
                 }
                 for (int i = 0; i < GRID; i++) {
                     for (int j = 0; j < GRID; j++) {
@@ -187,13 +219,101 @@ final class FilmChecks {
                 }
             }
             parts.computeIfAbsent(bone.getName(), name -> new ArrayList<>())
-                    .add(new Sample(picture, tick, corners, depth, block, at));
+                    .add(new Sample(picture, tick, time, corners, depth, block, at));
         }
         if (!bone.isHidingChildren()) {
             for (GeoBone child : bone.getChildBones()) {
-                sample(child, origin, picture, tick, parts);
+                sample(child, heldFrame, origin, picture, tick, time, limit, parts);
             }
         }
+    }
+
+    /** A block's jutting edge found inside a box: how deep, the block's place and the point. */
+    private record Lip(double depth, BlockPos pos, Vec3 at) {
+    }
+
+    /**
+     * The deepest point of any block's jutting edge inside this box (null when none is): the box is lo to hi in its
+     * own frame, {@code pose} takes that frame to places relative to {@code origin}. A box's own points (the grid)
+     * cannot see this: a belly riding over a step's lip takes the lip into its underside while every one of its
+     * points stays outside the step.
+     */
+    private static Lip lipInside(Matrix4f pose, double[] lo, double[] hi, Vec3 origin) {
+        var level = Minecraft.getInstance().level;
+        double[] min = {Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE};
+        double[] max = {-Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE};
+        for (int c = 0; c < 8; c++) {
+            Vector4f p = pose.transform(new Vector4f((float) ((c & 1) == 0 ? lo[0] : hi[0]),
+                    (float) ((c & 2) == 0 ? lo[1] : hi[1]), (float) ((c & 4) == 0 ? lo[2] : hi[2]), 1.0F));
+            double[] w = {origin.x + p.x(), origin.y + p.y(), origin.z + p.z()};
+            for (int k = 0; k < 3; k++) {
+                min[k] = Math.min(min[k], w[k]);
+                max[k] = Math.max(max[k], w[k]);
+            }
+        }
+        BlockPos from = BlockPos.containing(min[0], min[1], min[2]), to = BlockPos.containing(max[0], max[1], max[2]);
+        long blocks = (long) (to.getX() - from.getX() + 1) * (to.getY() - from.getY() + 1) * (to.getZ() - from.getZ() + 1);
+        if (blocks > LIP_BLOCKS || !Double.isFinite(min[0] + max[0])) {
+            return null;
+        }
+        Matrix4f back = new Matrix4f(pose).invert();
+        // blocks to one unit of the box's own frame
+        double scale = Math.sqrt(pose.m00() * pose.m00() + pose.m01() * pose.m01() + pose.m02() * pose.m02());
+        Lip best = null;
+        for (BlockPos pos : BlockPos.betweenClosed(from, to)) {
+            BlockState state = level.getBlockState(pos);
+            if (state.isAir()) {
+                continue;
+            }
+            for (AABB box : state.getCollisionShape(level, pos).toAabbs()) {
+                double[][] ends = {{box.minX, box.minY, box.minZ}, {box.maxX, box.maxY, box.maxZ}};
+                for (int along = 0; along < 3; along++) {
+                    int u = (along + 1) % 3, v = (along + 2) % 3;
+                    for (int side = 0; side < 4; side++) {
+                        int su = side & 1, sv = side >> 1;
+                        // an edge juts out where both faces meeting in it are open (a flat floor's seams are not edges)
+                        if (covered(pos, u, su, ends) || covered(pos, v, sv, ends)) {
+                            continue;
+                        }
+                        for (int i = 0; i < LIP_POINTS; i++) {
+                            double[] w = new double[3];
+                            w[along] = ends[0][along] + (ends[1][along] - ends[0][along]) * i / (LIP_POINTS - 1);
+                            w[u] = ends[su][u];
+                            w[v] = ends[sv][v];
+                            Vec3 world = new Vec3(pos.getX() + w[0], pos.getY() + w[1], pos.getZ() + w[2]);
+                            Vector4f p = back.transform(new Vector4f((float) (world.x - origin.x),
+                                    (float) (world.y - origin.y), (float) (world.z - origin.z), 1.0F));
+                            double deep = insideBox(new double[] {p.x(), p.y(), p.z()}, lo, hi) * scale;
+                            if (deep > 0.0 && (best == null || deep > best.depth())) {
+                                best = new Lip(deep, pos.immutable(), world);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return best;
+    }
+
+    /** Whether the face of this box on that side of an axis lies on its block's own face with a whole block against it. */
+    private static boolean covered(BlockPos pos, int axis, int side, double[][] ends) {
+        if (Math.abs(ends[side][axis] - side) > 1.0e-6) {
+            return false;
+        }
+        var level = Minecraft.getInstance().level;
+        Direction.Axis a = Direction.Axis.values()[axis];
+        BlockPos next = pos.relative(Direction.fromAxisAndDirection(a,
+                side == 1 ? Direction.AxisDirection.POSITIVE : Direction.AxisDirection.NEGATIVE));
+        return level.getBlockState(next).isCollisionShapeFullBlock(level, next);
+    }
+
+    /** How far inside the box lo to hi this point is, in the box's own units (0 when it is not in it): to its nearest face. */
+    static double insideBox(double[] p, double[] lo, double[] hi) {
+        double best = Double.MAX_VALUE;
+        for (int k = 0; k < 3; k++) {
+            best = Math.min(best, Math.min(p[k] - lo[k], hi[k] - p[k]));
+        }
+        return Math.max(0.0, best);
     }
 
     /** How far inside the block at pos this point is (0 when it is not in it): its distance to the nearest face. */
@@ -217,12 +337,14 @@ final class FilmChecks {
     }
 
     /**
-     * The scene's findings, one line each, then a summary line; framesPerTick is how many pictures were taken each game
-     * tick (a jump's size is counted per tick).
+     * The scene's findings, one line each, then a summary line. A move is sized by the time between its two pictures
+     * (code review R12-44: it was sized by the scene's last "frames" number, whatever each take had, and not at all
+     * by the ticks between two pictures); pictures more than {@link #TAKE_GAP} ticks apart are not compared, and the
+     * summary says how many were not, so a take too sparse to judge does not read as "0 jumps".
      */
-    List<String> report(int framesPerTick) {
+    List<String> report() {
         List<String> lines = new ArrayList<>();
-        int inside = 0, jumps = 0;
+        int inside = 0, jumps = 0, compared = 0, apart = 0;
         String worstInside = "none", worstJump = "none";
         double worstDepth = 0.0, worstMove = 0.0;
         for (var insect : tracks.entrySet()) {
@@ -241,15 +363,22 @@ final class FilmChecks {
                         }
                     }
                 }
-                double[] moves = new double[samples.size()];
+                double[] moves = new double[samples.size()], far = new double[samples.size()];
                 for (int i = 1; i < samples.size(); i++) {
-                    int gap = samples.get(i).tick() - samples.get(i - 1).tick();
-                    moves[i] = gap < 0 || gap > TAKE_GAP ? Double.NaN : moved(samples.get(i - 1), samples.get(i)) * framesPerTick;
+                    moves[i] = aTick(moved(samples.get(i - 1), samples.get(i)), samples.get(i).time() - samples.get(i - 1).time());
+                    // how far it went, for the least a jump must be: that is a size, which more ticks between two
+                    // pictures do not make smaller (several pictures a tick count it a tick, as they always did)
+                    far[i] = Math.max(moves[i], moved(samples.get(i - 1), samples.get(i)));
+                    if (Double.isNaN(moves[i])) {
+                        apart++;
+                    } else {
+                        compared++;
+                    }
                 }
                 double big = bigMoves(moves);
                 for (int i = 1; i < samples.size(); i++) {
                     double usual = usual(moves, i);
-                    if (jump(moves, i, big)) {
+                    if (jump(moves, i, big, far[i])) {
                         jumps++;
                         lines.add(String.format(Locale.ROOT, "jump %s tick %d %s: %s moved %.3f a tick (usually %.3f), from %s",
                                 samples.get(i).picture(), samples.get(i).tick(), who, part.getKey(), moves[i], usual,
@@ -262,9 +391,21 @@ final class FilmChecks {
                 }
             }
         }
-        lines.add(String.format(Locale.ROOT, "summary: %d moments of %d insect(s) checked; %d part(s) inside blocks (worst %s); %d jump(s) (worst %s)",
-                pictures, tracks.size(), inside, worstInside, jumps, worstJump));
+        String off = apart == 0 ? "" : String.format(Locale.ROOT, compared == 0
+                ? "; JUMP CHECK OFF: every picture more than %d ticks from the one before"
+                : "; no jump check for %2$d of %3$d moves (pictures more than %1$d ticks apart)", TAKE_GAP, apart, apart + compared);
+        lines.add(String.format(Locale.ROOT, "summary: %d moments of %d insect(s) checked; %d part(s) inside blocks (worst %s); %d jump(s) (worst %s)%s",
+                pictures, tracks.size(), inside, worstInside, jumps, worstJump, off));
         return lines;
+    }
+
+    /**
+     * A move as blocks a tick: the move between two pictures over the game ticks between them (the in-between time
+     * counted), or no move at all (NaN) for pictures not of one take: the same moment or an earlier one, or more than
+     * {@link #TAKE_GAP} ticks on.
+     */
+    static double aTick(double moved, double ticksApart) {
+        return ticksApart < 0.01 || ticksApart > TAKE_GAP ? Double.NaN : moved / ticksApart;
     }
 
     /** How far the part moved between two pictures: the most any of its corners moved, relative to the insect. */
@@ -281,8 +422,13 @@ final class FilmChecks {
      * either more than its big moves in the whole scene or so far over the moves round it that those are no excuse.
      */
     static boolean jump(double[] moves, int i, double big) {
+        return jump(moves, i, big, moves[i]);
+    }
+
+    /** The same, {@code far} being how far the part went for the least a jump must be ({@link #JUMP_MIN}). */
+    static boolean jump(double[] moves, int i, double big, double far) {
         double move = moves[i];
-        if (Double.isNaN(move) || move <= JUMP_MIN) {
+        if (Double.isNaN(move) || !(far > JUMP_MIN)) {
             return false;
         }
         double usual = usual(moves, i);

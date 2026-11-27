@@ -763,11 +763,15 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (held == null && !level().isClientSide && isVehicle()) {
             // A catch saved in its jaws (review R9-27): Minecraft saves a rider with the animal it rides and seats it again
             // on load, still helpless, but the otter's own note of it is not saved. It is let go properly: off, its will
-            // back, able to be hurt again.
+            // back, able to be hurt again. The film camera's own catch (the tag "caught.<degrees>", summoned riding)
+            // is kept: it is how the held fish is filmed (the scene otter_catch_held had lost its fish to this).
+            boolean filmed = getTags().stream().anyMatch(tag -> tag.startsWith("caught."));
             for (Entity rider : java.util.List.copyOf(getPassengers())) {
                 if (rider instanceof LivingEntity living) {
                     held = living;
-                    release();
+                    if (!filmed) {
+                        release();
+                    }
                 } else {
                     rider.stopRiding();
                 }

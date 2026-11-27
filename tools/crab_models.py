@@ -573,7 +573,7 @@ def clips(big=None):
         return still(p)
 
     return {'idle': clip(4.0, idle, 48), 'walk': clip(WALK_LEN, walk, 12), 'pick': clip(PICK_LEN, pick, 120),
-            'crack': clip(CRACK_LEN, crack, 120), 'threat': clip(3.2, threat, 48), 'court': clip(COURT_LEN, court, 36),
+            'crack': clip(CRACK_LEN, crack, 120, 'hold'), 'threat': clip(3.2, threat, 48), 'court': clip(COURT_LEN, court, 36),
             'court_female': clip(COURT_LEN, court_female, 36),
             'death': clip(1.0, death, 12, 'hold')}
 

@@ -304,7 +304,8 @@ def checks_problems(plan, bones):
             bone(key, row.get('bone'))
             if 'clip' in row:
                 clip(key, row['clip'])
-    for key in ('feet_free', 'tuck_ok', 'water', 'dig', 'wave', 'walk_clips', 'feet_up_ok', 'flight', 'on_ground', 'walks'):
+    for key in ('feet_free', 'tuck_ok', 'water', 'dig', 'wave', 'walk_clips', 'feet_up_ok', 'flight', 'on_ground', 'walks',
+                'working_feet'):
         for pattern in ck.get(key, []):      # (a list of patterns, or a table keyed by them)
             clip(key, pattern)
     for pair in ck.get('switches', []):

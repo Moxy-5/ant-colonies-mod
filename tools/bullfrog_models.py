@@ -1115,7 +1115,7 @@ def clips():
         _face(p, t, pump=0.0 if swell > 0.01 else _breath(t, 0.6),
               throat=[1.0 + 0.08 * swell + tremble, 1.0 + 1.0 * swell + tremble, 1.0 + 0.35 * swell])   # down under the chin
         return p
-    make('call', CALL_LEN, call, 30)
+    make('call', CALL_LEN, call, 30, loop=False)   # the game plays it once (R12-32)
 
     # puff: blown up, risen on straight front legs, the mouth a little open, rocking toward the threat
     P = _Poser()

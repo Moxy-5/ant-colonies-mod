@@ -219,10 +219,22 @@ public final class MoveRider {
             return stepOn(p);
         }
         if (mayStart && start()) {
-            return stepOn(play());
+            if (stepOn(play())) {
+                return true;
+            }
+            // cut on its very first tick: nothing has moved. From this same stand the same move would be cut again
+            // (and each such try stops the animal: the otter walked at half pace by some steps), so none is started
+            // until it has moved or turned (the monitor's lesson, BUGS 330 and review R9-37; R12-65)
+            cutAt = mob.position();
+            cutYaw = mob.getYRot();
         }
         return false;
     }
+
+    /** Where and how turned it stood when a move was cut on its first tick (null: none since it last moved or turned). */
+    @Nullable
+    private Vec3 cutAt;
+    private float cutYaw;
 
     /** A hurt (or anything else) cuts a move short: set down where it is. */
     public void cut() {
@@ -276,6 +288,12 @@ public final class MoveRider {
     private boolean start() {
         if (mob.isPassenger() || mob.isDeadOrDying() || mob.hurtTime > 0 || mob.getScale() < s.smallest) {
             return false;
+        }
+        if (cutAt != null) {
+            if (cutAt.distanceToSqr(mob.position()) < 1.0E-6 && Math.abs(Mth.wrapDegrees(mob.getYRot() - cutYaw)) < 0.5F) {
+                return false;
+            }
+            cutAt = null;
         }
         boolean afloat = mob.isInWater() && !mob.onGround();
         if (!afloat && (!mob.onGround() || mob.isInWater())) {
@@ -515,10 +533,10 @@ public final class MoveRider {
         };
     }
 
-    /** A whole block under both feet for the two blocks past the face, open over it, and room for the body over the step and in front. */
+    /** A whole block under both feet and the middle line (the move rests on it: a wide animal's is a third column; R12-65) for the two blocks past the face, open over it, and room for the body over the step and in front. */
     private boolean roomUp(int y, boolean alongX, double face, int sign, double across, double scale) {
         double out = s.feetOutPx * scale / 16.0;
-        for (double side : new double[] {across - out, across + out}) {
+        for (double side : new double[] {across - out, across, across + out}) {
             for (double ahead : new double[] {0.5, 1.5}) {
                 BlockPos step = cell(alongX, face + ahead * sign, side, y);
                 if (!full(step) || !open(step.above())) {
@@ -537,7 +555,7 @@ public final class MoveRider {
     /** The top it leaves whole, and a whole dry block a block lower under both feet for two blocks past the edge, open over it. */
     private boolean roomDown(int y, boolean alongX, double face, int sign, double across, double scale) {
         double out = s.feetOutPx * scale / 16.0;
-        for (double side : new double[] {across - out, across + out}) {
+        for (double side : new double[] {across - out, across, across + out}) {
             if (!full(cell(alongX, face - 0.5 * sign, side, y - 1))) {
                 return false;
             }
@@ -598,7 +616,7 @@ public final class MoveRider {
     /** Out onto the bank at {@code face} (its top at {@code y}): a whole dry block under both feet for two blocks past the face, open over it and over the water it rises from. */
     private boolean roomOut(int y, boolean alongX, double face, int sign, double across, double scale) {
         double out = s.feetOutPx * scale / 16.0;
-        for (double side : new double[] {across - out, across + out}) {
+        for (double side : new double[] {across - out, across, across + out}) {
             for (double ahead : new double[] {0.5, 1.5}) {
                 BlockPos top = cell(alongX, face + ahead * sign, side, y - 1);
                 if (!full(top) || !dryOpen(top.above())) {

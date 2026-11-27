@@ -438,6 +438,13 @@ def clips():
         p['body']['rotation'][2] = round(12.0 * c, 3)
         return _fins(p, t, out=0.0, back_fin=1.0 - 0.8 * settle)
     make('scatter', SCATTER_LEN, scatter, 60, loop=False)
+    # struggle: thrashing in a crocodile's jaws: the scatter round and round. Its own clip (code review R12-32): the game
+    # looped "scatter", whose file says it plays once, so the checks never judged the loop's seam
+    def struggle(t):
+        p = scatter(t)
+        p['back_fin'] = scatter(0.0)['back_fin']       # folded flat all the way round (unfolding, it snapped back at the seam)
+        return p
+    make('struggle', SCATTER_LEN, struggle, 60)
 
     # flop: stranded out of water, on its side, curling and springing (the game hops it about)
     def flop(t):
@@ -492,7 +499,7 @@ def WORKSHOP_CLIPS():
 # For the versions page's clip player: the made size against the game's (0.25 blocks of the made 1.875), the water
 # clips and their surface (blocks at made size), and a line about each clip.
 WORKSHOP_CLIP_INFO = {
-    'scale': 0.25 / (LENGTH / 16), 'water': ['idle', 'swim', 'turn_left', 'turn_right', 'sip', 'nibble', 'scatter'],
+    'scale': 0.25 / (LENGTH / 16), 'water': ['idle', 'swim', 'turn_left', 'turn_right', 'sip', 'nibble', 'scatter', 'struggle'],
     'surface': 1.0,
     'notes': {
         'idle': 'Hanging in the water: a slow small wave, the breast fins sculling to hold it still, a gentle bob.',
@@ -502,6 +509,7 @@ WORKSHOP_CLIP_INFO = {
         'sip': 'Nose up to the surface, the mouth opens for a quick gulp, back down (dawn and dusk).',
         'nibble': 'Nose down to the algae, three pecks: the mouth opens as it reaches in, snaps shut on a strand, tugs.',
         'scatter': 'The escape when a hunter strikes: snaps into a C, the tail whips it clear, fast beats.',
+        'struggle': 'Thrashing in the jaws of a crocodile: the scatter, round and round.',
         'flop': 'Stranded on land: on its side, curling and springing.',
         'death': 'The wave dies away as it rolls onto its side.',
     }}

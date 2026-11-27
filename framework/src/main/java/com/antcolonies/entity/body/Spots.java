@@ -101,7 +101,10 @@ public final class Spots {
         this.path = path;
         try (InputStream in = owner.getResourceAsStream(path)) {
             if (in == null) {
-                return;                                 // none: no spots, no holds
+                // none: no spots, no holds. Said once (a table is read once): an animal asked for its spots and
+                // without the file finds no hold and never strikes, with nothing else to say why (review R12-68)
+                com.antcolonies.ColonyFrameworkMod.LOGGER.warn("[spots] no spot table {} for {}: no spots, no holds", path, owner.getSimpleName());
+                return;
             }
             JsonObject json = JsonParser.parseReader(new InputStreamReader(in, StandardCharsets.UTF_8)).getAsJsonObject();
             if (json.has("spots")) {
@@ -217,7 +220,10 @@ public final class Spots {
         double[] row;
         double[][] rows = clips.get(clip);
         if (rows == null) {
-            row = middles.getOrDefault("idle", new double[names.size() * 3]);
+            row = middles.get("idle");
+            if (row == null) {
+                return Vec3.ZERO;
+            }
         } else {
             row = loop ? middles.get(clip) : rows[Mth.clamp(tick, 0, rows.length - 1)];
         }

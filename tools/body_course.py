@@ -50,12 +50,13 @@ each its summon id, its summon data (its size fixed, so every run is the same an
 (as its goals send it), "bpt" (blocks a tick it goes at speed 1.0, measured on the course) and optional "setup"
 (camera commands before the scene).
 """
-import gzip, json, math, os, statistics, subprocess, sys
+import json, math, os, statistics, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT = os.path.normpath(os.path.join(HERE, '..'))
 sys.path.insert(0, HERE)
 import body_plan  # noqa: E402
+import recording  # noqa: E402
 
 COURSE = os.path.join(PROJECT, 'tools', 'film', 'course')
 SHOTS = os.path.join(PROJECT, 'run-film', 'screenshots')
@@ -281,10 +282,10 @@ def scenes_of(animal, scare=True):
 # --- reading a recording ----------------------------------------------------------------------------------------------
 class Recording:
     def __init__(self, path):
-        with gzip.open(path, 'rt', encoding='utf-8') as f:
-            lines = [json.loads(line) for line in f if line.strip()]
-        self.header = lines[0]
-        self.frames = lines[1:]
+        # (one reader of the format for every tool: tools/recording.py; a "more" line's blocks, R12-48, come with it)
+        self.header, self.frames, blocks, water, trouble = recording.read(path)
+        if trouble:
+            print(f'{path}: {trouble}', file=sys.stderr)
         self.names = [b['name'] for b in self.header['bones']]
         self.index = {n: i for i, n in enumerate(self.names)}
         self.parent = {b['name']: b.get('parent') for b in self.header['bones']}
@@ -294,10 +295,9 @@ class Recording:
         for cubes in self.cubes:
             pts = [p for c in cubes for p in c]
             self.center.append(tuple(sum(p[k] for p in pts) / len(pts) for k in range(3)) if pts else (0.0, 0.0, 0.0))
-        self.blocks = {}
-        for entry in self.header['blocks']:
-            self.blocks[tuple(entry[:3])] = [tuple(b) for b in entry[3:]]
-        self.water = {tuple(w[:3]): w[3] for w in self.header['water']}
+        self.blocks = {tuple(entry[:3]): [tuple(b) for b in entry[3:]] for entry in blocks}
+        self.water = {tuple(w[:3]): w[3] for w in water}
+        self._lips = {}
         # one model pixel in blocks: the root bone's scale over 16
         first = next(f for f in self.frames if f['b'][0] != 0)
         m = first['b'][0]
@@ -368,6 +368,52 @@ class Recording:
                 best = max(best, min(x - b[0], b[3] - x, y - b[1], b[4] - y, z - b[2], b[5] - z))
         return best
 
+    def lips(self, key):
+        """The jutting edges of the block at key (code review R12-5): each of its boxes' 12 edges whose two faces are
+        both open (a flat floor's seams are not edges: a whole block lies against the face), as pairs of end points."""
+        if key not in self._lips:
+            full = lambda k: (0.0, 0.0, 0.0, 1.0, 1.0, 1.0) in self.blocks.get(k, ())
+            out = []
+            for b in self.blocks.get(key, ()):
+                ends = (b[:3], b[3:])
+
+                def covered(axis, side):
+                    if abs(ends[side][axis] - side) > 1e-6:
+                        return False
+                    n = list(key)
+                    n[axis] += 1 if side else -1
+                    return full(tuple(n))
+                for along in range(3):
+                    u, v = (along + 1) % 3, (along + 2) % 3
+                    for su in (0, 1):
+                        for sv in (0, 1):
+                            if covered(u, su) or covered(v, sv):
+                                continue
+                            p0, p1 = [0.0] * 3, [0.0] * 3
+                            p0[along], p1[along] = key[along] + ends[0][along], key[along] + ends[1][along]
+                            p0[u] = p1[u] = key[u] + ends[su][u]
+                            p0[v] = p1[v] = key[v] + ends[sv][v]
+                            out.append((tuple(p0), tuple(p1)))
+            self._lips[key] = out
+        return self._lips[key]
+
+    def lip_in(self, box):
+        """How deep a block's jutting edge lies inside this box (its 8 corners in the world; 0 when none does), and
+        where: a belly riding over a step's lip takes the lip into its underside with all its corners outside."""
+        lo = [math.floor(min(p[k] for p in box)) for k in range(3)]
+        hi = [math.floor(max(p[k] for p in box)) for k in range(3)]
+        best, at = 0.0, None
+        for x in range(lo[0], hi[0] + 1):
+            for y in range(lo[1], hi[1] + 1):
+                for z in range(lo[2], hi[2] + 1):
+                    for p0, p1 in self.lips((x, y, z)):
+                        for i in range(9):
+                            p = tuple(a + (b - a) * i / 8 for a, b in zip(p0, p1))
+                            d = box_inside(p, box)
+                            if d > best:
+                                best, at = d, p
+        return best, at
+
     def ground_under(self, x, y, z, reach=1.5):
         """The highest solid top in this column at or below y + 0.3 (down to reach blocks below), or None."""
         bx, bz = math.floor(x), math.floor(z)
@@ -398,6 +444,24 @@ def wrap(angle):
     return (angle + 180.0) % 360.0 - 180.0
 
 
+def box_inside(p, box):
+    """How far point p lies inside a box given by its 8 corners (corner 0 lowest; 1 x, 2 y, 4 z along its edges): to
+    its nearest face, 0 outside it."""
+    c0 = box[0]
+    d = (p[0] - c0[0], p[1] - c0[1], p[2] - c0[2])
+    best = 1e9
+    for k in (1, 2, 4):
+        e = (box[k][0] - c0[0], box[k][1] - c0[1], box[k][2] - c0[2])
+        length = math.sqrt(e[0] * e[0] + e[1] * e[1] + e[2] * e[2])
+        if length < 1e-9:
+            return 0.0                                  # a flat box has no inside
+        proj = (d[0] * e[0] + d[1] * e[1] + d[2] * e[2]) / length
+        best = min(best, proj, length - proj)
+        if best <= 0.0:
+            return 0.0
+    return best
+
+
 def box_distance(p, box):
     """How far point p is outside a box given by its 8 corners (corner 0 lowest; 1 x, 2 y, 4 z along its edges)."""
     c0 = box[0]
@@ -425,21 +489,29 @@ def analyse(rec, plan):
     out = {'frames': len(frames), 'seconds': (times[-1] - times[0]) / 20.0 if frames else 0, 'px': px}
     drawn = [n for n in rec.names if any(rec.cubes[rec.index[n]])]
 
-    # inside blocks: every box corner, every moment
+    # inside blocks: every box corner, every moment; and a block's jutting edge inside a box, over a model pixel deep
+    # (code review R12-5: a body riding over a step's or bank's lip, which no corner of its own shows)
+    # (a foot stands on a lip and a dragged tail lies over one: not for the edge test)
+    no_lip = {n for chain in legs.values() if chain and chain[-1] in rec.index for n in rec.descendants(chain[-1])}
+    tail = plan.get('checks', {}).get('tail_drag', {}).get('from')
+    if tail in rec.index:
+        no_lip |= set(rec.descendants(tail))
     inside = {}
     for fi, f in enumerate(frames):
         for bone in drawn:
             for box in rec.corners(f, bone):
-                for p in box:
-                    d = rec.depth_in(p)
-                    if d > 0.5 * px:
-                        worst = inside.get(bone)
-                        n = (worst[3] if worst else 0) + 1
-                        if worst is None or d > worst[0]:
-                            inside[bone] = [d, times[fi], p, n]
-                        else:
-                            worst[3] = n
-                        break
+                hit = next(((d, p) for p in box for d in [rec.depth_in(p)] if d > 0.5 * px), None)
+                if hit is None and bone not in no_lip:
+                    d, p = rec.lip_in(box)
+                    hit = (d, p) if d > px else None
+                if hit is not None:
+                    d, p = hit
+                    worst = inside.get(bone)
+                    n = (worst[3] if worst else 0) + 1
+                    if worst is None or d > worst[0]:
+                        inside[bone] = [d, times[fi], p, n]
+                    else:
+                        worst[3] = n
     out['inside'] = inside
 
     # seams between chain neighbours: the corners of one that touch the other most of the time (found on about 60

@@ -15,8 +15,8 @@ public class TermiteQueenRenderer extends AntRenderer<TermiteQueenEntity> {
     }
 
     @Override
-    public void render(TermiteQueenEntity queen, float yaw, float partialTick, PoseStack pose, MultiBufferSource buffers, int light) {
+    protected void draw(TermiteQueenEntity queen, float yaw, float partialTick, PoseStack pose, MultiBufferSource buffers, int light) {
         shadowRadius = 0.2F + 0.4F * queen.getSize();
-        super.render(queen, yaw, partialTick, pose, buffers, light);
+        super.draw(queen, yaw, partialTick, pose, buffers, light);
     }
 }
