@@ -74,6 +74,13 @@ def checkReviewBugs = tasks.register('checkReviewBugs', Exec) {
 }
 tasks.named('check') { dependsOn checkReviewBugs }
 
+// The list of every bug left in the game (docs/OPEN-BUGS.md) is written by tools/open_bugs.py from the tags in
+// docs/BUGS.md and the "In play" lines of the review files; this fails when one changed and the list was not written again.
+def checkOpenBugs = tasks.register('checkOpenBugs', Exec) {
+    commandLine 'python', 'tools/open_bugs.py', '--check'
+}
+tasks.named('check') { dependsOn checkOpenBugs }
+
 // The spot tables (assets/<mod>/spots/, where one animal touches another: the Motion Studio, phase 3) are written by
 // tools/spots.py from the body plans and the game's model and clip files; this fails when one is behind them.
 def checkSpotTables = tasks.register('checkSpotTables', Exec) {

@@ -43,6 +43,8 @@ HEADING = re.compile(r"(?m)^### (R(\d+)-(\d+)) \(([ABC])(.*?)\)(?:[:.] *(.*))?$"
 STATUS = re.compile(r"(?ms)^\*\*Status\s*(?:\([^)]*\))?:\s*(.*?)(?:\n\s*\n|\Z)")
 CALL = re.compile(r"(?ms)^\*\*Your call\s*(?:\([^)]*\))?:\*\*\s*(.*?)(?:\n\s*\n|\Z)")
 CALL_MADE = re.compile(r"(?m)^\*\*Call made")
+# What a player meets of a finding, for docs/OPEN-BUGS.md (tools/open_bugs.py): "**In play (date):** B. what they see".
+IN_PLAY = re.compile(r"(?m)^\*\*In play\s*(?:\([^)]*\))?:\*\*\s*([ABC])\b[.:]?\s*(.*)$")
 SAYS_CALL = re.compile(r"(?i)\buser'?s call\b|\bask the user\b")
 
 
@@ -90,10 +92,12 @@ def findings():
                 unclear.append(f"{head.group(1)}: says it is the user's call but has no '**Your call (date):**' line")
             bugs = sorted({int(n) for line in lines for part in re.findall(r"BUGS ((?:\d+(?:,? and |, | to )?)+)", line)
                            for n in re.findall(r"\d+", part)})
+            plays = list(IN_PLAY.finditer(body))
             found.append({
                 "id": head.group(1), "round": int(head.group(2)), "n": int(head.group(3)), "grade": grade,
                 "title": (head.group(6) or first_words(body)).strip(), "state": state, "note": note, "bugs": bugs, "file": path.name,
                 "call": call,
+                "play": plays[-1].group(1) if plays else "", "play_note": plays[-1].group(2).strip() if plays else "",
             })
     return found, unclear
 

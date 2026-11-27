@@ -87,6 +87,8 @@ scene to measure it.
 
 ### R8-3 (B, likely): biome mods that are data packs lose all their biomes
 
+**In play (2026-11-27):** B. Likely, not proven: with a biome mod that is a data pack (Terralith, say) its biomes may not appear at all.
+
 - **What is wrong:** `MinecraftZones.replace` empties TerraBlender's zone 0 (Minecraft's own) and gives its weight to
   our region, whose table is rebuilt from Minecraft's built-in list (`new OverworldBiomeBuilder()`). By the class's own
   notes zone 0 is the only zone that uses the world preset's biome list. A mod or data pack that adds its biomes by

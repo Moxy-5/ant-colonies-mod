@@ -413,6 +413,8 @@ look. The same hole as the crocodile's nest (R9-10). **Fix:** `level().isLoaded(
 
 ### R9-18 (B/C, proven in the code): when the pool is gone each hippo takes its own, and "gone" is judged two ways
 
+**In play (2026-11-27):** C. When a hippo pool dries up, each hippo picks its own new spot instead of the pod going together.
+
 - `PoolGoal.tick` 2020-2022: each hippo whose pool has no water left makes the spot it stands on its new pool, at
   its own time, and `setPool` (865-868) clears its lawns. The pod stops sharing one pool and one pair of lawns (the
   small form of BUGS 272's drift; it happens once, not for ever).
@@ -513,6 +515,8 @@ three of those.
 **Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: the depth test is in the search's own filter, so the three nearest fish over deep water are tried for a clear line, not the three nearest of all.**
 
 ### R9-23 (B, the search proven, the stuck shark likely; to measure): a shark with nowhere to go asks for a new target every tick and lies still
+
+**In play (2026-11-27):** C. A bull shark that spawned in a hole too small to swim in lies still.
 
 **What is wrong.** `PatrolGoal.tick` 169-176: with no target it calls `deepPoint` twice (a hippo search 40 blocks
 wide and 16 tries, each a water-column scan and a deep-line scan), and if both fail the same again next tick, with no

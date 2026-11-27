@@ -251,6 +251,8 @@ the rule the raids keep.
 
 ### R6-4 (B, the path proven; how often in play likely): a termite soldier clamped on a raider's leg vanishes when its mound is far from every player (a new side of R1-26)
 
+**In play (2026-11-27):** C. A termite soldier clamped on a raider's leg vanishes when its mound is far from every player.
+
 **The lead's grade: B, not the reader's A.** This is R1-26 (grade B, not started) seen at the clamp: the far rule
 folds a colony's loaded members with no "can a player see it" check. R1-26's fix (ask before folding) mends this
 case too; the reader's one-line guard below is worth adding with it. The lead read `AwayLife.frozenOf` (`:270-276`:
@@ -387,6 +389,8 @@ The root of R6-3, R6-5, R6-6 and R6-8. The fix proposed is in the section "Is th
 
 ### R6-8 (B, proven): "busy with a chore" leaves out wound care and rescue, so the ants tending the wounded are the first taken for a raid
 
+**In play (2026-11-27):** C. The ants tending the wounded are the first taken for a raid.
+
 **Found by three readers.** The lead read the list (`MatabeleEntity.java:899-902`): `ClampCareGoal` is in it,
 `WoundCareGoal` and `RescueGoal` are not, though its comment ends "care".
 
@@ -410,6 +414,8 @@ The root of R6-3, R6-5, R6-6 and R6-8. The fix proposed is in the section "Is th
   are work), or the owner slot of R6-7.
 
 ### R6-9 (B, proven; how often a soldier is shut in with raiders not known): the bite-out goal's "a foe right beside it: the fight first" never fires, so a shut-in ant with a termite soldier on it bites the wall instead of fighting
+
+**In play (2026-11-27):** C. A shut-in Matabele with a termite soldier on it bites the wall instead of fighting.
 
 The lead read `MatabeleBiteOutGoal.foeNear` (`:204-207`, it asks `ant.getTarget()`) and searched both mods for `setTarget(`: only the animals call it. It holds. It may be part of BUGS 361 (raiders caught in termite tunnels, open); not checked against that replay.
 
@@ -453,6 +459,8 @@ The lead read `MatabeleBiteOutGoal.foeNear` (`:204-207`, it asks `ant.getTarget(
   say how rescuer size matches the hurt one's; the 0.8 is the user-era pick and is kept.
 
 ### R6-11 (B, proven): in a raid the hurt are fetched only after the attack, so a clamp squeezes all through it (a correction to R3-41)
+
+**In play (2026-11-27):** C. In a raid a clamped ant is fetched only after the attack, so the clamp squeezes all through it.
 
 Round 3 is not merged here, so this is written as a finding of its own; a fix session should read it with R3-41.
 
@@ -549,6 +557,8 @@ One link is from memory, not read: Minecraft's half-second hurt cooldown and how
 
 ### R6-15 (B, proven): two rules squeak at a player beside a raid column
 
+**In play (2026-11-27):** C. Beside a raid column you are squeaked at by two rules at once.
+
 - **What is wrong:** raid rework R7 made one squeak rule for a column (`Raid.squeak`: the raider nearest each player
   squeaks, louder and more often the nearer). The older rule in `NestDefence.touchesAColumn` is still there: every
   member in a column or on a fight order within 3 blocks of a player squeaks with a 1-in-4 chance each second. They
@@ -559,6 +569,8 @@ One link is from memory, not read: Minecraft's half-second hurt cooldown and how
 - **Fix proposed:** delete lines 400-402 (the touch that provokes, 392-399, stays); the column's squeak is the raid's.
 
 ### R6-16 (B, proven for the code; how often in play likely): a Matabele with no colony lives for ever, and one whose colony is gone joins any colony of its kind near it
+
+**In play (2026-11-27):** C. A Matabele with no colony lives for ever; one whose colony is gone joins any colony near it.
 
 - **What is wrong:** an ant of no colony is never hungry (`WorkerHunger.java:63-70`), never grows old (`AbstractAntEntity.java:652-669`
   needs a colony), never despawns (`:2973-2976`), never defends or is provoked (`Fights.java:90-93` needs a colony),
@@ -616,6 +628,8 @@ Honest about what is known: neither reader had a checked Megaponera development 
 
 ### R6-19 (B, proven): the prey pile's count and its heaps drift apart, and nothing squares them
 
+**In play (2026-11-27):** C. The prey pile can show fewer termites than the colony counts (after you break a heap, say).
+
 - **What is wrong:** the count of termites (`edible`) is "the truth" and the heaps only follow it. When a heap goes
   without the count knowing (a player breaks it, a piston, water washing it out: the block has `noCollission`,
   `PushReaction.DESTROY`, `canSurvive` needs a floor, and no loot table), or when a bundle is counted with no room for a
@@ -634,6 +648,8 @@ Honest about what is known: neither reader had a checked Megaponera development 
   pieces out of the count (`forget`). A test: stock 6, break the heap, the colony is hungry within a second.
 
 ### R6-20 (B, likely; three links not read, named): one block a player puts anywhere in the chimney hides every room of the nest
+
+**In play (2026-11-27):** B. Likely, not proven: one block you put in a Matabele nest's chimney (a torch) makes the colony lose all its rooms.
 
 The lead read `Nest.getRoomCells` (`Nest.java:798-806`) and `isDugOut` (`:775-781`): every way-in cell must be air, a heap or a ramp, or the room has no cells. The rule holds; that a torch in a dead mound's chimney is on the way in of every room, and what the ants then do, were not walked, so it stays "likely" and grade B. If it holds in play it is a grade A (a player can meet it with one torch).
 

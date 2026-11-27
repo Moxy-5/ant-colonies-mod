@@ -286,6 +286,8 @@ other.
 
 ### R3-10 (A, the mechanism proven and checked again; the cost to measure): a fighter with no foe in reach runs costly searches every other tick, for minutes
 
+**In play (2026-11-27):** C. Big fights cost the server more than they need: a fighter with no foe near still looks round once a second.
+
 - **Checked again (the main session):** `FightGoal.java:198` asks `pickFoe` whenever `foe == null`, so on every goal tick while it searches; `pickFoe` (`:349-351`) is one entity search over the fight reach with `worthChasing` on each candidate, and that (`:415-433`) ends in `Fights.isShutIn` (`Fights.java:286-316`, a flood of up to `most` cells with a new map, queue and set each time) for every termite under cover. `MatabeleEntity.pickBreach` (`:710-736`) has no "nothing here" memory. The mechanism holds. The reader's sum (about a million cell checks a second) is arithmetic, not a measurement. The fight thread's reader met the same search from the once-a-second side.
 - **Where:** `FightGoal.java:198-210` (`tick`, the re-pick), `337-351` (`pickFoe`), `353-358` (`usable`), `415-433`
   (`worthChasing`), `226` (the major's `breakIn`); `Fights.java:286-316` (`isShutIn`); `MatabeleEntity.java:641-663`
@@ -678,6 +680,8 @@ pace (see R3-33).
 
 ### R3-30 (A, the mechanism proven and checked again; how it looks in play not run): a walk planned in `canUse` is thrown away by the goal it pushes out, so a fleeing worker's first try always fails, and a worker carrying food never flees at all
 
+**In play (2026-11-27):** C. Some ants lose one try (a short pause) when they set off to go in, wait at the nest or follow the queen.
+
 - **Checked again (the main session):** `FleeGoal.canUse` ends in `errand.setOff` (`:83-85`), `start` (`:94-97`) plans nothing, `canContinueToUse` (`:89-91`) needs `errand.isWalking()`; `Errand.stop` (`:82-84`) calls `AntNavigator.stop` (`:386-396`), which sets `route = null`; `StoreFoodGoal.stop` (`:70-71`) calls `errand.stop`. Minecraft's order (ask `canUse`, stop the lower goal, then `start`) is as I know `GoalSelector.tick` in 1.21.1; the reader read it in the decompiled game. Not run in the game: `hideUntil` is set before the walk is lost, so `GoInsideGoal` may still bring the worker in at a walk, which is why the tests pass.
 - **Where:** `FleeGoal.java:57-86` (`canUse` ends with `return errand.setOff(...)`, the route is planned here),
   `:89-91` (`canContinueToUse` needs `errand.isWalking()`), `:94-97` (`start` plans nothing); `Errand.java:82-84`
@@ -920,6 +924,8 @@ and both species files. Not read line by line: the rest of `AbstractAntEntity`, 
 **Status (2026-11-26, `claude/review-fix-b6`): fixed: a blow on anything that is not an insect (a player, an animal) lands as its clip begins (`AbstractAntEntity.strike`); only an insect is gripped and stung at the clip's hit moment. The wait between stings is still taken when the blow begins (it now lands whenever it begins in reach). Not seen in the game.**
 
 ### R3-38 (A, proven for leaving; likely for the swap near a player; checked again): a hurt ant that goes into the numbers comes back whole
+
+**In play (2026-11-27):** B. A Matabele that lost a leg has all six again after it goes into the nest out of sight and comes out.
 
 - **Checked again (the main session):** `mayGoIntoNest` (`AbstractAntEntity.java:560-562`) asks only alive, empty jaws, no target, not riding, no clamp; `Population.goingIn` (`:543-568`) asks only that, sight and distance; `AwayLife.frozenOf` (`:274`) keeps out only the downed, and what it writes down (`Frozen`: caste, age, load, last meal) has no place for legs, wounds or venom. Four readers met this hole from four sides (the insect slice, the fighting slice, both threads); this is the fullest write-up. The open link is the same for all: how often a caste has more real mobs than wanted while hurt ones are about.
 - **Where:** `AbstractAntEntity.java:560-562` (`mayGoIntoNest`), `2889-2897` (legs, wound and clamp are saved on the

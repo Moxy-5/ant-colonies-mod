@@ -355,6 +355,9 @@ block corner can (every overlapped block gets a spring).
 **Status (2026-11-26, `claude/review-fix-a-4-6`): fixed: one rule, `PlantPush.spring`: every plant in a block a pusher's box overlaps gets a spring (upright when its middle is too far to lean), and every marked plant within a block of the box too (the server's box runs a little ahead of the drawn one); the 64-block cut is gone, so plants round far pushers are drawn. A plant on the pusher's very middle with no way to lean gets an upright spring too. Left: a plant marked with no pusher the client knows near it (joined mid-push, the pusher gone) still has none for its last two seconds. Unit test `PlantPushSpringTest` (a player's box on a block corner). Not seen in the game.**
 
 ### R4-13 (B, likely): a fly cloud goes silent for good after the sound system reloads
+
+**In play (2026-11-27):** C. Fly clouds go silent after F3+T or a new sound device, until you walk 48 blocks away and back.
+
 (The reader graded it A. The leading session made it B: the link through Minecraft's sound engine was not opened, the trigger is rare in play (a resource reload or a new sound device) and walking away and back mends it.)
 **What is wrong:** A cloud starts its buzz once, the first tick the player's computer has it, and then remembers "I am
 buzzing" for as long as it exists. When Minecraft reloads its sound system, every playing sound is dropped, but the cloud
@@ -569,6 +572,9 @@ with their entity), `PlantPushClient.SWAYS` (emptied on a world change), `BodyPl
 never emptied on a resource reload (R4-7). Nothing grows without limit.
 
 ### R4-18 (A, the mechanism proven; the size to measure): every animal is drawn the slow way the insects were moved off, with more boxes and from further away
+
+**In play (2026-11-27):** B. A busy river costs frames: about 6.5 ms a frame for 103 river animals in view (it was 13.3).
+
 (Also found by the big animals' reader as "the big animals have no far model": a herd of buffalo or a pride 100 blocks off costs as much to draw as one beside the player; that reader's test scene: 20 buffalo and a pride at 40, 80 and 120 blocks.)
 **What is wrong:** The insects were given three savings because drawing a crowd was too slow: their boxes are turned
 into ready-made faces once (`BoneMesh`), far ones use a model with a quarter of the boxes, and far ones reuse their
@@ -824,6 +830,9 @@ keyed by the roll's start tick), used by the model, the held one's drawing and t
 **Status (2026-11-26, `claude/review-fix-a-4-6`): fixed: on a screen `CrocodileEntity.rollAngle` reads the roll's own `MoveClock`, keyed by the roll's start tick, so the model, the held one and a held player's view never follow the game time back. As R12-61: no slow server was run.**
 
 ### R4-26 (B, proven): a GeckoLib animal held by a crocodile is never turned with the roll, laid along or made to struggle
+
+**In play (2026-11-27):** B. A bullfrog (or a land animal later) caught by a crocodile hangs upright and still while the crocodile rolls it.
+
 **What is wrong:** the held one's roll, lay-along and struggle are done in NeoForge's `RenderLivingEvent.Pre`, which only
 Minecraft's own `LivingEntityRenderer` fires. Every animal of this mod is drawn by GeckoLib's `GeoEntityRenderer`, which
 extends `EntityRenderer` and fires GeckoLib's own `GeoRenderEvent.Entity.Pre` instead.
@@ -838,6 +847,9 @@ the renderer.
 held one from the crocodile's own renderer as `OtterRenderer` draws its fish.
 
 ### R4-27 (B, proven): the termite queen's own posing overwrites her walk and turn clips' body bob and forebody swing
+
+**In play (2026-11-27):** C. The termite queen's walk and turn lose their body bob.
+
 **What is wrong:** the queen's model sets her `body` bone's height and length place and her `forebody` bone's turn to
 fixed values every frame (her settling and droop). It sets them outright instead of adding to what the clip put there.
 Her walk clips (`walk_slow`, `walk`, `walk_fast`) move `body` (the bob) and turn `forebody`, her turn clips turn
@@ -854,6 +866,9 @@ values to zeros.
 they were (the crocodile's `turnUp` pattern), and keep the absolute set only for the bones no clip moves.
 
 ### R4-28 (B, proven): resource reload does not refresh the monitor's tail rest pose or the otter's faces
+
+**In play (2026-11-27):** C. After F3+T the monitor's tail rest pose and the otter's faces stay as they were.
+
 **What is wrong:** two drawing tables are kept in `static` fields read once for the whole run of the game:
 `MonitorModel.TAIL` (a `DraggedTail` that reads the 12 tail bones' rest pose from the first baked model and never again,
 `ready` stays true) and `OtterModel.FACE` (`FaceLayer.of` keeps the face file in a static map, read from the jar).
@@ -890,6 +905,9 @@ at a crocodile half up a bank.
 **Your call (2026-11-26):** should a crocodile's and monitor's hit boxes follow the body where it lies over a bank (head dipped to the water, chest up on a step)? Today the hit boxes stay level at the animal's own height, so a swing or arrow at a dipped head can pass through it. My pick: yes, but only after it is seen in play to matter; it is server work for every crocodile and monitor every tick.
 
 ### R4-30 (B, proven): crossing the near line (48 or 64 blocks) snaps a crocodile's or monitor's whole pose
+
+**In play (2026-11-27):** C. Coming within 48 or 64 blocks of a crocodile or monitor, its whole pose snaps into place in one frame.
+
 **What is wrong:** beyond `NEAR` the models skip the body's lie, the legs and the tail drag and reset their eased state
 (`legNanos = 0`, `legStand` set, `drawnNanos = 0`); coming inside, the first frame eases with "a whole second has passed"
 (`dt = 1.0`, so `k = 1`): the bend, the folded or standing legs and the dragged tail all appear at once. Leaving, they

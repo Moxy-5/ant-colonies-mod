@@ -191,6 +191,8 @@ second of thunder for each living hollow tree).
 
 ### R7-5 (B, to measure). The fall in sight: up to 2,500 entities made in one tick
 
+**In play (2026-11-27):** C. A big tree falling in sight may stutter the game (up to 2,500 pieces made in one tick; to measure).
+
 **What is wrong.** When a dead tree lets go, one tick makes a block display entity for every outer block of the
 standing wood (up to `MAX_DISPLAYS` 2,500), takes every moving block out of the world, and from then on every 3rd tick
 gives each display a new pose (a data packet for each display to each player in range) for 3 seconds.
@@ -790,6 +792,8 @@ now), the same idea as the colonies' away timetable, instead of only starting in
 **Status (2026-11-26, `claude/review-fix-b6`): fixed: a bare bunch that has not borne its tree's crop yet takes the stage the calendar gives (green, turning or ripe by the stages' average times, `HangingFruit.cropStage`), so a tree nobody was near shows its fruit when a player comes back. A new block state `crop` remembers which crop a bunch last bore, so one picked or fallen waits for the next crop, and a bunch hung by hand starts as borne (no ripe fruit for nothing, R7-28). The budding window (`budDays`, `cropStarts`) is gone. Unit test `HangingFruitTest`.**
 
 ### R7-33 (A, likely; to be seen in the game). A palm's crown can blink out at the screen's edge
+
+**In play (2026-11-27):** C. A palm's crown might blink out at the edge of the screen (never seen).
 
 **What is wrong.** A doum palm's whole crown (about 1,500 boxes, 9,000 faces) is drawn as the model of **one**
 block and reaches up to 6 blocks out of it. Minecraft decides what to draw by 16-block cubes of the world: when the
