@@ -51,13 +51,11 @@ Rounds 5 and 9 are big enough to split in two sessions each if a session runs sh
 grade A, `docs/reviews/full/round-02-legs.md`; fixes not started), 7, 8, 9, 10 (fixed and merged) and 11. Not read
 yet: 3, 4, 5, 6.
 
-<<<<<<< HEAD
 **Round 4 read (2026-11-26):** how bodies move and are drawn in play, 37 findings, 6 of grade A
 (`docs/reviews/full/round-04-bodies-drawn.md`, branch `claude/review-round-4`); fixes not started.
-=======
+
 **Round 6 (2026-11-26):** read, the Matabele ants all but the raids: 33 findings, 3 of grade A, 8 waiting for the
 user's call (`docs/reviews/full/round-06-matabele.md`, branch `claude/review-round-6`); fixes not started.
->>>>>>> claude/review-round-6
 
 ## What every round looks for (the user's order, 2026-11-23: lag first, then behaviours that fight, then bugs)
 
