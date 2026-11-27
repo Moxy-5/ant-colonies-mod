@@ -656,6 +656,68 @@ public class TermiteRaidDefenceTests {
     }
 
     /**
+     * BUGS 202 (the raid soak of 2026-11-27): the termites feeding under the mud are there for a watched raid. The same
+     * colony by day with a feeding gallery under dead wood on its record, sixty workers in its numbers and no body at
+     * the place. Under whole wood, with no mud, the raiders have no way in ({@code MatabeleEntity.wayIn}); two blocks
+     * eaten through and plastered with mud, they have. Then three feeders are called out ({@code Raid.feedersOut}, what
+     * a raid of real ants does as its attack begins): three workers stand in the gallery's cells, the numbers hold three
+     * fewer, and five seconds later they are still bodies (the colony's crew count took such ones back at once).
+     */
+    @GameTest(template = "arena", timeoutTicks = 2000, skyAccess = true, batch = "termite_feeders_come_out")
+    public static void theTermitesFeedingUnderTheMudStandInTheirGalleryWhenRaidersBreakIn(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Scene scene = scene(helper, 9.0);
+        List<com.antcolonies.entity.AbstractAntEntity> came = new java.util.ArrayList<>();
+        List<BlockPos> galleryCells = new java.util.ArrayList<>();
+        long[] calledAt = {-1};
+        helper.runAfterDelay(15, () -> {
+            Colony colony = scene.colony[0];
+            List<BlockPos> cells = scene.tunnel[0].tunnel();
+            int at = cells.size() - 2;
+            helper.assertTrue(at >= 4, "the foraging tunnel is too short for the test: " + cells.size() + " cells");
+            List<BlockPos> gallery = List.of(cells.get(at - 3), cells.get(at - 2), cells.get(at - 1), cells.get(at));
+            galleryCells.addAll(gallery);
+            for (int i = 0; i < 4; i++) {
+                level.setBlock(gallery.get(i).above(), com.antcolonies.savanna.registry.SavannaBlocks.DEAD_WOOD.get().defaultBlockState(), 3);
+            }
+            BlockPos food = gallery.get(3).above();
+            colony.foodMap().knowForTests(food);
+            colony.nest().foodWays().addNewTunnelForTests(new com.antcolonies.colony.FoodWays.NewTunnel(scene.tunnel[0], food, gallery));
+            helper.assertTrue(com.antcolonies.savanna.colony.FeedingSpots.byDayPlaces(level, colony).size() == 1,
+                    "the test's feeding gallery does not count as fed at by day");
+            // (the scene's own six workers out of the way: nobody stands at the place)
+            TestIsolation.insectsOf(helper, TermiteWorkerEntity.class).forEach(worker -> worker.discard());
+            colony.population().addNewMembers(com.antcolonies.colony.Caste.WORKER, builderAge(level, colony), 60);
+            helper.assertTrue(!com.antcolonies.savanna.entity.MatabeleEntity.wayIn(level, food, 10.0),
+                    "a gallery in the ground under whole wood, with no mud, counts as having a way in for raiders");
+            net.minecraft.world.level.block.state.BlockState mud = ((com.antcolonies.block.FacedWall) com.antcolonies.savanna.registry.SavannaBlocks.MUD_CRUST.get())
+                    .withFace(com.antcolonies.savanna.registry.SavannaBlocks.MUD_CRUST.get().defaultBlockState(), net.minecraft.core.Direction.DOWN);
+            level.setBlock(gallery.get(1).above(), mud, 3);
+            level.setBlock(gallery.get(2).above(), mud, 3);
+            helper.assertTrue(com.antcolonies.savanna.entity.MatabeleEntity.wayIn(level, food, 10.0),
+                    "a gallery under mud a major may bite open counts as having no way in");
+            int inside = colony.population().inside(com.antcolonies.colony.Caste.WORKER);
+            int out = com.antcolonies.savanna.colony.Raid.feedersOut(level, colony, food, 10.0, 3, level.getGameTime() + 2400);
+            helper.assertTrue(out == 3, out + " feeder(s) came out of 3 asked for, with " + inside + " workers in the numbers and 4 free gallery cells");
+            helper.assertTrue(colony.population().inside(com.antcolonies.colony.Caste.WORKER) == inside - 3,
+                    "the numbers hold " + colony.population().inside(com.antcolonies.colony.Caste.WORKER) + " workers after 3 came out of " + inside);
+            came.addAll(TestIsolation.insectsOf(helper, TermiteWorkerEntity.class));
+            helper.assertTrue(came.size() == 3 && came.stream().allMatch(termite -> gallery.contains(termite.blockPosition())),
+                    "the feeders do not stand in the gallery's cells: " + came.stream().map(termite -> termite.blockPosition().toShortString()).toList());
+            // (under the mud first: where a major can break in to them)
+            helper.assertTrue(came.stream().anyMatch(termite -> termite.blockPosition().equals(gallery.get(1)) || termite.blockPosition().equals(gallery.get(2))),
+                    "no feeder stands under the mud, where the raiders have their way in");
+            calledAt[0] = level.getGameTime();
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(calledAt[0] >= 0 && level.getGameTime() - calledAt[0] >= 100, "waiting 5 s after the feeders came out");
+            helper.assertTrue(came.stream().allMatch(termite -> termite.isAlive() && !termite.isRemoved()),
+                    "a feeder brought out for the raid went back into the numbers within 5 s: "
+                            + came.stream().filter(termite -> termite.isRemoved()).count() + " of 3 gone");
+        });
+    }
+
+    /**
      * The termite alarm rework, step 2: soldiers go where the workers are. The same colony by day, with a feeding place
      * on its record: the last cells of its first foraging tunnel a gallery under dead wood, two blocks of it eaten
      * through and plastered with mud (so the workers can eat there by day under cover, the place a raid comes to). A

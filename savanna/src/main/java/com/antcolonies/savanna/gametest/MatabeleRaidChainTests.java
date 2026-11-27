@@ -81,7 +81,7 @@ public class MatabeleRaidChainTests {
     private static final Pattern BLOCKS_OUT = Pattern.compile("(\\d+) blocks out");
 
     /** What a scene does to its raid on the way (none of them for the plain scenes). */
-    private enum Twist { NONE, EMPTY_AT_MUSTER, EMPTIES_ON_THE_MARCH, DUSK_AT_THE_SPOT, SCOUT_KILLED_ON_THE_MARCH }
+    private enum Twist { NONE, EMPTY_AT_MUSTER, NO_WAY_IN, EMPTIES_ON_THE_MARCH, DUSK_AT_THE_SPOT, SCOUT_KILLED_ON_THE_MARCH }
 
     // ------------------------------------------------------------------ the scenes
 
@@ -134,6 +134,17 @@ public class MatabeleRaidChainTests {
     @GameTest(template = "arena", timeoutTicks = 6000, skyAccess = true, batch = "matabele_raid_chain")
     public static void noRaidSetsOutToASpotWhereNoTermiteIsNowAndTheFindIsForgotten(GameTestHelper helper) {
         chain(helper, 45, (x, z) -> 0, false, 30, 40, 1, true, false, Twist.EMPTY_AT_MUSTER);
+    }
+
+    /**
+     * No way in (BUGS 202, the soak of 2026-11-27: 13 of 27 watched attacks found nothing they might go for, most at a
+     * gallery dug in plain ground under a whole log): the termites are there, shut in under a log not eaten through,
+     * with no mud anywhere. Majors bite only the termites' mud, never wood or the ground, so no raid sets out, the
+     * diary says why, and the find is forgotten.
+     */
+    @GameTest(template = "arena", timeoutTicks = 6000, skyAccess = true, batch = "matabele_raid_chain")
+    public static void noRaidSetsOutToTermitesTheRaidersHaveNoWayInTo(GameTestHelper helper) {
+        chain(helper, 45, (x, z) -> 0, false, 30, 40, 1, true, false, Twist.NO_WAY_IN);
     }
 
     /**
@@ -363,6 +374,16 @@ public class MatabeleRaidChainTests {
                 if (twist == Twist.EMPTY_AT_MUSTER) {
                     termites.forEach(termite -> termite.discard()); // (the termites have left the log)
                 }
+                if (twist == Twist.NO_WAY_IN) {
+                    // (the log not eaten through anywhere: whole wood over the gallery where the scene put mud casts)
+                    for (int x = 37; x <= 38; x++) {
+                        helper.setBlock(x, SURFACE, NEST + 3, Blocks.OAK_LOG.defaultBlockState()
+                                .setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X));
+                    }
+                    helper.assertTrue(termites.stream().allMatch(termite -> termite.isAlive()
+                                    && com.antcolonies.fight.Fights.isShutIn(level, termite.blockPosition())),
+                            "the test's termites are not shut in under the whole log");
+                }
                 MatabeleEntity leader = TestIsolation.insectsOf(level, colony, MatabeleEntity.class).stream()
                         .filter(ant -> ant.hasMajorBody() && !raids.scouts().isScouting(ant.getUUID())).findFirst().orElse(null);
                 helper.assertTrue(leader != null, "no real major to be the scout");
@@ -375,12 +396,13 @@ public class MatabeleRaidChainTests {
                 helper.assertTrue(raids.scouts().sendNow(level) != null, "the scout command found no fit major");
             });
         }
-        if (twist == Twist.EMPTY_AT_MUSTER) {
+        if (twist == Twist.EMPTY_AT_MUSTER || twist == Twist.NO_WAY_IN) {
+            String why = twist == Twist.NO_WAY_IN ? "no way in" : "no termite";
             sequence.thenIdle(600)
                     .thenExecute(() -> {
-                        helper.assertTrue(!book.sawAny(), "a raid set out to a spot where no termite is: " + book.story());
-                        helper.assertTrue(book.sawLine("no raid to") && book.sawLine("no termite"),
-                                "the diary does not say why no raid went (\"no raid to ...: no termite there now\"); " + raids.describe(level));
+                        helper.assertTrue(!book.sawAny(), "a raid set out to a spot where " + why + " is: " + book.story());
+                        helper.assertTrue(book.sawLine("no raid to") && book.sawLine(why),
+                                "the diary does not say why no raid went (\"no raid to ...: " + why + " ...\"); " + raids.describe(level));
                         helper.assertTrue(raids.finds().stream().noneMatch(find -> find.at().closerThan(at, 6)),
                                 "the find with no termites at it is still remembered; " + raids.describe(level));
                         book.nobodyOutside("after the raid that never went");

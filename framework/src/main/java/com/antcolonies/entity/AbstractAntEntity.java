@@ -570,7 +570,19 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      * ever would fill the real-mob cap; holding legs in the numbers is its own job.)
      */
     public boolean staysABody() {
-        return isDowned() || pinnedBy != null || wounds.isOpen();
+        return isDowned() || pinnedBy != null || wounds.isOpen() || level().getGameTime() < bodyUntil;
+    }
+
+    /** Game time until which it stays a real mob whatever its colony's crew says ({@link #stayABodyUntil}). Not saved. */
+    private long bodyUntil = Long.MIN_VALUE;
+
+    /**
+     * It stays a real mob until then (game time): a member its colony brought out of the numbers where hunters are at
+     * its galleries (BUGS 202: the termites feeding under the mud at a raid's spot). Without this the colony's crew
+     * count, already full, took it back into the numbers a second later, out of the raiders' jaws.
+     */
+    public void stayABodyUntil(long until) {
+        bodyUntil = Math.max(bodyUntil, until);
     }
 
     /** The kind of body this insect leaves: its species' dead ({@link com.antcolonies.species.SpeciesBodies}). */

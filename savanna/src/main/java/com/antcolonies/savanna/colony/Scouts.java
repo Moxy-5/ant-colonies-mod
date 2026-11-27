@@ -572,9 +572,14 @@ public class Scouts {
      */
     public boolean looked(ServerLevel level, MatabeleEntity ant, BlockPos at, int worth, @Nullable Find rechecking) {
         int away = (int) Math.round(RaidGround.flat(at, colony.getCenter()));
-        boolean taken = raids.worthARaid(at, worth);
+        // (BUGS 202: the raid's own question, so the scout brings home no find the judge will then refuse: termites it
+        // smells under a whole log in plain ground, with no mud to bite and no open gallery, are no place for a raid)
+        boolean wayIn = com.antcolonies.savanna.entity.MatabeleEntity.wayIn(level, at,
+                colony.profile().section(SavannaNumbers.COLUMN).map(Raid::reach).orElse(10.0));
+        boolean taken = wayIn && raids.worthARaid(at, worth);
         say(level, "scout " + RaidGround.shortId(ant.getUUID()) + (taken ? " takes the termites at " : " passes over termites at ")
-                + at.toShortString() + ", " + away + " blocks out: worth " + worth + ", a raid that far needs "
+                + at.toShortString() + ", " + away + " blocks out: " + (wayIn ? "" : "no way in to them (no open gallery, no mud to bite open); ")
+                + "worth " + worth + ", a raid that far needs "
                 + String.format(Locale.ROOT, "%.1f", raids.need(at)) + " with the colony " + Math.round(raids.fedShare() * 100) + " percent fed");
         if (taken) {
             foundBy(level, ant, at); // (its own memory: it keeps to this way, its trips shrink back to the find)

@@ -288,16 +288,28 @@ public final class Raid implements FightDiary {
      * What the judge found at a spot: termite workers seen there ({@code seen}), or none seen but the termite colony's
      * own record says it feeds there now, under cover ({@code underCover}).
      */
-    public record Termites(int seen, boolean underCover, boolean byTheLand) {
+    public record Termites(int seen, boolean underCover, boolean byTheLand, boolean noWayIn) {
         public Termites(int seen, boolean underCover) {
-            this(seen, underCover, false);
+            this(seen, underCover, false, false);
+        }
+
+        public Termites(int seen, boolean underCover, boolean byTheLand) {
+            this(seen, underCover, byTheLand, false);
+        }
+
+        /** Termites are there, but the raiders have no way in to them ({@link MatabeleEntity#wayIn}): no reason to raid. */
+        static Termites noWayIn(int seen) {
+            return new Termites(seen, false, false, true);
         }
 
         public boolean any() {
-            return seen > 0 || underCover || byTheLand;
+            return !noWayIn && (seen > 0 || underCover || byTheLand);
         }
 
         String words() {
+            if (noWayIn) {
+                return seen + " termite(s) counted there, but no way in to them: no open gallery and no mud a major may bite open";
+            }
             return seen > 0 ? seen + " termite(s) counted there" : underCover ? "0 termite(s) counted there, but their colony feeds there under cover"
                     : byTheLand ? "0 termite(s) counted there, no termite colony on record yet: it hunts by the land" : "0 termite(s) counted there";
         }
@@ -324,16 +336,30 @@ public final class Raid implements FightDiary {
      * lives as numbers and no living termite colony is on record in its scouts' reach at all (the termites' land not
      * made yet: their colony is put in when a player first comes near their mound), it hunts by the land
      * ({@link RaidCatch#noTermitesOnRecord}).
+     *
+     * <p>Where the land is loaded, termites count only if the raiders have a way in to them ({@link MatabeleEntity#wayIn}:
+     * an open gallery, or mud a major may bite open; BUGS 202). A feeding gallery in plain ground under a whole log has
+     * none: majors never dig through the ground or bite wood, so a raid sent there stood about and came home empty.
      */
     public static Termites termitesThere(ServerLevel level, Colony raiders, BlockPos at) {
         double reach = raiders.profile().section(SavannaNumbers.COLUMN).map(Raid::reach).orElse(10.0);
         boolean loaded = level.isPositionEntityTicking(at);
+        int seenThere = 0;
         if (loaded) {
-            int seen = inTheOpen(level, raiders, at, reach).size();
-            if (seen > 0) {
-                return new Termites(seen, false);
+            seenThere = inTheOpen(level, raiders, at, reach).size();
+            if (seenThere > 0) {
+                return MatabeleEntity.wayIn(level, at, reach) ? new Termites(seenThere, false) : Termites.noWayIn(seenThere);
             }
         }
+        return byRecord(level, raiders, at, reach, loaded);
+    }
+
+    /**
+     * {@link #termitesThere} with no termite seen: the nearest termite colony's own record of where it feeds by day. A
+     * place it feeds at within reach counts only with a way in for the raiders; a termite colony living as numbers is
+     * taken at its word (its places are not kept and its land may not be read).
+     */
+    private static Termites byRecord(ServerLevel level, Colony raiders, BlockPos at, double reach, boolean loaded) {
         int termiteReach = raiders.profile().section(SavannaNumbers.AWAY_RAIDS).orElse(SavannaNumbers.AwayRaidNumbers.DEFAULT).termiteReach();
         Colony termites = RaidCatch.termitesAt(level, at, termiteReach);
         if (termites == null) {
@@ -347,7 +373,7 @@ public final class Raid implements FightDiary {
         }
         for (FeedingSpots.ByDay place : FeedingSpots.byDayPlaces(level, termites)) {
             if (flat(place.food(), at) <= reach) {
-                return new Termites(0, true);
+                return MatabeleEntity.wayIn(level, at, reach) ? new Termites(0, true) : Termites.noWayIn(0);
             }
         }
         return new Termites(0, false);
@@ -1701,9 +1727,84 @@ public final class Raid implements FightDiary {
         attackedAt = now;
         lastActionAt = now;
         takeHidden(level);
+        bringOutFeeders(level, ants.size(), now);
         for (MatabeleEntity ant : ants) {
             sendIn(ant);
         }
+    }
+
+    /**
+     * <b>The termites feeding under the mud at the spot stand there as bodies when real raiders attack</b> (BUGS 202;
+     * the rewrite's step 4 named it: "the fix is on the termite side, who comes out at a break"). By day a termite
+     * colony feeds under cover mostly as numbers, so a watched raid broke in and found nobody: in the soak of
+     * 2026-11-27, 13 of 27 watched attacks stung nothing while the same raids out of sight brought 3 to 10 home. A
+     * counted termite is one termite: as the attack begins, as many of the termite colony's workers as these raiders
+     * could carry (the one rule of the numbers' catch, {@link RaidCatch#couldCarry}, never more than
+     * {@link RaidCatch#mostToTake}), less those already seen there, come out of its numbers into the cells of its
+     * feeding places round the spot, the cells with a way in first ({@link MatabeleEntity#wayInto}). They stay bodies
+     * for the attack's longest ({@link AbstractAntEntity#stayABodyUntil}); what they do there is their own (they feed,
+     * feel the raiders and flee, {@code FleeGoal}), and those not caught go back into the numbers as any termite does.
+     * Nothing for a raid as numbers ({@link #takeHidden} is its catch) or where the termite colony lives as numbers
+     * itself.
+     */
+    private void bringOutFeeders(ServerLevel level, int raiders, long now) {
+        if (asNumbers || raiders <= 0 || !level.isPositionEntityTicking(find.at())) {
+            return;
+        }
+        Colony termites = RaidCatch.termitesAt(level, find.at(), awayNumbers().termiteReach());
+        if (termites == null || termites.keepsOff(level, find.at())) {
+            return;
+        }
+        if (!termites.away().isHere(level)) {
+            say("the termites feeding under cover stay numbers: their colony lives as numbers now");
+            return;
+        }
+        double reach = reach(numbers);
+        int seen = inTheOpen(level, colony, find.at(), reach).size();
+        int could = Math.min(RaidCatch.couldCarry(colony, raiders, colony.random()), RaidCatch.mostToTake(colony, termites));
+        int out = feedersOut(level, termites, find.at(), reach, could - seen, now + numbers.fightTicks());
+        say("the termites feeding under cover there: " + out + " stand in their galleries now (these " + raiders + " raider(s) could carry "
+                + could + ", " + seen + " seen there already)");
+    }
+
+    /**
+     * {@link #bringOutFeeders}'s work: up to {@code wanted} workers of this termite colony come out of its numbers into
+     * the free cells of its by-day feeding places within {@code reach} of the spot, one a cell, the cells with a way in
+     * first, then the nearest the spot, and stay bodies until {@code until}. Returns how many came out.
+     */
+    public static int feedersOut(ServerLevel level, Colony termites, BlockPos at, double reach, int wanted, long until) {
+        if (wanted <= 0) {
+            return 0;
+        }
+        List<BlockPos> cells = new ArrayList<>();
+        for (FeedingSpots.ByDay place : FeedingSpots.byDayPlaces(level, termites)) {
+            if (flat(place.food(), at) > reach) {
+                continue;
+            }
+            for (BlockPos cell : place.cells()) {
+                if (flat(cell, at) <= reach && level.getBlockState(cell).getCollisionShape(level, cell).isEmpty()
+                        && level.getFluidState(cell).isEmpty() && !cells.contains(cell)
+                        && level.getEntitiesOfClass(AbstractAntEntity.class, new AABB(cell)).isEmpty()) {
+                    cells.add(cell);
+                }
+            }
+        }
+        Map<BlockPos, Boolean> wayIn = new HashMap<>();
+        cells.sort(Comparator.comparing((BlockPos cell) -> !wayIn.computeIfAbsent(cell, in -> MatabeleEntity.wayInto(level, in)))
+                .thenComparingDouble(cell -> cell.distSqr(at)));
+        int out = 0;
+        for (BlockPos cell : cells) {
+            if (out >= wanted) {
+                break;
+            }
+            AbstractAntEntity termite = termites.population().comeOutAt(level, Caste.WORKER, cell);
+            if (termite == null) {
+                break; // (no worker left in the numbers)
+            }
+            termite.stayABodyUntil(until);
+            out++;
+        }
+        return out;
     }
 
     /** The middle of the bunch at the halting place: a little back from the route's end, toward home. */

@@ -718,6 +718,28 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         return breach != null && getFightSpot() != null && !fightsNoMore() && !needsRescue() ? breach : null;
     }
 
+    /**
+     * <b>The one answer to "can a raid get at termites round this spot"</b> (BUGS 202, the soak of 2026-11-27: 13 of 27
+     * watched attacks found nothing they might go for, most at a gallery dug in plain dirt under a whole log, with no mud
+     * anywhere): some cell the raiders smell termites in ({@link #scentCells}: the termites there and their feeding
+     * galleries and runways within {@code reach}) is open to walk into, or lies under or beside a cover a major may bite
+     * open ({@link #coversOf}). The same cells and covers {@link #pickBreach} and {@link #scentNear} work from, so the
+     * judge that sends a raid ({@code Raid.termitesThere}) and the raiders at the spot cannot disagree.
+     */
+    public static boolean wayIn(ServerLevel level, BlockPos spot, double reach) {
+        for (BlockPos cell : scentCells(level, spot, reach, termiteCells(level, spot, reach))) {
+            if (wayInto(level, cell)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether a raider can get into this cell: open and not shut in (the small ones walk in), or under a cover a major bites open. */
+    public static boolean wayInto(ServerLevel level, BlockPos cell) {
+        return level.getBlockState(cell).getCollisionShape(level, cell).isEmpty() && !Fights.isShutIn(level, cell) || !coversOf(level, cell).isEmpty();
+    }
+
     /** The breach to work at: the nearest cover over a cell it smells termites in, cells with a termite first. */
     @Nullable
     private BlockPos pickBreach(ServerLevel level, BlockPos spot, double reach) {

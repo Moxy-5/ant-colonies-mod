@@ -389,6 +389,7 @@ newlandreedbedsstandintheshallowsandneveronsand 0.00
 nocrabcourtshipwhiletheriverisfull 0.01
 nodrytreestandsonthefloodplain 1.35
 noraidsetsouttoaspotwherenotermiteisnowandthefindisforgotten 0.21
+noraidsetsouttotermitestheraidershavenowayinto 0.08
 noravinesorcavesstartinthesavannaoritswaters 0.00
 notilapianestwhiletheriverisfull 0.00
 nymphsgrowintosoldierswhenthecolonyneedsthem 0.46
@@ -489,6 +490,7 @@ therulescatchahangingraidandsaveareport 0.09
 theschoolswimsonafterahunt 0.88
 thespawnerleaveshalfofabreedingkindscounttobreeding 0.00
 thetermitenestplanisthesameafterareload 0.19
+thetermitesfeedingunderthemudstandintheirgallerywhenraidersbreakin 0.05
 thornytwigsprickbiganimalsbutnotinsects 0.44
 tilapiaandcrabseattheeggs 0.00
 tilapiaandcrabsnibbleanunguardedfrogeggmat 0.01

@@ -978,7 +978,7 @@ public class Raids {
         // termites fed and went, or keep off the spot): no raid, and the find is forgotten.
         Raid.Termites counted = Raid.termitesThere(level, colony, find.at);
         if (!counted.any()) {
-            whyNoRaid = "no termite there now (the find is forgotten)";
+            whyNoRaid = (counted.noWayIn() ? "no way in to the termites there" : "no termite there now") + " (the find is forgotten)";
             say(level, "no raid to " + find.at.toShortString() + ": " + whyNoRaid);
             finds.remove(find);
             forgetWaiting(find);
