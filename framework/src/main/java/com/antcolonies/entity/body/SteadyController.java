@@ -1,6 +1,7 @@
 package com.antcolonies.entity.body;
 
 import software.bernie.geckolib.animatable.GeoAnimatable;
+import software.bernie.geckolib.animation.Animation;
 import software.bernie.geckolib.animation.AnimationController;
 
 /**
@@ -49,6 +50,14 @@ public class SteadyController<T extends GeoAnimatable> extends AnimationControll
         return this;
     }
 
+    private boolean loops() {
+        Animation.LoopType type = currentAnimation.loopType();
+        if (type == Animation.LoopType.DEFAULT) {
+            type = currentAnimation.animation().loopType();
+        }
+        return type == Animation.LoopType.LOOP;
+    }
+
     /** How far into its clip it is now (ticks of the clip; while it eases into a clip, the ticks of easing). */
     public double clipTicks() {
         return played;
@@ -82,6 +91,15 @@ public class SteadyController<T extends GeoAnimatable> extends AnimationControll
         double rate = animationState == State.TRANSITIONING ? 1.0 : animationSpeedModifier.apply(animatable);
         played += rate * (tick - at);
         at = tick;
+        // a loop going round keeps the bit past its end (code review R12-62, as the insects' player always did): GeckoLib
+        // starts a loop again at exactly 0 and throws that bit away, each time round, so legs turned over a little
+        // slower than the body moved and a long hold's drawn bites fell behind the server's, which counts whole rounds
+        if (animationState == State.RUNNING && currentAnimation != null && loops()) {
+            double length = currentAnimation.animation().length();
+            if (length > 0.0 && played >= length) {
+                played %= length;
+            }
+        }
         // (a moment before a loop's start, drawn by such a frame just after it began again, is drawn at its start; never
         // while easing into a clip, where a clip time of exactly 0 at another clock reading makes GeckoLib take again)
         return animationState == State.RUNNING ? Math.max(0.0, played) : played;

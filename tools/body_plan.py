@@ -260,6 +260,73 @@ def load(model):
     return _CACHE[model]
 
 
+# The names a plan's "checks" section holds, by kind (code review R12-14: a misspelt one did not fail, it switched its
+# check off for good: a knee measured against no boxes reads 0.0, a jaw bone that is not there is never open too little).
+CHECK_CLIP_LISTS = ('water', 'dig', 'wave', 'feet_free', 'tuck_ok', 'walk_clips')       # lists of clip patterns
+CHECK_CLIP_KEYS = ('feet_up_ok', 'walks', 'on_ground', 'flight')                        # tables keyed by clip pattern
+CHECK_BONE_LISTS = ('body_bones', 'skip_bones', 'hide_in', 'hidden_at_rest')            # lists of bones
+CHECK_BONES = (('jaw', 'bone'), ('carry', 'bone'), ('carry', 'jaw'), ('tail_drag', 'from'), ('tail_drag', 'root'))
+
+
+def checks_problems(plan, bones, clips):
+    """What a plan's "checks" names that is not there: bones that are neither a role of the plan nor a bone of the
+    model, clip patterns that match no clip of its animation file (clips: its clip names)."""
+    import fnmatch
+    checks = plan.data.get('checks', {})
+    known = set(plan.to_bone) | {b['name'] for b in bones}
+    out = []
+
+    def clip(pattern, where):
+        if not any(fnmatch.fnmatch(c, pattern) for c in clips):
+            out.append(f'checks.{where}: "{pattern}" matches no clip')
+
+    def bone(name, where):
+        if name not in known:
+            out.append(f'checks.{where}: "{name}" is no bone or role of the model')
+
+    for key in CHECK_CLIP_LISTS:
+        for pattern in checks.get(key, []):
+            clip(pattern, key)
+    for key in CHECK_CLIP_KEYS:
+        for pattern in checks.get(key, {}):
+            clip(pattern, key)
+    for a, b in checks.get('switches', []):
+        clip(a, 'switches')
+        clip(b, 'switches')
+    for key in CHECK_BONE_LISTS:
+        for name in checks.get(key, []):
+            bone(name, key)
+    for section, key in CHECK_BONES:
+        if key in checks.get(section, {}):
+            bone(checks[section][key], f'{section}.{key}')
+    for name in checks.get('hinge', {}).get('bones', []):
+        bone(name, 'hinge.bones')
+    for part in checks.get('feet_parts', []):
+        if not any(part in name for name in known):
+            out.append(f'checks.feet_parts: no bone or role holds "{part}"')
+    for key in ('surface_marks', 'dig_marks'):
+        for mark in checks.get(key, []):
+            if 'bone' in mark:
+                bone(mark['bone'], key)
+            elif not any(name.startswith(mark['prefix']) for name in known):
+                out.append(f'checks.{key}: no bone or role starts with "{mark["prefix"]}"')
+    for spec in checks.get('reach', []):
+        bone(spec['bone'], 'reach.bone')
+        clip(spec['clip'], 'reach.clip')
+    for pattern, feet in checks.get('feet_up_ok', {}).items():
+        for foot in ([] if feet == '*' else feet):
+            if foot not in plan.legs:
+                out.append(f'checks.feet_up_ok: "{foot}" ({pattern}) is no leg of the plan')
+    return out
+
+
+def clip_names(plan, model):
+    """The clip names of the animation file a plan's checks are about (its "checks.animations", else the model's)."""
+    stem = plan.data.get('checks', {}).get('animations', model)
+    path = os.path.join(assets(stem), 'animations', 'entity', f'{stem}.animation.json')
+    return list(json.load(open(path, encoding='utf-8'))['animations']) if os.path.exists(path) else None
+
+
 def geo_bones(model):
     geo = json.load(open(os.path.join(assets(model), 'geo', 'entity', f'{model}.geo.json'), encoding='utf-8'))
     return geo['minecraft:geometry'][0]['bones']
@@ -434,6 +501,9 @@ def check_all():
             bad += 1
             continue
         found = problems(plan, geo_bones(model))
+        clips = clip_names(plan, model)
+        if clips is not None:
+            found += checks_problems(plan, geo_bones(model), clips)
         found += [] if found else stale(plan)
         print(f'{model}: ' + ('OK' if not found else f'{len(found)} problem(s)'))
         for p in found:

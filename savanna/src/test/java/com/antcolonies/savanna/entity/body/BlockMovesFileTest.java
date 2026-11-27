@@ -95,4 +95,39 @@ class BlockMovesFileTest {
         assertEquals(15, BlockMoves.turnFor(270.0F, 0.0F));
         assertEquals(-1, BlockMoves.turnFor(180.0F, 0.0F));
     }
+
+    /**
+     * Code review R12-72: every move file in the mod's folder loads as the game loads it (only the monitor's was read
+     * by a test; the lions' and the buffalo's are loaded by no game code yet), every move with a clip and a path for
+     * each size, a move ending on land ending on the level it says.
+     */
+    @Test
+    void everyMoveFileLoadsAndItsLandMovesEndOnTheirLevel() throws Exception {
+        String inMod = "/assets/antcolonies/block_moves";
+        java.net.URI folder = com.antcolonies.savanna.SavannaMod.class.getResource(inMod).toURI();
+        java.util.List<String> files;
+        // (the mod's files come to a test as a folder or inside a jar)
+        try (java.nio.file.FileSystem jar = "jar".equals(folder.getScheme())
+                ? java.nio.file.FileSystems.newFileSystem(folder, java.util.Map.of()) : null;
+                java.util.stream.Stream<java.nio.file.Path> listed = java.nio.file.Files.list(
+                        jar != null ? jar.getPath(inMod) : java.nio.file.Path.of(folder))) {
+            files = listed.map(path -> path.getFileName().toString()).filter(name -> name.endsWith(".json")).sorted().toList();
+        }
+        assertTrue(files.size() >= 7, "the move files are found");
+        for (String file : files) {
+            String animal = file.substring(0, file.length() - 5);
+            BlockMoves moves = BlockMoves.of(com.antcolonies.savanna.SavannaMod.class, "antcolonies", animal);
+            assertTrue(moves.count() > 0, animal + " has moves");
+            for (int i = 0; i < moves.count(); i++) {
+                BlockMoves.Move move = moves.move(i);
+                for (int size = 0; size < moves.sizes().length; size++) {
+                    String what = animal + ", move " + i + ", size " + size;
+                    assertTrue(move.ticks(size) > 0 && !move.clip(size).isEmpty(), what + " has a clip and a path");
+                    if (!move.endsAfloat) {
+                        assertEquals(move.endLevel, move.rise(size, move.ticks(size)), 0.03, what + " ends on its level");
+                    }
+                }
+            }
+        }
+    }
 }

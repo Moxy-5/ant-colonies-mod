@@ -31,7 +31,8 @@ TEXELS = 1.0          # texture pixels a model pixel (plain colours for now)
 
 # --- the outline's numbers (references/outlines/monitor.json, the approved outline; python tools/workshop.py outline
 # monitor draws it), turned into the model's axes: z = HIPS - outline x, the hips where the tail meets the body --------
-_OUTLINE = json.loads((Path(__file__).resolve().parent.parent / "references/outlines/monitor.json").read_text(encoding="utf-8"))
+DATA_FILES = [Path(__file__).resolve().parent.parent / "references/outlines/monitor.json"]   # part of every clip's fingerprint
+_OUTLINE = json.loads(DATA_FILES[0].read_text(encoding="utf-8"))
 _PART = {p["name"]: p for p in _OUTLINE["parts"]}
 HIPS = _PART["body"]["side"][0]                                     # 48: the tail is outline x 0 to 48
 BODY_Z = (float(HIPS - _PART["body"]["side"][1]), float(HIPS - _PART["body"]["side"][0]))   # the body, front to back

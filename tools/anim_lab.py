@@ -563,6 +563,10 @@ def sample_channel(frames, t):
     return value(frames[-1][2], t)
 
 
+SEAM_MOVE = 0.3      # a bone this far (model units) from where it started when a loop starts again is a jump (R12-21)
+SEAM_SIZE = 0.03     # ... or this much bigger or smaller
+
+
 class Clip:
     def __init__(self, name, data):
         self.name = name
@@ -1246,8 +1250,11 @@ def check(model, clip, speed_bps=None, quiet=False):
             moves = [math.dist(gait.tips[i][k][::2], gait.tips[i + 1][k][::2]) for i in range(n)
                      if gait.down[k][i] and gait.down[k][i + 1]]
             if moves and max(moves) / dt > 1.5:
-                i = max(range(len(moves)), key=lambda j: moves[j])
-                out.append(('NOTE', f'foot {k} moves along the ground while standing ({max(moves) / dt:.1f} units a second)'))
+                # a note, with how far in all (code review R12-24 asked for a fault above a limit; tried at 0.5 units
+                # on 2026-11-26 and taken out: every one of its 60 flags on the eight insects was a leg moved on purpose,
+                # antennae groomed with the forelegs, a paralysed fall, a soldier's clamp; nothing in a clip says which)
+                out.append(('NOTE', f'foot {k} moves along the ground while standing ({max(moves) / dt:.1f} units a '
+                                    f'second, {sum(moves):.2f} units in all)'))
     # Sinking into the floor, clipping, loop seams, snaps: sampled through the clip.
     floor = gait.ground if model.feet else 0.0
     sunk = clipped = None
@@ -1287,6 +1294,16 @@ def check(model, clip, speed_bps=None, quiet=False):
         out.append(('BAD', f'{sunk[0]} sinks {sunk[2]:.2f} units into the floor at {sunk[1]:.3f} s'))
     if clipped:
         out.append(('BAD', f'{clipped[0]} passes through {clipped[1]} at {clipped[2]:.3f} s'))
+    # a loop's seam in place and size too (code review R12-21: only turns were read, so a body or an abdomen that
+    # moved or swelled and jumped back where the loop starts again passed)
+    if clip.loop:
+        for bone, chans in clip.bones.items():
+            for ch, limit, unit in (('position', SEAM_MOVE, 'units'), ('scale', SEAM_SIZE, 'of its size')):
+                keys = chans.get(ch)
+                if keys and len(keys) > 1:
+                    gap = max(abs(a - b) for a, b in zip(sample_channel(keys, 0.0), sample_channel(keys, clip.length)))
+                    if gap > limit:
+                        out.append(('BAD', f'{bone} jumps {gap:.2f} {unit} ({ch}) where the loop starts again'))
     for bone, chans in clip.bones.items():
         rot = chans.get('rotation')
         if not rot:

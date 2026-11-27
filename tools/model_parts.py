@@ -338,6 +338,42 @@ def _row(r):
     return '[' + ', '.join(f'{round(x, 4) + 0.0:.4f}' for x in r) + ']'
 
 
+def block_moves_behind(animal, mod='savanna', data=None, clips=None):
+    """What in an animal's move file (the game's copy of each move clip's path) no longer matches the clips in its
+    animation file, as a list of lines; empty when the file is up to date (code review R12-72: a clip remade without
+    writing the move file again played on its old path, the checker showing the new one). data and clips: the file's
+    and the animation file's contents when they are already read (the self-test's broken copies)."""
+    import mod_paths
+    base = mod_paths.assets(mod)
+    if data is None:
+        data = json.loads((base / 'block_moves' / f'{animal}.json').read_text(encoding='utf-8'))
+    if clips is None:
+        clips = json.loads((base / 'animations' / 'entity' / f'{animal}.animation.json').read_text(encoding='utf-8'))['animations']
+    out = []
+    for m in data['moves']:
+        for i, clip in enumerate(m['clips']):
+            if clip not in clips:
+                out.append(f'{animal} {m["name"]}: its clip {clip} is not in the animation file')
+                continue
+            notes = [v if isinstance(v, str) else ' '.join(v) for v in clips[clip].get('timeline', {}).values()]
+            if not any(v.startswith('path ') for v in notes):
+                out.append(f'{animal} {m["name"]}: the clip {clip} has no path note')
+                continue
+            rows = move_path(clips[clip])[0]
+            B = data['block_px'][i]
+            for key, now in (('rise', [dy / B for _, dy, _ in rows]), ('along', [-dz for _, _, dz in rows])):
+                held = m[key][i]
+                if len(held) != len(now):
+                    out.append(f'{animal} {m["name"]} ({clip}): {len(held)} {key} rows in the move file, {len(now)} in the clip')
+                elif max(abs(a - b) for a, b in zip(held, now)) > 2e-4:
+                    k = max(range(len(now)), key=lambda j: abs(held[j] - now[j]))
+                    out.append(f'{animal} {m["name"]} ({clip}): {key} at tick {k} is {held[k]:.4f} in the move file, '
+                               f'{now[k]:.4f} in the clip')
+            if m['ticks'] != len(m['rise'][0]) - 1:
+                out.append(f'{animal} {m["name"]}: "ticks" {m["ticks"]} against {len(m["rise"][0]) - 1} rows')
+    return out
+
+
 def write_block_moves(animal, data, maker, mod='savanna'):
     """Writes an animal's move file (assets/<mod id>/block_moves/<animal>.json), one tick row a line."""
     import mod_paths

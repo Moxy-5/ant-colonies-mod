@@ -88,7 +88,7 @@ def checkEngineTools = tasks.register('checkEngineTools', Exec) {
     def marker = layout.buildDirectory.file('engine_selftest.txt')
     inputs.files(fileTree('tools') { include '*.py' })
     inputs.files(fileTree('savanna/src/main/resources/assets/antcolonies') {
-        include 'animations/**', 'geo/**', 'body_plans/**'
+        include 'animations/**', 'geo/**', 'body_plans/**', 'block_moves/**'
     })
     outputs.file(marker)
     commandLine 'python', 'tools/engine_selftest.py'
@@ -312,6 +312,17 @@ dependencies {
 def filmDir = file('run-film')
 tasks.matching { it.name == 'runFilm' }.configureEach {
     doFirst {
+        // One film at a time on the PC (code review R12-46; tools/film_run.py holds the lock and sets the variable for
+        // its own launch): a launch typed by hand stops here while a tool's film is running, before it deletes that
+        // film's world and pictures. (A lock left by a tool that is gone is ignored.)
+        def lock = new File(System.getProperty('java.io.tmpdir'), 'antcolonies_film.lock')
+        if (lock.exists() && System.getenv('ANTCOLONIES_FILM_LOCK') == null) {
+            def held = new groovy.json.JsonSlurper().parseText(lock.text)
+            if (ProcessHandle.of(held.pid as long).map { it.isAlive() }.orElse(false)) {
+                throw new GradleException("a film is already running: ${held.what} in ${held.folder} (process ${held.pid}, " +
+                        "since ${held.since}); films run one at a time. Wait for it, or delete ${lock} if that process is not a film.")
+            }
+        }
         new File(filmDir, 'saves/film').deleteDir()
         new File(filmDir, 'screenshots').deleteDir()
         def options = new File(filmDir, 'options.txt')

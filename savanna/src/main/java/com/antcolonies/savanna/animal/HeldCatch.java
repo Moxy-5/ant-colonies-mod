@@ -9,6 +9,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import javax.annotation.Nullable;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.util.Mth;
@@ -45,7 +46,8 @@ public final class HeldCatch {
     public record Grip(double along, double turn) {
     }
 
-    private static final Map<String, Fish> FISH = new HashMap<>();
+    /** Each prey kind's measures, read once; empty for a kind with none (a crab, a bullfrog: kept too, code review R12-63). */
+    private static final Map<String, Optional<Fish>> FISH = new HashMap<>();
     @Nullable
     private static Carry carry;
 
@@ -83,9 +85,9 @@ public final class HeldCatch {
         String name = BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).getPath();
         return FISH.computeIfAbsent(name, n -> {
             JsonObject h = checks(n).getAsJsonObject("held");
-            return h == null ? null : new Fish(h.get("px").getAsDouble(), h.get("middle").getAsDouble(),
-                    h.get("centre_z").getAsDouble(), h.get("half").getAsDouble(), h.get("thick").getAsDouble());
-        });
+            return h == null ? Optional.<Fish>empty() : Optional.of(new Fish(h.get("px").getAsDouble(), h.get("middle").getAsDouble(),
+                    h.get("centre_z").getAsDouble(), h.get("half").getAsDouble(), h.get("thick").getAsDouble()));
+        }).orElse(null);
     }
 
     private static double size(Entity e) {

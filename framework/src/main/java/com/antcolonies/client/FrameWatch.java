@@ -21,7 +21,7 @@ import net.neoforged.neoforge.client.event.RenderFrameEvent;
  * how much of it Java spent clearing memory, and where the drawing thread was (looked at every {@link #LOOK_MS} ms
  * by a helper thread). Few looks for a long frame mean the whole game stood still, helper and all.
  *
- * <p>Always on in the game; it costs nothing until a frame is already slow. Not while the game is paused or no world
+ * <p>Always on in the development game ({@link #DEV}); it costs nothing until a frame is already slow. Not while the game is paused or no world
  * is open.
  */
 @EventBusSubscriber(modid = ColonyFrameworkMod.MODID, value = Dist.CLIENT)
@@ -33,6 +33,12 @@ public final class FrameWatch {
     /** The helper starts looking once a frame has run this long. */
     static final long WATCH_FROM_MS = 20;
     static final long LOOK_MS = 5;
+    /**
+     * The helper thread and the slow-frame lines only in the development game (the user's own, {@code runClient}), never
+     * in a released mod (code review R12-47): taking the drawing thread's stack pauses it, and that is measuring paid
+     * for by every player. The frame counts (free) stay on everywhere.
+     */
+    private static final boolean DEV = !net.neoforged.fml.loading.FMLEnvironment.production;
     static final int LINES = 30;
 
     private static volatile Thread renderThread;
@@ -77,7 +83,9 @@ public final class FrameWatch {
         gcAtStart = gcNow;
         if (renderThread == null) {
             renderThread = Thread.currentThread();
-            startHelper();
+            if (DEV) {
+                startHelper();
+            }
             ColonyFrameworkMod.LOGGER.info("[frames] Java's memory cleaners: {}", java.lang.management.ManagementFactory
                     .getGarbageCollectorMXBeans().stream().map(bean -> bean.getName()).toList());
             return;
@@ -89,7 +97,7 @@ public final class FrameWatch {
             return;
         }
         count(now, ms, gc, taken);
-        if (ms < SLOW_MS) {
+        if (ms < SLOW_MS || !DEV) {
             return;
         }
         ColonyFrameworkMod.LOGGER.warn("[{}] a frame took {} ms, {} ms of it Java clearing memory; where the drawing"

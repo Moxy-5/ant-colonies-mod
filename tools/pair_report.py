@@ -159,7 +159,8 @@ def report(folder, prey_name):
         say(f'no prey named {prey_name}')
         return out
     for a in animals:
-        striking = ('jump_smack', 'stalk_leap_bite')
+        # its strike clips and its jaw from its own plan, never a name written here (R12-16)
+        striking = tuple(a.plan.get('strikes', {}).get('clips', {}))
         holds = [f for f in a.frames if f.get('facts', {}).get('holding') and a.clip(f) not in striking]
         strikes = [f for f in a.frames if a.clip(f) in striking]
         if not holds and not strikes:
@@ -211,7 +212,10 @@ def report(folder, prey_name):
                     f'a tick: ' + ' '.join(f'{v:.2f}' for v in steps))
         if not holds:
             continue
-        carry = a.plan.get('checks', {}).get('carry', {}).get('bone', 'carry')
+        carry = a.plan.get('holds', {}).get('jaw')
+        if carry is None:
+            say('jaws: its plan names no jaw (holds.jaw), nothing measured')
+            continue
         gaps = []
         rows = []
         for f in holds:

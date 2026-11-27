@@ -318,9 +318,15 @@ def stale():
         if not os.path.exists(path):
             out.append(f'{animal}: no table (python tools/spots.py write {animal})')
             continue
-        held = json.load(open(path, encoding='utf-8')).get('fingerprint')
-        if held != fingerprint(animal, plan_data(animal)):
+        held = json.load(open(path, encoding='utf-8'))
+        if held.get('fingerprint') != fingerprint(animal, plan_data(animal)):
             out.append(f'{animal}: its table is behind its plan, model or clips (python tools/spots.py write {animal})')
+        elif json.loads(json.dumps(build(animal))) != held:
+            # the fingerprint holds only the plan's sections and the two files; the rows are also made by the posing
+            # code and the plan's hinge, tail and chain (code review R12-13), so the table is made again and compared:
+            # "would write the same file" is the whole truth
+            out.append(f'{animal}: its table is not what would be written now (the posing code or the checks of the plan '
+                       f'changed: python tools/spots.py write {animal})')
     return out
 
 

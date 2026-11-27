@@ -7,12 +7,12 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**307 findings: 200 left (11 of them wait for your call), 107 done.**
+**307 findings: 184 left (11 of them wait for your call), 123 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
 | A: a player can meet it | 67 | 0 | 1 | 0 | 65 | 1 |
-| B: it will cost us when building on this | 143 | 103 | 3 | 4 | 32 | 1 |
+| B: it will cost us when building on this | 143 | 68 | 16 | 10 | 47 | 2 |
 | C: a tidy-up | 97 | 87 | 0 | 2 | 7 | 1 |
 
 | Round | System | Found | Left | Done |
@@ -28,7 +28,7 @@ review stay in `docs/BUGS.md`.
 | 9 | the river hunters | 44 | 34 | 10 |
 | 10 | the river's small life | 19 | 13 | 6 |
 | 11 | the new raid code | 22 | 6 | 16 |
-| 12 | the animation engine | 73 | 55 | 18 |
+| 12 | the animation engine | 73 | 39 | 34 |
 
 ## Waiting for your call (11)
 
@@ -70,7 +70,7 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R7-33** A palm's crown can blink out at the screen's edge
   - *Open:* waits to be seen (2026-11-24). Read from how Minecraft hides parts of the world, never seen in the game; the fix is large (sharing a crown's faces out over its blocks) and is built only if the user sees fronds blink out.
 
-### B: it will cost us when building on this (102 left)
+### B: it will cost us when building on this (86 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -166,40 +166,43 @@ is left; no word means nobody has started it. The findings that wait for your ca
 **Round 12, the animation engine** (`docs/reviews/full/round-12-animation-engine.md`)
 
 - **R12-5** the corner of a step or bank can sink into a box unseen, offline and in both game checks
+  - *Open:* not started. An exact box-against-block test changes what three checks flag (offline and both in the game), so it wants its own step with the films looked over; nothing was changed.
 - **R12-6** the pair check sees only part of a looping prey clip, at one phase, and not the blend or the walk
+  - *Half fixed:* a looping prey clip is posed for at least one whole loop, and each spot's first bite is also measured against every moment of the prey's loop (flag: "the bite misses at other moments of the loop"). Left: the blend into the hold ...
 - **R12-7** "jaw to the hide" measures the nearest box of the prey, not the spot, so a jaw 2.6 px off its spot reads 0.0
-- **R12-8** the pair check takes 75 s for one holder and prey
-- **R12-9** a bone the new clip does not move goes home over GeckoLib's 5-tick reset, not the blend
+  - *Half fixed:* the jaw's distance from its own spot (and how far above it) is printed for every spot beside the old "to the hide" number. It is printed, not judged: a limit of 3 px was tried and taken out, because a spot lies 5 to 6 px under ...
 - **R12-10** the blend length is read from the Java by a pattern that misses three animals and every blend changed while playing
-- **R12-11** the picture drawn for a flagged clip change shows a different moment from the one flagged
+  - *Half fixed:* the blend length comes from the animal's move file when its controller names one (`lead_ticks`), and the checker stops with a message when a named controller's blend cannot be read (no quiet fallback to 4). Left: blends changed ...
 - **R12-12** the offline dragged tail is its own simpler rule, never matched against the game's TailDrag
-- **R12-13** a spot table can be behind its plan or the posing code and `--check` still passes
-- **R12-14** names in a plan's "checks" are never checked, and a misspelt one silently switches its check off
-- **R12-15** clip_check redoes every clip on every run; the monitor takes about 9 minutes
-- **R12-16** pair_report names the lion's strike clips and reads the jaw from another section of the plan
-- **R12-21** the loop-seam and snap checks read only rotations; a position or scale jump at the loop passes
+  - *Open:* the label part was done with R12-2 (the dragged tail offline says "rough, not counted"). Matching it against the game's `TailDrag` was not started: it needs the game's rule moved into a table both read.
 - **R12-22** nothing measures that the offline pose is the game's pose; `match` only puts pictures side by side
+  - *Open:* not started (measuring the offline pose against the game's needs the game's bone places written out per picture for insects; the animals have it through `record`).
 - **R12-23** the lab's sizes and speeds are its own hand-typed tables, not the game's
+  - *Open:* not started.
 - **R12-24** a standing clip's sliding foot is only a note, so the summary says "0 problem(s)"
+  - *Open:* tried and taken out. Counting a sliding foot as a problem (over 0.5 units) flagged 60 clips, every one a leg moved on purpose (grooming, the paralysed fall, the clamp). The note now gives the whole distance; a real judgement ...
 - **R12-25** `two_bone` gives wrong pieces (and says "no miss") when the target is close, and crashes at the root
+  - *Half fixed:* a target nearer than the limb can fold to is reported as a miss, and a target at the root itself no longer crashes. The shape for a too-close target is left as it was: the right one changes the hippo's four climb clips (up to 15 ...
 - **R12-26** a pole along the leg's line crashes `two_bone` and flips the knee 180 degrees as the target crosses it
+  - *Half fixed:* a pole exactly along the leg's line no longer divides by nothing (a second pole takes over: up, else forward, else sideways). The knee still changes side as the target crosses that line: easing it near the line was built and ...
 - **R12-27** the kit returns a miss but every newer maker throws it away
-- **R12-28** the kit's clip cache leaves out the data files a maker reads, so a changed outline keeps old clips
+  - *Open:* not started.
 - **R12-32** whether a clip loops is decided twice, by the Java and by the file, and the tools read only the file
-- **R12-39** the guard films' headline says "ALL CHECKS PASS" with every picture changed
+  - *Open:* not started.
 - **R12-43** "frames N" does nothing for animals: N identical pictures a tick
+  - *Open:* not started.
 - **R12-44** the camera's jump check measures "per tick" wrongly in three cases
+  - *Open:* not started (the plan: size each move by the ticks between its two pictures, and write "jump check off" for bursts too sparse to compare).
 - **R12-45** a fish held in a mouth is checked and recorded at the wrong place
+  - *Open:* not started.
 - **R12-46** two films at once, an open watch session, and no timeout
-- **R12-47** the frame watch runs in every player's game and samples the drawing thread
+  - *Half fixed:* one film at a time on the PC (a lock file; `runFilm` and every tool that launches a film refuse while another runs, `ANTCOLONIES_FILM_LOCK` to pass), and a time limit of 5 minutes plus 2.5 a scene after which the game is stopped ...
 - **R12-48** the recorder writes the blocks only round where each animal was first drawn
+  - *Open:* not started.
 - **R12-49** insects in a running scene are drawn at a stale in-between time
-- **R12-50** a frame film whose checks saw no animal is still "ok"
-- **R12-62** the animals' clip player drops the bit past a loop's end each time round (the insects' player was written to fix exactly this)
-- **R12-63** an otter holding a crab or frog reads and parses a body plan file twice every frame
-- **R12-64** a lioness's throat hold and hold-down bite on a clock the drawn clip does not keep
+  - *Open:* not started (insects are on hold).
 - **R12-65** `MoveRider`, the planned one home for block moves, lacks two lessons of the monitor's copy, and the drawing half is copied three times
-- **R12-72** the move files have no staleness check (the spot tables do), and their unit test reads only the monitor's
+  - *Open:* not started; it belongs with R9-42 (moving the monitor and the hippo onto `MoveRider`), guarded by their course and frame films.
 
 ### C: a tidy-up (86 left)
 
@@ -435,17 +438,33 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R12-2** (A) most of the checker's findings never say FLAGGED, and a jump (a pop) is never judged at all, so the summary the rule book reads counts none of them (BUGS 428)
 - **R12-3** (B) clip_check always exits 0, whatever it finds
 - **R12-4** (A) a part spun a whole turn at a clip change passes the blend check on any animal with a blend of 4 ticks or more (BUGS 427)
+- **R12-8** (B) the pair check takes 75 s for one holder and prey
+- **R12-9** (B) a bone the new clip does not move goes home over GeckoLib's 5-tick reset, not the blend
+- **R12-11** (B) the picture drawn for a flagged clip change shows a different moment from the one flagged
+- **R12-13** (B) a spot table can be behind its plan or the posing code and `--check` still passes
+- **R12-14** (B) names in a plan's "checks" are never checked, and a misspelt one silently switches its check off
+- **R12-15** (B) clip_check redoes every clip on every run; the monitor takes about 9 minutes
+- **R12-16** (B) pair_report names the lion's strike clips and reads the jaw from another section of the plan
 - **R12-20** (A) the lab's floor sinks with the lowest foot, so feet pushed into the ground are never reported (BUGS 426)
+- **R12-21** (B) the loop-seam and snap checks read only rotations; a position or scale jump at the loop passes
+- **R12-28** (B) the kit's clip cache leaves out the data files a maker reads, so a changed outline keeps old clips
 - **R12-35** (A) verify_animal says "passed" for an animal it never filmed in the game
 - **R12-36** (A) a game crash during the films is not a hard failure
 - **R12-37** (A) a course scene with no recording, or almost none, reads as "nothing found"
 - **R12-38** (A) nothing checks that the animal did what the scene asked, and the game's own warnings are never read (BUGS 429)
+- **R12-39** (B) the guard films' headline says "ALL CHECKS PASS" with every picture changed
 - **R12-40** (A) a finding at an approved picture is let through however much worse it is
 - **R12-41** (A) the camera's jump check cannot see a pop that repeats
 - **R12-42** (A) the watch mode films old spot tables and old body plans after they change
+- **R12-47** (B) the frame watch runs in every player's game and samples the drawing thread
+- **R12-50** (B) a frame film whose checks saw no animal is still "ok"
 - **R12-58** (A) after a step down the otter skates on about a block with its legs frozen (a move's "rest" keeps moving) (BUGS 432)
 - **R12-59** (A) an animal seen mid-move is first drawn at the move's start, then jumps to where it really is
 - **R12-60** (A) a Nile monitor more than 48 blocks away pops a block up or down on every move
 - **R12-61** (A) when the server runs slow, moves on screen rewind (BUGS 380, 432)
+- **R12-62** (B) the animals' clip player drops the bit past a loop's end each time round (the insects' player was written to fix exactly this)
+- **R12-63** (B) an otter holding a crab or frog reads and parses a body plan file twice every frame
+- **R12-64** (B) a lioness's throat hold and hold-down bite on a clock the drawn clip does not keep *Not a bug after all.*
 - **R12-70** (A) the monitor's drawn leg fold turns its right hind foot the wrong way (a Java copy of the swim pose, "kept in step by hand", is out of step)
 - **R12-71** (A) the spot tables and the pair check never see what the game draws on top of the clips, so a throat hold bites the air with every check green
+- **R12-72** (B) the move files have no staleness check (the spot tables do), and their unit test reads only the monitor's

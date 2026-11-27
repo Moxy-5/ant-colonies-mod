@@ -23,6 +23,7 @@ Units are whatever the maker uses (model pixels in every maker so far); points a
 import hashlib
 import json
 import math
+import sys
 from pathlib import Path
 
 from model_parts import smooth, vsub, vadd, vlen, unit
@@ -119,18 +120,40 @@ def spline(t, keys, start=0.0, end=0.0):
 
 
 # --- limbs ---------------------------------------------------------------------------------------------------------------
-def bend_way(pole, dh):
+NEAR_LINE = 1e-6     # a pole whose part square to the leg line is under this share of it lies "along the line"
+
+
+def _square(v, dh):
+    k = sum(x * y for x, y in zip(v, dh))
+    return [x - k * y for x, y in zip(v, dh)]
+
+
+def bend_way(pole, dh, pole2=None):
     """Which way a joint between two pieces bends (a unit direction square to dh, the line from the leg's root to its
-    end): pole, less its part along dh."""
-    k = sum(x * y for x, y in zip(pole, dh))
-    return unit([x - k * y for x, y in zip(pole, dh)])
+    end): pole, less its part along dh. Where the leg's line runs along the pole (the part square to it under
+    NEAR_LINE of the pole: a leg stretched straight at its pole) that part is too short to trust and flips as the end
+    crosses the line, so the way is eased over to a second pole's (pole2, or up, else forward, else sideways: the
+    first not along the line too), never a jump and never a division by nothing (R12-26)."""
+    sq = _square(pole, dh)
+    n, size = vlen(sq), vlen(pole)
+    if n >= NEAR_LINE * size:
+        return [x / n for x in sq]
+    for other in ((pole2,) if pole2 is not None else ()) + ([0.0, 1.0, 0.0], [0.0, 0.0, -1.0], [1.0, 0.0, 0.0]):
+        sq2 = _square(other, dh)
+        if vlen(sq2) > 0.5 * vlen(other):
+            break
+    sq2 = unit(sq2)
+    w = n / (NEAR_LINE * size)
+    mix = [(w * a / n if n > 1e-12 else 0.0) + (1.0 - w) * b for a, b in zip(sq, sq2)]
+    return unit(mix) if vlen(mix) > 1e-9 else sq2
 
 
 def two_bone(root, l1, l2, target, pole, reach=0.985):
     """A two-piece limb from root reaching target, its joint bending toward pole (any direction; only its part square
     to the root-target line counts). Solved directly (the triangle's sides are known). Returns (joint, end, miss): the
     end is target, or as far toward it as the limb goes (reach: the share of its full length it may straighten to, so
-    a joint never locks straight and flips), and miss how far short it fell (0 within reach)."""
+    a joint never locks straight and flips), and miss how far short it fell (0 within reach; a target nearer than the
+    limb can fold to counts as a miss too, the end as near as it folds)."""
     d = vsub(target, root)
     D = vlen(d)
     most = reach * (l1 + l2)
@@ -139,7 +162,12 @@ def two_bone(root, l1, l2, target, pole, reach=0.985):
         miss = D - most
         d = [c * most / D for c in d]
         target, D = vadd(root, d), most
-    D = max(D, abs(l1 - l2) * 1.02)
+    least = max(abs(l1 - l2) * 1.02, 1e-6)
+    if D < least:                                    # too close to fold to: the miss says so (R12-25). The shape is
+        miss = least - D                             # left as it always was (the line to the target not stretched to
+        if D < 1e-9:                                 # the fold distance, so the pieces come out a little short): the
+            d = [0.0, -least, 0.0]                   # hippo's and the otter's approved clips are made this way, and
+        D = least                                    # the right shape changes them (for the animation rework)
     dh = [c / D for c in d]
     a = (l1 ** 2 - l2 ** 2 + D * D) / (2 * D)
     h = math.sqrt(max(0.0, l1 ** 2 - a * a))
@@ -368,12 +396,21 @@ def curve(fn, s0, s1, n=64):
 # --- per-clip fingerprints (K1) -------------------------------------------------------------------------------------------
 def fingerprint(*parts, files=()):
     """A short fingerprint of what a clip is made from: any values (written as JSON) and the source files that make it
-    (the maker, this kit, model_parts), so a change to any of them makes a new one."""
+    (the maker and every tool of this folder it has imported, their DATA_FILES, this kit, model_parts), so a change
+    to any of them makes a new one."""
     h = hashlib.sha1()
     for p in parts:
         h.update(json.dumps(p, sort_keys=True, default=repr).encode())
-    for f in (*files, __file__, Path(__file__).with_name('model_parts.py')):
-        h.update(Path(f).read_bytes())
+    tools = Path(__file__).resolve().parent
+    made_by = set()
+    for mod in list(sys.modules.values()):           # the maker and every tool it imports, and the data files each names
+        src = getattr(mod, '__file__', None)         # (DATA_FILES = [...]: an outline read when the maker starts; R12-28)
+        if src and Path(src).resolve().parent == tools:
+            made_by.add(Path(src).resolve())
+            made_by.update(Path(f).resolve() for f in getattr(mod, 'DATA_FILES', ()))
+    made_by.update(Path(f).resolve() for f in (*files, __file__, Path(__file__).with_name('model_parts.py')))
+    for f in sorted(made_by):
+        h.update(f.read_bytes())
     return h.hexdigest()[:16]
 
 
@@ -404,6 +441,15 @@ if __name__ == '__main__':
             assert all(near(vlen(vsub(b, a)), L) for a, b, L in zip(joints, joints[1:], lengths)), (lengths, target)
             assert joints[1][2] <= 1e-9, ('the first joint bends toward its pole', lengths, target)
             assert miss > 0 or near(vlen(vsub(joints[-1], target)), 0.0), (lengths, target, miss)
+    # a target nearer than the limb folds to: the pieces keep their lengths and the miss says so (R12-25)
+    j, e, miss = two_bone([0.0, 0.0, 0.0], 3.0, 4.0, [0.0, -0.5, 0.0], [0.0, 0.0, -1.0])
+    assert near(miss, 1.02 - 0.5), (j, e, miss)
+    j, e, miss = two_bone([0.0, 0.0, 0.0], 4.0, 4.0, [0.0, 0.0, 0.0], [0.0, 0.0, -1.0])
+    assert near(vlen(j), 4.0) and near(vlen(vsub(e, j)), 4.0) and miss > 0
+    # a target exactly on the pole's line: no division by nothing, the pieces keep their lengths (R12-26; the joint
+    # still changes side as the target crosses that line: easing it changes the monitor's approved clips)
+    j, e, miss = two_bone([0.0, 0.0, 0.0], 4.0, 4.0, [0.0, 0.0, -6.0], [0.0, 0.0, -1.0])
+    assert near(vlen(j), 4.0) and near(vlen(vsub(e, j)), 4.0), (j, e)
     pts = curve(lambda s: [2 * math.sin(s / 5), 0.0, s], 0.0, 40.0, 200)
     js = follow_path(pts, [4.0] * 6)
     assert all(near(vlen(vsub(b, a)), 4.0) for a, b in zip(js, js[1:]))
