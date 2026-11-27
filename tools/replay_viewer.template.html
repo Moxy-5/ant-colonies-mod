@@ -93,6 +93,12 @@ function rawHash(key) {
   return kv ? kv.slice(1).join('=') : '';
 }
 const rawPick = (() => { try { return decodeURIComponent(rawHash('pick')); } catch (e) { return ''; } })();
+if (!DATA) {                                    // the template itself, opened by mistake: it holds no recording
+  document.getElementById('loading').textContent = 'This is the template, with no recording in it. Build a scene\'s page with ' +
+    '"python tools/replay.py run-film/screenshots/<scene>" and open references/replay/<scene>.html.';
+  window.Replay = {error: 'the template holds no recording'};
+  throw new Error('the replay template holds no recording');
+}
 document.getElementById('title').textContent = 'Replay: ' + DATA.title;
 document.title = DATA.title + ' Replay';
 const $ = id => document.getElementById(id);
