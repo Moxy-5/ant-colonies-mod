@@ -196,9 +196,13 @@ const Viewer = (() => {
     window.addEventListener('resize', resize);
     const v = new THREE.Vector3();
     let last = performance.now();
+    // st.held: the loop draws nothing (a tool taking pictures draws each one itself, and a software-drawn page
+    // redrawing behind it doubled the time a picture took: tools/replay_video.py, 2026-11-27)
+    st.held = false;
     function frame() {
       const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000);
       last = now;
+      if (st.held) { requestAnimationFrame(frame); return; }
       st.onFrame.forEach(f => f(dt));
       if (st.active === camera) controls.update();
       renderer.render(scene, st.active);

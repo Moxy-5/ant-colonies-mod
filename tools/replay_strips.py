@@ -159,33 +159,48 @@ def tile_size(n):
     return w, int(w * 574 / 1246)          # (the page's drawing is about 1246 by 574 in the default browser size)
 
 
+def opened(b, page, pick, cams, start, end, ticks_after=None):
+    """The replay page opened in browser b (a viewer_shot.Browser), its cameras and the animal checked, the cameras
+    fitted to the animal's moments between its game ticks start and end (None: its first; None: 40 of its moments
+    on, or with ticks_after that many game ticks after the first): (first, last, rows), the range's first and last
+    moments (indexes) and the page's row of every moment between. Shared with tools/replay_video.py."""
+    b.call('Page.navigate', url=page.resolve().as_uri() + '#labels=0')
+    t0 = time.time()
+    while not b.evaluate('!!(window.Replay && window.Replay.ready)'):
+        failed = b.evaluate("(document.getElementById('loading')||{}).textContent || ''")
+        if 'Could not' in failed or 'cannot draw' in failed or time.time() - t0 > 60:
+            raise SystemExit(f'the page did not open: {failed or "no answer in 60 s"}')
+        time.sleep(0.2)
+    known = b.evaluate('Replay.cams()')
+    wrong = [c for c in cams if c not in known]
+    if wrong:
+        raise SystemExit(f'no camera named {", ".join(wrong)}: the cameras are {", ".join(known)}')
+    if not b.evaluate(f'Replay.has({json.dumps(pick)})'):
+        raise SystemExit(f'no animal named {pick} in this recording: ' + ', '.join(b.evaluate('Replay.names()')))
+
+    def span(to):
+        got = b.evaluate(f'Replay.span({json.dumps(pick)}, {-1 if start is None else start}, {to})')
+        if 'why' in got:
+            raise SystemExit(got['why'])
+        return got['first'], got['last']
+    first, last = span(-1 if end is None else end)
+    if end is None and ticks_after is not None:
+        first, last = span(b.evaluate(f'Replay.rows({json.dumps(pick)}, {first}, {first})')[0]['tick'] + ticks_after)
+    rows = b.evaluate(f'Replay.rows({json.dumps(pick)}, {first}, {last})')
+    b.evaluate(f'Replay.fit({json.dumps(pick)}, {first}, {last})')   # (the cameras fitted to these moments)
+    return first, last, rows
+
+
 def take(page, pick, start, end, every, cams, fixed, paths, size, pictures=True):
     """Every moment in the range (the page's rows), the pictured ones' {cam: picture} (shrunk as taken) and the chart
     picture, in one browser launch."""
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as profile:
         b = viewer_shot.Browser(profile, size)
         try:
-            b.call('Page.navigate', url=page.resolve().as_uri() + '#labels=0')
-            t0 = time.time()
-            while not b.evaluate('!!(window.Replay && window.Replay.ready)'):
-                failed = b.evaluate("(document.getElementById('loading')||{}).textContent || ''")
-                if 'Could not' in failed or time.time() - t0 > 60:
-                    raise SystemExit(f'the page did not open: {failed or "no answer in 60 s"}')
-                time.sleep(0.2)
-            known = b.evaluate('Replay.cams()')
-            wrong = [c for c in cams if c not in known]
-            if wrong:
-                raise SystemExit(f'no camera named {", ".join(wrong)}: the cameras are {", ".join(known)}')
-            if not b.evaluate(f'Replay.has({json.dumps(pick)})'):
-                raise SystemExit(f'no animal named {pick} in this recording: ' + ', '.join(b.evaluate('Replay.names()')))
-            span = b.evaluate(f'Replay.span({json.dumps(pick)}, {-1 if start is None else start}, {-1 if end is None else end})')
-            if 'why' in span:
-                raise SystemExit(span['why'])
-            first, last = span['first'], span['last']
-            rows = b.evaluate(f'Replay.rows({json.dumps(pick)}, {first}, {last})')
-            b.evaluate(f'Replay.fit({json.dumps(pick)}, {first}, {last})')   # (the cameras fitted to these moments)
+            first, last, rows = opened(b, page, pick, cams, start, end)
             shots, chart = {}, None
             if pictures:
+                b.evaluate('Replay.hold(true)')         # (each picture is drawn by snap: the page's own loop held)
                 b.evaluate(f'Replay.pick({json.dumps(pick)})')
                 b.evaluate(f'Replay.traces({json.dumps(paths)}, 0)')
                 b.evaluate('Replay.fadeOthers(true)')    # (every other animal see-through: none hides it)

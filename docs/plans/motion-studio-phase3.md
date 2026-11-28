@@ -38,6 +38,7 @@ video. It checks the same frames as picture strips; the videos are for the user'
    played at 1x then slowed, a bar under it with the tick, the clip, the play speed and a red mark for each sliding foot
    (the one feet rule in `tools/recording.py`). An mp4 into `references/replay/video/` (ffmpeg, as the guard films).
    Its own check: one frame matches `replay_strips.py`'s picture of the same tick.
+   **Built 2026-11-27 (branch `claude/motion-video`; the user: "Start step 1 of phase 3"), below.**
 2. **A clip to video, no game (61).** `python tools/clip_check.py <animal> <clips> --video` (my pick over a new tool:
    the checker already poses every clip as the game draws it, with `--switches`, `--pair`, `--scene` and `--size`): the
    clip on a floor whose lines move at the clip's own stride (a planted foot that slides shows against them), the
@@ -45,6 +46,35 @@ video. It checks the same frames as picture strips; the videos are for the user'
 3. **Real footage beside it (62), small, last.** `--ref <video> --cycle <start>,<end>`: a video the user gives (Claude
    downloads nothing without asking), its marked stride stretched to the clip's length, side by side.
 Checks: each tool's self-test; the lion hunt film and the feast bench turned into videos and sent to the user.
+
+#### Step 1, built (2026-11-27)
+- **`python tools/replay_video.py <scene> --pick <animal> [--from t] [--to t] [--cams side,front,above] [--slow 4]
+  [--fixed] [--no-paths] [--check]`** writes `references/replay/video/<scene>_<animal>_<from>-<to>_<cams>[_fixed]_s<slow>.mp4`:
+  the replay page drawn moment by moment (each camera 640 by 480, side by side), every other animal see-through, the
+  foot paths drawn, played at the game's speed then `--slow` times slower (`--slow 1`: one pass). Under the pictures a
+  bar: the pass, the animal's game tick and seconds into the range, its clip with play speed and how far in, each foot
+  (dark down, red sliding with px a tick, light lifted), and a line along the range with a red mark where a foot slides,
+  a blue one after ticks not recorded, and the place now. Without `--to`, 200 game ticks. Neon's own note (its file on
+  `neon/studio`) added `--fixed` and the see-through animals: both in.
+- **Timing (my picks):** each moment lasts the scene's clock till the next (the client's ticks, one a tick through a
+  stepped burst, so 1x is the game's speed; the feast bench draws two moments a tick and plays right); a clock step over
+  4 ticks (ticks not recorded) plays as 4; 60 frames a second, so a moment a tick is always 3 frames; the real-speed
+  pass rests 0.5 s on its last moment.
+- **Drawn on the graphics card:** the software drawing every check picture uses took 0.15 s a camera picture (a
+  60-tick range: 2 minutes); `viewer_shot.Browser(gpu=True)` draws on the computer's card (the RTX 3080: 0.035 s a
+  moment for three cameras, the same range in 25 to 40 s with the page built), falling back to software where there is
+  none. The check below proves the card draws what the software draws (2 of 255 apart).
+- **The page's own loop held:** the stage redrew the scene behind every picture (doubling the software drawing's time);
+  `Replay.hold(true)` (`st.held` in `viewer_common.js`) stops it while a tool draws each picture itself. The strips use
+  it too (their pictures unchanged). Also on the page: each row's `clock` and `gapBefore`, and `snap`'s JPEG option.
+  `replay_strips.opened` is the one way both tools open a recording.
+- **Its own check (`--check`):** the frame of the range's middle moment and the one 4 game ticks before, read back out
+  of the mp4, against `replay_strips.py`'s picture of the middle moment (same range, same cameras): must match (under 8
+  of 255) and the other must match worse by 1. Feast bench, lioness walking (ticks 130 to 190): 2.06 against 13.45;
+  lying down into the feed (214 to 279): 1.93 against 3.74; one camera, one pass: 3.25 against 17.83. A reading made 4
+  ticks late on purpose: 16.05, FAILED.
+- **Not done yet:** the lion hunt's video (its recording is gone from `run-film` and the old page predates the feet
+  rule's move; a re-film waits for the game to be free: another session's game tests were running).
 
 ### Part C: living motion (Neon's 63 and 64), measured first
 **What the code says (checked 2026-11-27):** the ants' `BodyTurn`, which Neon's 63 names as its pattern, bends no spine:
