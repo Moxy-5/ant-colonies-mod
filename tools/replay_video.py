@@ -188,7 +188,7 @@ def take(page, a, cams, frames):
                 b.evaluate(f'Replay.pick({json.dumps(a.pick)})')
                 b.evaluate(f'Replay.traces({json.dumps(not a.no_paths)}, 0)')
                 b.evaluate('Replay.fadeOthers(true)')
-                width = TILE[0] * len(cams)
+                width = TILE[0] * (len(cams) + (1 if a.side else 0))
                 bar = Bar(width, rows, a.title or a.pick, a.tick_word)
                 starts, _ = times_of(rows)
                 passes = [1.0] + ([a.slow] if a.slow != 1 else [])
@@ -207,6 +207,10 @@ def take(page, a, cams, frames):
                         pictures.paste(shot, (k * TILE[0], 0))
                         if k:
                             ImageDraw.Draw(pictures).line([k * TILE[0], 0, k * TILE[0], TILE[1]], fill=DARK, width=2)
+                    if a.side:                  # one more picture beside the cameras (a real animal's footage)
+                        x = len(cams) * TILE[0]
+                        pictures.paste(a.side.frame(r), (x, 0))
+                        ImageDraw.Draw(pictures).line([x, 0, x, TILE[1]], fill=DARK, width=2)
                     for p, slow in enumerate(passes):
                         pictures.paste(bar.draw(i, slow, starts[i]), (0, TILE[1]))
                         pictures.save(frames / f'p{p}_{i:05d}.jpg', quality=93)
@@ -281,7 +285,7 @@ def check(page, a, cams, rows, video, work):
 
 
 def make(folder, pick, start=None, end=None, cams=('side', 'front', 'above'), slow=4.0, fixed=False, no_paths=False,
-         check_it=False, out=None, tick_word='game tick', title=None, fit_with=()):
+         check_it=False, out=None, tick_word='game tick', title=None, fit_with=(), side=None):
     """One video of a scene folder's recordings (the command below, callable: tools/clip_video.py makes its offline
     recordings and hands them here, so a clip off the files and a game film are drawn by one drawing). out: the mp4's
     path (default references/replay/video/<made name>.mp4); tick_word names the bar's clock ("clip tick" offline);
@@ -300,7 +304,7 @@ def make(folder, pick, start=None, end=None, cams=('side', 'front', 'above'), sl
     if not cams:
         raise SystemExit('name at least one camera')
     a = argparse.Namespace(pick=pick, start=start, end=end, slow=slow, fixed=fixed, no_paths=no_paths,
-                           tick_word=tick_word, title=title, fit_with=fit_with)
+                           tick_word=tick_word, title=title, fit_with=fit_with, side=side)
     started = time.time()
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as work:
         work = Path(work)
@@ -326,6 +330,10 @@ def make(folder, pick, start=None, end=None, cams=('side', 'front', 'above'), sl
         print(f'wrote {viewer_shot.shown(out)} ({len(rows)} moments, {tick_word}s {t0} to {t1}, {len(cams)} camera{"s" if len(cams) > 1 else ""}, '
               f'{seconds:.1f} s of video, {out.stat().st_size // 1024} KB, made in {made:.0f} s, drawn by {drew})')
         ok = check(page, a, cams, rows, out, work) if check_it else True
+        if side:                        # its own check, every time: the footage shown where it should be
+            starts, lengths = times_of(rows)
+            ok = side.check(lambda s, n: frame_at(out, s, work, n), rows, starts, lengths,
+                            (len(cams) * TILE[0], 0, (len(cams) + 1) * TILE[0], TILE[1])) and ok
     return out, ok
 
 

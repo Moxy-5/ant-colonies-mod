@@ -394,7 +394,7 @@ def own_wants(animal, moments):
     return {mo.k: [[mo.to(p) for p in cs] for _, cs, _ in animal.model.posed(mo.pose)] for mo in moments}
 
 
-def make(animal, name, label, sc, moments, cams, slow, fixed, no_paths, title, cc_kind):
+def make(animal, name, label, sc, moments, cams, slow, fixed, no_paths, title, cc_kind, side=None):
     import replay_video
     # drawn at the size its scene is made for: a block is sc.block model px (a step or bank made for a small monitor
     # is a block at its size, as the game draws it; a young one's raised to a block at its size; else the plan's)
@@ -404,13 +404,26 @@ def make(animal, name, label, sc, moments, cams, slow, fixed, no_paths, title, c
     folder, video = out_paths(animal, name)
     path, = write(folder, world, [(animal, label, ms)])
     held_to(*check(path, animal, ms, px, own_wants(animal, ms)), 'px')
-    out, _ = replay_video.make(folder, label, end=moments[-1][0] // SUB, cams=cams, slow=slow, fixed=fixed,
-                               no_paths=no_paths, out=video, tick_word='clip tick', title=title)
+    out, ok = replay_video.make(folder, label, end=moments[-1][0] // SUB, cams=cams, slow=slow, fixed=fixed,
+                                no_paths=no_paths, out=video, tick_word='clip tick', title=title, side=side)
+    if not ok and side:
+        raise SystemExit(f'{out}: the footage is not where its stride says it should be (above)')
     return out
 
 
-def clip_video(cc, animal, name, cams, slow, plays, fixed, no_paths):
+def clip_video(cc, animal, name, cams, slow, plays, fixed, no_paths, ref=None):
+    """One clip's video; ref = (footage file, stride start s, stride end s): the real animal beside it (Footage)."""
     pl = cc.Played(animal, name)
+    if ref:
+        if not pl.clip.loop:
+            raise SystemExit(f'--ref: {name} plays once; real footage is matched to a looping clip (a walk, a trot)')
+        import tempfile
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as work:
+            side = Footage(ref[0], ref[1], ref[2], name, pl.length, Path(work))
+            moments, speed = clip_moments(cc, animal, pl, plays)
+            print(f'  video of {name} beside {side.words()}, {len(moments)} moments')
+            return make(animal, f'{animal.model_name}_{name}_ref', name, pl.scene, moments, cams, slow, fixed,
+                        no_paths, f'{animal.model_name} {name} (offline) beside real footage', animal.kind(name), side)
     moments, speed = clip_moments(cc, animal, pl, plays)
     ground = (f'walking at {speed:.2f} px/s ({speed / pl.scene.block:.3f} blocks/s) over still ground' if speed
               else 'carried by its own path' if pl.clip.path else 'standing')
@@ -428,6 +441,146 @@ def switch_video(cc, animal, a, b, ticks, phase, cams, slow, fixed, no_paths):
           + f', the ground {va * animal.px:.3f} to {vb * animal.px:.3f} blocks/s, {len(moments)} moments')
     return make(animal, f'sw_{a}_{b}', f'{a}-{b}', sc, moments, cams, slow, fixed, no_paths,
                 f'{animal.model_name} {a} -> {b} (offline)', 'land')
+
+
+# --- real footage beside the clip (phase 3 part B step 3, idea 62, 2026-11-28) -------------------------------------
+# python tools/clip_check.py <animal> <clip> --video --ref <video> --cycle <start>,<end>: a video of the real animal the
+# user gives (Claude downloads nothing without asking), one stride of it marked by its start and end in seconds, set
+# beside the clip's cameras in one mp4. The marked stride is stretched to the clip's own loop (cycle-matched, Neon's
+# idea 62): at every moment the footage shows the point of its stride the clip is at (a quarter of the way through the
+# clip's loop, a quarter of the way through the marked stride), in the real-speed pass and the slowed one alike, so the
+# real cadence, weight shift and spine flow sit against the clip frame by frame. The bar says how much the stride was
+# stretched (the footage played at x0.80 means the clip's stride is a quarter longer than the real one's). Its own
+# check, every time (Footage.check): frames read back out of the mp4 show the footage frame of their stride point (and
+# a frame half a stride off matches worse, or the timing went unproven by them).
+REF_FPS = 60            # the marked stride decoded at this many frames a second (my pick: the game draws 60)
+REF_MATCH = 8.0         # the footage in a frame of the mp4 against the frame it should show: mean difference under this
+REF_MARGIN = 1.0        # ...and the frame half a stride off must match worse by this much (of 255)
+
+
+def ffprobe_seconds(path):
+    import subprocess
+    done = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', str(path)],
+                          capture_output=True, text=True)
+    try:
+        return float(done.stdout.strip().splitlines()[0])
+    except (ValueError, IndexError):
+        raise SystemExit(f'--ref: ffprobe cannot read {path}: {done.stderr.strip()[-300:]}')
+
+
+class Footage:
+    """The marked stride of a real animal's video, decoded once, a frame for any moment of a looping clip."""
+
+    def __init__(self, path, start, end, clip, clip_len, work, tile=None):
+        import shutil
+        import subprocess
+        from PIL import Image
+        import replay_video
+        if not shutil.which('ffmpeg') or not shutil.which('ffprobe'):
+            raise SystemExit('--ref needs ffmpeg and ffprobe')
+        self.path = Path(path)
+        if not self.path.is_file():
+            raise SystemExit(f'--ref: no file {path}')
+        if not (0 <= start < end):
+            raise SystemExit(f'--cycle {start:g},{end:g}: the stride must start at 0 s or later and end after it starts')
+        length = ffprobe_seconds(self.path)
+        if end > length + 1e-3:
+            raise SystemExit(f'--cycle ends at {end:g} s but {self.path.name} is {length:.2f} s long')
+        if clip_len <= 0:
+            raise SystemExit(f'--ref: {clip} has no length')
+        self.start, self.end, self.clip, self.clip_len = start, end, clip, clip_len
+        self.tile = tile or replay_video.TILE
+        w, h = self.tile
+        frames = Path(work) / 'footage'
+        frames.mkdir(parents=True, exist_ok=True)
+        done = subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', f'{start:.4f}', '-i', str(self.path),
+                               '-t', f'{end - start:.4f}', '-an', '-vf',
+                               f'fps={REF_FPS},scale={w}:{h}:force_original_aspect_ratio=decrease,'
+                               f'pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:color=0x1c1a18', '-q:v', '2',
+                               str(frames / 'f_%05d.jpg')], capture_output=True, text=True)
+        self.files = sorted(frames.glob('f_*.jpg'))
+        if done.returncode or not self.files:
+            raise SystemExit(f'--ref: ffmpeg could not read the stride out of {self.path.name}: '
+                             f'{done.stderr.strip()[-400:]}')
+        self.Image = Image
+        self.cache = {}
+
+    def words(self):
+        return (f'{self.path.name}, its stride {self.start:g} to {self.end:g} s ({len(self.files)} frames) matched to '
+                f"{self.clip}'s {self.clip_len:g} s (the footage at x{self.speed():.2f})")
+
+    def speed(self):
+        """How fast the footage plays against real time in the clip's real-speed pass."""
+        return (self.end - self.start) / self.clip_len
+
+    def phase(self, row):
+        """How far through its loop the row's clip is (0 to 1), or None: not drawn, or another clip."""
+        import replay_strips
+        c = replay_strips.clip_of(row) if row.get('drawn') else None
+        if not c or c.get('name') != self.clip or c.get('ticks') is None:
+            return None
+        return ((c['ticks'] / 20.0) % self.clip_len) / self.clip_len
+
+    def index(self, phase):
+        return min(len(self.files) - 1, int(phase * len(self.files)))
+
+    def seconds(self, phase):
+        """Where in the real video the footage shown at this phase is."""
+        return self.start + self.index(phase) / REF_FPS
+
+    def picture(self, i):
+        if i not in self.cache:
+            self.cache[i] = self.Image.open(self.files[i]).convert('RGB')
+        return self.cache[i].copy()
+
+    def frame(self, row, phase=None):
+        """The footage tile shown with this row: the frame of its stride point, labelled; dark when none."""
+        from PIL import ImageDraw
+        import replay_strips
+        import replay_video
+        p = self.phase(row) if phase is None else phase
+        if p is None:
+            shot = self.Image.new('RGB', self.tile, replay_video.DARK)
+        else:
+            shot = self.picture(self.index(p))
+        d = ImageDraw.Draw(shot)
+        top, small = replay_strips.font(16), replay_strips.font(14)
+        name = 'real footage'
+        d.rounded_rectangle([6, 6, 16 + d.textlength(name, font=top), 30], 5, fill=replay_video.DARK)
+        d.text((11, 9), name, fill=replay_video.INK, font=top)
+        words = (f'{self.seconds(p):.2f} s of {self.path.name}  (stride {self.start:g}-{self.end:g} s, x{self.speed():.2f})'
+                 if p is not None else 'not this clip here')
+        y = self.tile[1] - 30
+        d.rounded_rectangle([6, y, 16 + d.textlength(words, font=small), y + 22], 5, fill=replay_video.DARK)
+        d.text((11, y + 3), words, fill=replay_video.INK, font=small)
+        return shot
+
+    def check(self, grab, rows, starts, lengths, box):
+        """The mp4's own frames (grab(seconds, name) -> picture) show, in the footage's place (box), the frame of
+        their stride point: three moments of the real-speed pass, each against its own footage frame and the frame
+        half a stride off. True when it passed (printed either way)."""
+        import replay_video
+        drawn = [k for k, r in enumerate(rows) if self.phase(r) is not None]
+        if len(drawn) < 3:
+            print('footage check: under 3 moments of the clip to check')
+            return False
+        worst, unproven = 0.0, 0
+        for n, k in enumerate(drawn[len(drawn) // 4::max(1, len(drawn) // 4)][:3]):
+            got = grab(starts[k] + lengths[k] / 2, f'ref{n}').crop(box)
+            p = self.phase(rows[k])
+            d_own = replay_video.difference(got, self.frame(rows[k]))
+            d_off = replay_video.difference(got, self.frame(rows[k], (p + 0.5) % 1.0))
+            worst = max(worst, d_own)
+            if d_own >= REF_MATCH:
+                print(f'footage check: the frame at {starts[k]:.2f} s ({p:.2f} of the stride) is {d_own:.2f} of 255 off '
+                      f'its footage frame (match under {REF_MATCH:g}): FAILED')
+                return False
+            if d_off < d_own + REF_MARGIN:
+                unproven += 1
+        print(f'footage check: 3 moments, each within {worst:.2f} of 255 of the footage frame of its stride point '
+              f'(match under {REF_MATCH:g})' + (f'; {unproven} looked nearly the same half a stride off, so their timing '
+                                                f'went unproven by them' if unproven else ', and worse half a stride off: passed'))
+        return True
 
 
 # --- two or more animals: a pair and a scene round a prey (2026-11-28) ---------------------------------------------

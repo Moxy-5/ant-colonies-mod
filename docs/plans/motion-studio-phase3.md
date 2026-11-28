@@ -57,6 +57,8 @@ video. It checks the same frames as picture strips; the videos are for the user'
    of the real animal the user gives (Claude downloads nothing without asking), its marked stride stretched to the
    clip's length (cycle-matched), side by side in one mp4, so the real cadence, weight shift, spine flow and wingbeat
    timing are set against the clip directly, not from slices of stills.
+   **Built 2026-11-28 (branch `claude/motion-b3`, the night the user slept: "complete the rest of the animal maker
+   upgrades while I sleep"), below; proved on a made-up stand-in video, waiting for a real one from the user.**
 Checks: each tool's self-test; the lion hunt film and the feast bench turned into videos and sent to the user.
 
 #### Step 1, built (2026-11-27)
@@ -173,6 +175,37 @@ Checks: each tool's self-test; the lion hunt film and the feast bench turned int
   between neighbouring feeders, legs and manes in each other; nothing new.
 - **Left:** `--hold` (a catch in the jaws); a hop or leap's own travel (the bullfrog hops on the spot: its plan gives
   the hop no ground speed); step 3 (62), when the user gives a real animal's video.
+
+#### Step 3, built (2026-11-28)
+**What was built (idea 62):** `python tools/clip_check.py <animal> <clip> --video --ref <video> --cycle <start>,<end>`:
+one looping clip's video (step 2's, the cameras side by side, real speed then slowed) with one more picture beside the
+cameras, the real animal's footage. The user marks one stride in the video by its start and end in seconds; that
+stride is decoded once (60 frames a second, my pick: the game's drawing rate) and stretched to the clip's loop, so at
+every moment the footage shows the same point of its stride as the clip (a quarter through the loop, a quarter through
+the stride), in the slowed pass too and in every play of the loop. The picture's foot line says where in the real
+video it is and how much the stride was stretched (`x0.80`: the footage plays at 0.8 of real time, so the clip's
+stride is a quarter longer than the real animal's): the cadence told at a glance. The footage keeps its own shape
+(fitted into the tile, dark round it). `tools/clip_video.py`'s `Footage`; `tools/replay_video.py` takes one more
+picture beside its cameras (`side`), so a game film's video could carry footage too later (not wired: no ask yet).
+Out: `references/anim_lab/<animal>/video/vid_<model>_<clip>_ref.mp4`.
+- **Its own check, every time** (`Footage.check`): three frames of the real-speed pass read back out of the mp4 must
+  show the footage frame of their stride point (mean difference under 8 of 255) and match the frame half a stride off
+  worse (or their timing is said to be unproven). A failed check makes no video count as made (the command stops).
+- **Self-test** (`tools/engine_selftest.py`, `real_footage_follows_the_clips_stride_and_a_frame_off_its_stride_is_caught`):
+  a made-up video whose brightness rises with time stands in for the footage: the stride 0.5 to 2.0 s on a 1 s loop
+  shows at each point of the loop the frame of the same point of the stride (the second play of the loop too, another
+  clip never matched); footage shown half a stride off is flagged (42 of 255 off), then the right footage passes. No
+  browser, so it stays quick in the build; skipped where there is no ffmpeg.
+- **Refused plainly:** `--ref` without `--cycle` (or the other way), more than one clip, `--switches`, `--pair`,
+  `--scene`, `--hold`, a clip that plays once (`roar`: a strike or a call has no stride to match), a stride past the
+  video's end, a missing file.
+- **Tried:** the lioness's `walk` (1.22 s loop) beside ffmpeg's test picture with its running counter (4 s, wider than
+  the tiles), its stride marked 0.5 to 1.7 s: 148 moments, 13 s of video, made in 24 s; the check passed (every
+  frame within 1.07 of 255 of its footage frame); a frame looked at: the lioness 5.3 ticks into her walk (0.22 of
+  it), the footage at 0.75 s (0.22 of the marked stride). **Not tried on a real animal:** there is no real footage
+  on the PC, and Claude downloads nothing without asking. To use it: give a short video of a walking lion (or any
+  animal with a clip), and say or let Claude find where one stride starts and ends (the same foot down twice).
+- **Left:** a game film's video with footage beside it (`replay_video.py --ref`, the same `side`), when wanted.
 
 ### Part C: living motion (Neon's 63 and 64), measured first
 **What the code says (checked 2026-11-27):** the ants' `BodyTurn`, which Neon's 63 names as its pattern, bends no spine:

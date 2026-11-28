@@ -609,6 +609,48 @@ def the_moving_ground_keeps_a_walks_feet_still_and_shows_a_wrong_speed():
 
 
 @test
+def real_footage_follows_the_clips_stride_and_a_frame_off_its_stride_is_caught():
+    """Real footage beside a clip (clip_check.py --video --ref --cycle; phase 3 part B step 3): a made-up video whose
+    brightness rises with time stands in for the footage; its stride 0.5 to 2.0 s matched to a 1 s loop shows, at each
+    point of the loop, the frame of the same point of the stride (in the second play of the loop too); the video's
+    own check flags footage shown half a stride off, then passes the footage where it belongs."""
+    import shutil
+    import subprocess
+    import tempfile
+    from pathlib import Path
+    import clip_video
+    if not shutil.which('ffmpeg') or not shutil.which('ffprobe'):
+        print('      (no ffmpeg here: the footage test skipped)')
+        return
+    work = Path(tempfile.mkdtemp())
+    src = work / 'rising.mp4'
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=black:s=160x120:r=30:d=3',
+                    '-vf', "geq=lum='min(235,16+T*70)':cb=128:cr=128", '-pix_fmt', 'yuv420p', str(src)], check=True)
+    ft = clip_video.Footage(src, 0.5, 2.0, 'walk', 1.0, work, tile=(160, 120))
+
+    def row(seconds):
+        return {'drawn': True, 'clips': {'body': {'name': 'walk', 'state': '', 'speed': 1.0, 'ticks': seconds * 20}}}
+
+    for t, want in ((0.5, 1.25), (1.25, 0.875), (0.0, 0.5)):
+        got = ft.seconds(ft.phase(row(t)))
+        need(abs(got - want) <= 1.5 / clip_video.REF_FPS, f'the loop at {t} s shows the footage at {got:.3f} s, not {want}')
+        lum = ft.frame(row(t)).convert('L').getpixel((80, 60))
+        bright = want * 70 * 255 / 219              # (the video's 16 to 235 read back as a picture's 0 to 255)
+        need(abs(lum - bright) < 5, f'the loop at {t} s shows a frame of brightness {lum}, not {bright:.0f}')
+    need(ft.phase({'drawn': True, 'clips': {'body': {'name': 'trot', 'ticks': 3}}}) is None,
+         'another clip was matched to the walk\'s stride')
+    rows = [row(k * 0.05) for k in range(40)]
+    starts, lengths = [k * 0.05 for k in range(40)], [0.05] * 40
+    box = (0, 0, 160, 120)
+
+    def grab(off):
+        return lambda s, name: ft.frame(rows[round((s - 0.025) / 0.05)],
+                                        (ft.phase(rows[round((s - 0.025) / 0.05)]) + off) % 1.0)
+    need(not ft.check(grab(0.5), rows, starts, lengths, box), 'footage half a stride off passed the check')
+    need(ft.check(grab(0.0), rows, starts, lengths, box), 'the footage where it belongs failed the check')
+
+
+@test
 def a_pair_recording_puts_both_where_the_pair_check_does_and_a_holder_moved_is_caught():
     """The pair video (clip_check.py --pair --video) draws what the pair check judged: a lioness biting a buffalo and
     the buffalo read back where clip_check.Pair places them (the spot tables), every corner where it is in the world;

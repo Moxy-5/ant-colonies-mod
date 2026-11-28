@@ -47,6 +47,12 @@ the game draws it, then in the game frame by frame.
                everyone round the prey, one form a spot (the forms in turn) and round a carcass the full lions lying
                by it: <prey>/video/vid_scene_<pose>[_size<s>].mp4. The cameras round the holder (a scene: the prey)
                take in everyone. Not yet with --hold or --gait-changes.
+  --video --ref <video> --cycle <start>,<end>  (phase 3 part B step 3, idea 62, 2026-11-28; tools/clip_video.py's
+               Footage) one looping clip's video with a real animal's footage beside the cameras: the video the user
+               gives, one stride marked in it by its start and end in seconds, stretched to the clip's loop so at
+               every moment both are at the same point of the stride (in the slowed pass too); the bar's footage line
+               says how much it was stretched. Checked every time: frames read back out of the mp4 show the footage
+               frame of their stride point. references/anim_lab/<animal>/video/vid_<model>_<clip>_ref.mp4
   --gait-changes [--write]  (the Motion Studio, phase 2, step 3, 2026-11-25) for each change between two of the plan's
                gaits (its "gaits.order"), the moment of the old clip whose pose is nearest the new clip's first frame (the
                farthest any box corner is from its place in the other, model px), against the worst moment; --write
@@ -2140,6 +2146,7 @@ def main(argv):
     hold, angles = None, [90.0, 25.0, 155.0]
     pair_with, spots_wanted, size, scene = None, [], 1.0, None
     video, cams, slow, plays, fixed, no_paths = False, ['side', 'front', 'above'], 4.0, 2, False, False
+    ref, cycle = None, None
     i = 0
     while i < len(args):
         a = args[i]
@@ -2203,6 +2210,15 @@ def main(argv):
         elif a == '--no-paths':
             no_paths = True
             i += 1
+        elif a == '--ref':
+            ref = args[i + 1]
+            i += 2
+        elif a == '--cycle':
+            try:
+                cycle = tuple(float(x) for x in args[i + 1].split(','))
+            except ValueError:
+                cycle = ()
+            i += 2
         else:
             names.append(a)
             i += 1
@@ -2212,6 +2228,15 @@ def main(argv):
         print('--video is made for clips, clip changes (--switches), pairs (--pair) and scenes (--scene); not yet with '
               '--hold or --gait-changes')
         return 1
+    if ref or cycle:
+        if not (ref and cycle and len(cycle) == 2):
+            print('--ref <video> and --cycle <start>,<end> (the marked stride, in seconds) go together')
+            return 1
+        if not video or switches or changes or hold or pair_with or scene or len(names) != 1:
+            print("--ref is made for one looping clip's --video (a walk, a trot): name one clip, with no --switches, "
+                  '--pair, --scene, --hold or --gait-changes')
+            return 1
+        ref = (ref, cycle[0], cycle[1])
     filmed = None
     if video:
         import clip_video
@@ -2248,7 +2273,7 @@ def main(argv):
             if any('FLAGGED' in line for line in lines):
                 bad_clips.append(name)
             if video:
-                print('    drew', clip_video.clip_video(me, animal, name, cams, slow, plays, fixed, no_paths))
+                print('    drew', clip_video.clip_video(me, animal, name, cams, slow, plays, fixed, no_paths, ref))
             continue
         pl, planted, lines = check_clip(animal, name, flagged)
         print('\n'.join(lines))
@@ -2270,7 +2295,7 @@ def main(argv):
                         f'{animal.model_name} {name}  {pl.length:g} S')
             print('  wrote', png)
         if video:
-            print('    drew', clip_video.clip_video(me, animal, name, cams, slow, plays, fixed, no_paths))
+            print('    drew', clip_video.clip_video(me, animal, name, cams, slow, plays, fixed, no_paths, ref))
     if switches:
         ticks, source = animal.blend_ticks()
         todo = pairs(animal, every)
