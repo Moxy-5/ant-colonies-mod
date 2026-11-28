@@ -180,7 +180,7 @@ plan"). The clips were the easy part of step 5; nearly every fault came from put
 59. **The young's gaits** (BUGS 378): `clip_check.py` at a young size, young gait slots in `Gaits` and the pace report,
     so stride-matched calf and cub gaits can be made and checked against the young's real speeds. S, Claude.
 
-**H. Video review (Neon's phase 3c, part 1; added 2026-11-27).** Neon can watch an `.mp4` itself and judge timing and
+**H. Video review (Neon's; added 2026-11-27; phase 3, part B).** Neon can watch an `.mp4` itself and judge timing and
 weight that fall between contact-sheet frames.
 60. **A recording to video** (`tools/replay_video.py` or `replay_strips.py --video`): several cameras in one frame,
     1x and slow motion, a bar with tick, clip, play speed and a red mark for a sliding foot. M, Claude.
@@ -188,7 +188,7 @@ weight that fall between contact-sheet frames.
     of `--switches`, a `--pair` scene), in seconds, no game. M, Claude or Neon.
 62. **Real footage beside the clip** (`--ref <video>`, grows idea 47), cycle-matched. S-M, Claude.
 
-**I. Living motion (Neon's phase 3c, part 2; promotes 27 and 28).**
+**I. Living motion (Neon's; promotes 27 and 28; phase 3, part C, rethought there as clips the game picks).**
 63. **The spine bending into turns** from the body plan's chain, eased on `DrawClock`. M, Claude.
 64. **Start, stop and banked-turn weight** (`stop_pitch`, `turn_lean`, `accel_stride` in the plan, eased on
     `DrawClock`), for runners and fliers. M, Claude.
@@ -202,11 +202,11 @@ weight that fall between contact-sheet frames.
 - **Phase 2 (new, 2026-11-27, the user: "its a new phase delete the old one that was already completed"): the glue,**
   51 to 56 with Neon's 57 to 59: `docs/plans/motion-studio-phase2.md`. (The first phase 2, ideas 20 to 26, one source
   of truth for motion, was built 2026-11-25; its record is in `docs/HISTORY.md`.)
-- **Phase 3, partner moves (the lion and buffalo first):** 31, 32, then 36 and 37 offline, then 33 with 34 or 35 in
-  the game (pick after seeing the phase 0 films), then 38, 40, 41. The hunt's oval and fixed ticks go.
-  **Started 2026-11-26: its own plan and steps in `docs/plans/motion-studio-phase3.md` (step 1, the hold on the prey's body, built).**
-- **Phase 3b, the glue:** became the new phase 2 (above).
-- **Phase 3c (Neon's, 2026-11-27): video review and living motion,** 60 to 62, then 63 and 64. After phase 2.
+- **Phase 3 (tidied 2026-11-27, no more 3b or 3c; its plan `docs/plans/motion-studio-phase3.md`, "Phase 3 now"):**
+  step 0, the branches in step for Neon; **part A, partner moves** (31 to 41, the lion and buffalo): built 2026-11-26,
+  steps 1 to 5; **part B, motion as video** (60 to 62, Neon's); **part C, living motion** (63 and 64, Neon's),
+  measured first and made as clips the game picks (my pick, to confirm with the measuring). The old "phase 3b, the
+  glue" became the new phase 2 (above).
 - **Phase 4, the replay key (9)** and the tests (43 to 46). **On hold (the user, 2026-11-26).** Its hold and strike
   tests would be written against the placement code that 51 replaces; the replay key loses nothing by waiting.
 

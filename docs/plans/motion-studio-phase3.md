@@ -7,6 +7,92 @@ phase needs only the phase 0 recordings and `tools/pair_report.py`, so it does n
 (CLAUDE.md, 2026-11-14): every number here is my pick unless measured. Branch `claude/motion-phase3` (worktree
 `.claude\worktrees\motion-phase3`, from `claude/review-fix-2`).
 
+## Phase 3 now (tidied 2026-11-27; the user: "its kind of a mess")
+**Why it was a mess:** phase 3 was started before phase 2, so the numbers crossed. The first phase 2 (gaits) was built
+2026-11-25 and its plan deleted; phase 3 built its steps 1 to 5 (partner moves) on 2026-11-26; its glue ideas, first
+called "phase 3b", became the new phase 2 (built 2026-11-27); Neon's "phase 3c" (videos and living motion) was folded
+into `docs/plans/motion-studio.md` as its parts H and I. Checked 2026-11-27 against Neon's own file (`neon/studio`,
+commit 7ca907b2): every idea of Neon's is there (57 to 59 built in phase 2, 60 to 64 in parts H and I), nothing lost.
+**From now on there is no 3b or 3c. Phase 3 is this file, in three parts:**
+- **Part A, partner moves (ideas 31 to 41): built** (steps 1 to 5, the record below). What it left, and where each
+  goes: "Not in phase 3" at the end of this section.
+- **Part B, motion as video** (Neon's 60 to 62): steps 1 to 3.
+- **Part C, living motion** (Neon's 63 and 64), measured first and rethought as clips: steps 4 to 6.
+- First, **step 0**, the branch sync Neon asked for.
+
+### Step 0: the branches in step (before Neon is back, about 2026-12-02; no code)
+Neon's note asked for this first and it has not happened. `neon/studio` has none of the Motion Studio's work since
+phase 0 (149 commits behind: no `tools/recording.py`, `replay.py`, `spots.py`, no `Placement` in the framework), and
+`master` stops at `claude/review-fixes` (2026-11-25). Neon's makers on its own branch still write plans the old way, so a
+re-export there would drop the `spots`, `holds`, `strikes` and `postures` tables that phase 2's `keep_sections` now
+keeps. So: the full run and the whole guard set (the rules before a merge into `master`), the merge into `master` (the
+user's yes first), and a line on `docs/HANDOFF.md` asking Neon to merge `master` into `neon/studio` before any new clip.
+
+### Part B: motion as video (Neon's 60 to 62)
+**Why first:** making animations faster comes first (the user), and the animation rework (every clip redone) comes
+next; a video sent to the user's phone shows timing and weight that stills miss. **Said plainly:** Claude cannot watch a
+video. It checks the same frames as picture strips; the videos are for the user's eye and Neon's.
+1. **A recording to video (60).** `python tools/replay_video.py <scene> --pick <animal> [--from t --to t]
+   [--cams side,front,above] [--slow 4]`: the replay page drawn frame by frame by the headless browser
+   `replay_strips.py` already uses (the recorded parts, nothing re-imagined), the cameras side by side in one frame,
+   played at 1x then slowed, a bar under it with the tick, the clip, the play speed and a red mark for each sliding foot
+   (the one feet rule in `tools/recording.py`). An mp4 into `references/replay/video/` (ffmpeg, as the guard films).
+   Its own check: one frame matches `replay_strips.py`'s picture of the same tick.
+2. **A clip to video, no game (61).** `python tools/clip_check.py <animal> <clips> --video` (my pick over a new tool:
+   the checker already poses every clip as the game draws it, with `--switches`, `--pair`, `--scene` and `--size`): the
+   clip on a floor whose lines move at the clip's own stride (a planted foot that slides shows against them), the
+   faults in red as on its strips, 1x then slowed, in seconds.
+3. **Real footage beside it (62), small, last.** `--ref <video> --cycle <start>,<end>`: a video the user gives (Claude
+   downloads nothing without asking), its marked stride stretched to the clip's length, side by side.
+Checks: each tool's self-test; the lion hunt film and the feast bench turned into videos and sent to the user.
+
+### Part C: living motion (Neon's 63 and 64), measured first
+**What the code says (checked 2026-11-27):** the ants' `BodyTurn`, which Neon's 63 names as its pattern, bends no spine:
+it eases the whole body's heading after the head. A big animal turns like a turntable (up to 20 degrees a tick, its
+planted feet turning with the body, so likely skating in every turn: not measured yet), and a start or stop is a
+straight blend. Neon's 63 and 64 add live layers on top of the clips (a bend, then `stop_pitch`, `turn_lean`,
+`accel_stride`). Bending a body live and fixing the feet after is the starting idea that failed twice on the monitor
+(method M1), and three new numbers in every plan pushing on each other is the warning sign "fewer rules" names.
+**My pick (to confirm with step 4's numbers): turns, starts and stops become clips the game picks, as it already picks
+a gait by speed.** One rule grown, no new live layer.
+4. **Measure first: the turning bench.** A film bench in phase 2's way (`until <facts> freeze`, one take per moment): a
+   lioness and a cow walking a curve, a sharp turn at the trot, a start from standing to the gallop, a stop out of the
+   gallop. Read from the recording: how fast they really turn (degrees a tick), how often and how long, and how far
+   their planted feet slide in turns, starts and stops; part B's video of it for the user. My addition: a take of the
+   hold, so BUGS 449 (the hunt film misses the hold) is filmed at last. **Then the user gets the numbers, the video and
+   the pick before step 5.** The risk to look for: the game's paths turn sharply at block corners, so a turn may last
+   too short a time for a turn clip to show; the numbers say.
+5. **Turns (63), my pick: turn clips.** A gait may name turn clips (`gaits.walk.turn`: left and right, made with the
+   motion kit, the spine bent into the curve over planted feet as the monitor's S-curve already is, at the turn rate
+   each is made for). The game reads its own turn rate as it reads its speed and changes clip on the matching
+   footfall, the gait change that exists; the checker and the pace report read the same rows. Proved on the lioness
+   (the most filmed). Fallback if clips cannot cover the turns step 4 measures: a drawing-only lag of the hips behind
+   the shoulders, said as a live rule and filmed.
+6. **Starts and stops (64), my pick: clips that carry their own travel.** A `stop` out of the gallop (hind legs brought
+   under, head up, a short skid) and a `start` (the first strides from standing), made as the strikes are (their
+   travel in the clip with the kit's `travel`, `path_note`, `on_path`; the box follows the clip, `Strikes.Ride`'s way),
+   and entered and left through the clip map (a gait gets ways in and out, as a posture has). The buffalo's heavy stop
+   and the lion's springy one stay each animal's own clips (the engine's rule 5). Fliers: the eagle's `bank_left`,
+   `bank_right` and `land_flare` are clips already, picked the same way once the eagle is in the game (not before).
+Checks: `clip_check.py` with `--switches`, the bench again (the slide in turns, starts and stops against step 4's
+numbers), the course scenes and the `land` tests the lion and the buffalo touch.
+
+### Not in phase 3
+- **Part A's leftovers, new clips (for the animation rework):** the `cling` (a lioness on a walking cow's haunch), the
+  drag (idea 42), forepaws holding the carcass; the looks bugs 466 (a let-go buffalo's tail flick), 467 (lions in each
+  other at a carcass), the lioness's `hold_sink` and `hold_down` jaw 5.5 to 5.9 px over its spot on a lying cow (R12-7's
+  flag), the cow's cheek in a throat holder's neck.
+- **Part A's leftovers, small game fixes (for `docs/plans/lion.md`):** the carcass tilted to a slope, holders stepping
+  clear as a dying cow rolls, a third lioness gripping mid-sink behind the cow's clock, a feeding spot kept through a
+  save, the dead buffalo's head 4.5 px over the ground, the calf's mother standing over the carcass through the feast.
+- **BUGS 378** (a calf's feet slide when it runs): the young clips, for the animation rework (phase 2 step 6 made
+  their slots).
+- **Phase 4** (the replay key, idea 9, and the motion tests 43 to 46): still on hold.
+- **At the end:** reviewers read the phase's code as in phase 2 (at most four, the agent budget), findings checked
+  and fixed.
+
+**Everything below is part A's record (steps 1 to 5, built 2026-11-26).**
+
 ## What the phase 0 films showed (the evidence, BUGS 373 to 377)
 373 the holding lioness's jaws 0.4 to 1.0 blocks off the calf; 374 her planted feet skate while the calf lies still (her
 box pushed toward a place each tick); 375 the strike carries her box 4 to 5 blocks while the leap clip stays in place;
