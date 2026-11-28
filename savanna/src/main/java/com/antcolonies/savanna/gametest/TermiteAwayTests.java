@@ -307,8 +307,12 @@ public class TermiteAwayTests {
      * of the test below at midday: 60 old workers in the numbers and 3 known dry tufts with 2 of their 4 pieces left.
      * By day nothing is foraged. Then a night of 500 seconds is jumped over (as a bed does): in that one pass the
      * numbers bring the 6 pieces in, and the tufts vanish out of sight after.
+     * <p>Review R5-52, the same scene: the day clock's jump is read whole (a bed's jump forward, and {@code /time set
+     * day} at night, a jump many days back, both give the rest of the night; a clock that just runs gives nothing),
+     * and before the night is jumped the day clock stands still at midday for 30 seconds: the numbers forage a night's
+     * share of that time, so pieces come in with no night at all.
      */
-    @GameTest(template = "arena", timeoutTicks = 900, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void aNightSleptThroughIsForagedByTheTermiteNumbers(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TestScenes.deepGround(helper);
@@ -345,11 +349,26 @@ public class TermiteAwayTests {
             helper.assertTrue(colony.foragingTicksBetween(level, 13000, 23000) >= 8000 && colony.foragingTicksBetween(level, 1000, 11000) == 0,
                     "a night should count as the termites' foraging time and a day not: " + colony.foragingTicksBetween(level, 13000, 23000)
                             + " and " + colony.foragingTicksBetween(level, 1000, 11000));
+            long[] bed = com.antcolonies.colony.FieldLife.clockJump(24000L * 5 + 15000, 100, 24000L * 6, 120);
+            long[] setDay = com.antcolonies.colony.FieldLife.clockJump(24000L * 5 + 15000, 100, 1000, 120);
+            helper.assertTrue(bed != null && colony.foragingTicksBetween(level, bed[0], bed[1]) >= 6000,
+                    "a bed's jump from 21:00 to the morning should give the rest of the night");
+            helper.assertTrue(setDay != null && colony.foragingTicksBetween(level, setDay[0], setDay[1]) >= 6000,
+                    "/time set day at 21:00 (a jump back to the first day) should give the rest of the night too");
+            helper.assertTrue(com.antcolonies.colony.FieldLife.clockJump(24000L * 5 + 15000, 100, 24000L * 5 + 15020, 120) == null,
+                    "a day clock that just runs has not jumped");
+            colony.field().setClockStandsForTests(true); // the daylight cycle is switched off at midday
+        });
+        helper.runAfterDelay(900, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(!colony.isForagingTime(level) && colony.food().getFood() > foodBefore[0],
+                    "with the day clock standing still at midday the numbers should forage a night's share: " + colony.food().getFood() + ", was " + foodBefore[0]);
+            colony.field().setClockStandsForTests(null);
             colony.field().forageSkippedNight(level, 500);
             helper.assertTrue(colony.food().getFood() == foodBefore[0] + 6, "the night slept through should bring the 6 pieces in: "
                     + colony.food().getFood() + ", was " + foodBefore[0]);
         });
-        helper.runAfterDelay(600, () -> {
+        helper.runAfterDelay(1200, () -> {
             for (BlockPos tuft : tufts) {
                 helper.assertTrue(level.getBlockState(tuft).isAir(), "a tuft eaten up in the night slept through should be gone: " + tuft);
             }

@@ -109,6 +109,12 @@ final class HoleTurns {
         }
     }
 
+    /** A foraging time nobody sees (the day clock jumped over its start, or stands still): its holes are picked now. */
+    void unseenRound(ServerLevel level, boolean away) {
+        pickTurns(level, away);
+        ColonyManager.get(level).markChanged();
+    }
+
     /**
      * The holes open to the foragers this foraging time: the night's turns, the holes runways leave from, and the holes of
      * pieces out to rich food whose food lasts (see {@link #isInTurn}); never a hole closed for danger (brain step 4g,

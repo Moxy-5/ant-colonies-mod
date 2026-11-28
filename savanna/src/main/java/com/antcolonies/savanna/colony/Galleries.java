@@ -281,6 +281,12 @@ public class Galleries implements ColonyHooks.Underground {
         return turns.holesInTurn(level);
     }
 
+    /** A foraging time nobody sees: its holes are picked now (see {@link HoleTurns#unseenRound}; review R5-52). */
+    @Override
+    public void foragingTimeUnseen(ServerLevel level, boolean away) {
+        turns.unseenRound(level, away);
+    }
+
     /** A new hole in place of one left for good (see {@link HoleTurns#openInstead}). */
     HoleTurns.Instead openInstead(ServerLevel level, NestPlan.ForagingTunnel left, BlockPos spot, double from) {
         return turns.openInstead(level, left, spot, from);

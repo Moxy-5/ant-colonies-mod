@@ -291,6 +291,13 @@ public final class ColonyHooks {
         /** The numbers brought food in by this hole now. */
         void noteForaged(BlockPos hole, long now);
 
+        /**
+         * A foraging time passes that nobody sees (the day clock jumped over it before it began, or stands still;
+         * {@code FieldLife}, review R5-52): its holes are picked now, as at its start.
+         */
+        default void foragingTimeUnseen(net.minecraft.server.level.ServerLevel level, boolean away) {
+        }
+
         /** How far round an open hole (blocks) the foragers graze. */
         int grazeRadius();
 

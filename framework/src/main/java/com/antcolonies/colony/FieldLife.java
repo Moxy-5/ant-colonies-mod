@@ -115,10 +115,7 @@ public class FieldLife {
         }
         awayNow = away;
         boolean changed = showCuts(level);
-        long slept = nightJumpedOver(level);
-        if (slept > 0) {
-            changed |= forageSkippedNight(level, slept);
-        }
+        changed |= forageUnseenTime(level);
         changed |= forage(level);
         if (changed) {
             ColonyManager.get(level).markChanged();
@@ -364,23 +361,93 @@ public class FieldLife {
     private double seconds = 1.0;
     private boolean jumpedNight;
 
+    /** Tests only: whether the day clock counts as standing still (null: as it is; never under a test's own clock). */
+    @Nullable
+    private Boolean clockStandsForTests;
+    /** The share of a day that is foraging time, while the day clock stands still (below 0: not worked out). Not saved. */
+    private double nightShare = -1;
+    /** When the holes were last picked for a foraging time nobody saw, while the day clock stands still. Not saved. */
+    private long unseenRoundAt = Long.MIN_VALUE;
+
     /**
-     * The seconds of foraging time the day clock jumped over since the last tick: a player slept (the day clock goes
-     * to morning, the game clock, which hunger runs on, does not), or the time was set forward. 0 for a species that
-     * keeps no schedule, and when nothing jumped.
+     * The foraging time the day clock took from the colony since the last tick, foraged by the numbers (review R5-52:
+     * the species forages by the day clock and gets hungry by game time, which never jumps or stops). One rule for
+     * every way the two clocks part:
+     * <ul>
+     * <li>the day clock jumped, forward or back (a bed, {@code /time set day} in the evening, {@code /time add}): the
+     * time of day went from the old hour to the new one, and the foraging time between the two, going forward (less
+     * than a day), is foraged in one pass ({@link #clockJump});
+     * <li>the day clock stands still outside foraging time (the daylight cycle switched off at noon): every second
+     * the numbers forage a night's share of it, so a world of endless day does not starve the colony.
+     * </ul>
+     * Both are nights foraged unseen (my pick): the termites did forage; the player did not see it. Nothing for a
+     * species that keeps no schedule.
      */
-    private long nightJumpedOver(ServerLevel level) {
+    private boolean forageUnseenTime(ServerLevel level) {
         long day = level.getDayTime();
         long game = level.getGameTime();
         long wasDay = lastDayTime;
         long wasGame = lastGameTime;
         lastDayTime = day;
         lastGameTime = game;
-        if (wasGame == Long.MIN_VALUE || !colony.keepsASchedule()) {
-            return 0;
+        if (wasGame == Long.MIN_VALUE || game <= wasGame || !colony.keepsASchedule()) {
+            return false;
         }
-        long jumped = (day - wasDay) - (game - wasGame);
-        return jumped < 200 ? 0 : colony.foragingTicksBetween(level, wasDay + (game - wasGame), day) / 20;
+        long[] jump = clockJump(wasDay, wasGame, day, game);
+        if (jump != null) {
+            long seconds = colony.foragingTicksBetween(level, jump[0], jump[1]) / 20;
+            if (seconds <= 0) {
+                return false;
+            }
+            if (colony.foragingTicksBetween(level, jump[0] - 100, jump[0]) == 0) {
+                pickUnseenHoles(level); // (that foraging time had not begun: no holes were picked for it)
+            }
+            return forageSkippedNight(level, seconds);
+        }
+        boolean stands = clockStandsForTests != null ? clockStandsForTests : day == wasDay && !Colony.hasTestClock();
+        if (!stands) {
+            nightShare = -1;
+            return false;
+        }
+        if (colony.isForagingTime(level)) {
+            return false; // (stopped at night, or it rains: they are out for real)
+        }
+        if (nightShare < 0) {
+            nightShare = colony.foragingTicksBetween(level, 0, 24000) / 24000.0;
+        }
+        if (unseenRoundAt == Long.MIN_VALUE || game - unseenRoundAt >= 24000) {
+            unseenRoundAt = game;
+            pickUnseenHoles(level); // (a new night's holes once a day of game time)
+        }
+        return nightShare > 0 && forageUnseen(level, nightShare * (game - wasGame) / 20.0);
+    }
+
+    /**
+     * The span of the day clock ({@code from} to {@code to}, on its own scale) that it jumped over between two ticks:
+     * from where it would have been by now to the hour it shows instead, going forward (less than a day). Null when it
+     * did not jump (less than 10 seconds off). A jump back counts too: {@code /time set day} at night sets the clock to
+     * the first day's morning, many days back, and the rest of that night is gone all the same (R5-52).
+     */
+    public static long[] clockJump(long wasDay, long wasGame, long day, long game) {
+        long expected = wasDay + (game - wasGame);
+        long jumped = day - expected;
+        if (Math.abs(jumped) < 200) {
+            return null;
+        }
+        return new long[] {expected, expected + Math.floorMod(jumped, 24000L)};
+    }
+
+    /** A foraging time nobody saw has no holes picked yet: the species' web picks them (the numbers graze only round them). */
+    private void pickUnseenHoles(ServerLevel level) {
+        ColonyHooks.Underground web = colony.underground();
+        if (web != null) {
+            web.foragingTimeUnseen(level, awayNow);
+        }
+    }
+
+    /** Tests only: the day clock counts as standing still (or not) whatever it does; null, as it is. */
+    public void setClockStandsForTests(@Nullable Boolean stands) {
+        clockStandsForTests = stands;
     }
 
     /**
@@ -391,6 +458,11 @@ public class FieldLife {
      * holes in turn, the room in the store, plants in a player's sight left alone. True if anything changed.
      */
     public boolean forageSkippedNight(ServerLevel level, long nightSeconds) {
+        return forageUnseen(level, nightSeconds);
+    }
+
+    /** One pass of the numbers standing for this many seconds of foraging time nobody saw (see {@link #forageSkippedNight}). */
+    private boolean forageUnseen(ServerLevel level, double nightSeconds) {
         seconds = nightSeconds;
         jumpedNight = true;
         try {

@@ -479,6 +479,11 @@ public class Colony {
         return (int) ((1.0 - light) * 11.0) < 4;
     }
 
+    /** Whether a test clock is set (the game test server): the colonies do not go by the world's own day clock. */
+    public static boolean hasTestClock() {
+        return testTime != null;
+    }
+
     /** The time of day for the day clock (see {@link #isForagingTime}). */
     public long timeOfDay(net.minecraft.world.level.Level level) {
         return testTime != null ? testTime.dayTimeAt(level, center) : level.getDayTime();
