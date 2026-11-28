@@ -114,6 +114,11 @@ public class TermiteFoodTests {
                 colony[0] = TermiteMoundTests.colony(helper);
                 if (colony[0] != null) {
                     TestClock.still(helper, 0.0); // always midnight here: the foragers go out
+                    // The plants lie all round the mound, 7 blocks out, and the clock stands at one endless night: with
+                    // the galleries the colony goes out only round that night's few holes (review R5-61, the numbers'
+                    // rule and the real foragers' alike), and the plants by the others would wait for a night that never
+                    // comes. This test is about the garden: the galleries off, the 2 holes of before, both open.
+                    com.antcolonies.savanna.colony.Galleries.of(colony[0]).setSwitchForTests(false);
                     for (BlockPos plant : List.of(bush, tallGrass, grassA, grassB, hay)) {
                         colony[0].foodMap().knowForTests(helper.absolutePos(plant)); // (finding them is the next test)
                     }
@@ -512,6 +517,51 @@ public class TermiteFoodTests {
         helper.assertTrue(level.getBlockState(first).isAir() && level.getBlockState(second).isAir() && level.getBlockState(wood).isAir(),
                 "the casts did not crumble once the wood was gone");
         helper.assertTrue(level.getBlockState(wood.above()).isAir(), "the mud on top of the log did not crumble once the wood was a cast");
+        helper.succeed();
+    }
+
+    /**
+     * Review R5-80: the leftovers age beside a spectator too. Minecraft gives random ticks only near a player who is not
+     * a spectator, so watching in spectator an eaten log's cast stood for good, every crust stayed fresh, pulp heaps did
+     * not sink and remains did not weather. The framework now gives the blocks of its tag the random ticks held back
+     * ({@code WithheldTicks}); given by hand here, the scene's cells only. Mound soil is not in the tag (the mound dries
+     * its own, {@code MoundDrying}) and is left as it is.
+     */
+    @GameTest(template = "arena", skyAccess = true)
+    public static void theLeftoversAgeBesideASpectator(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestScenes.deepGround(helper);
+        BlockPos crust = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
+        BlockPos cast = crust.east(2);
+        BlockPos heap = crust.west(2);
+        BlockPos remains = crust.north(2);
+        BlockPos soil = crust.south(2);
+        level.setBlock(crust, SavannaBlocks.MUD_CRUST.get().withFace(Blocks.AIR.defaultBlockState(), net.minecraft.core.Direction.NORTH), 3);
+        level.setBlock(cast, SavannaBlocks.MUD_CAST.get().defaultBlockState(), 3);
+        level.setBlock(heap, com.antcolonies.savanna.registry.TreeBlocks.PULP_HEAP.get().withLayers(8), 3);
+        BlockState pile = SavannaBlocks.TERMITE_REMAINS.get().defaultBlockState()
+                .setValue(com.antcolonies.block.SeedPileBlock.LAYERS, com.antcolonies.block.SeedPileBlock.MAX_LAYERS);
+        level.setBlock(remains, pile, 3);
+        level.setBlock(soil, SavannaBlocks.TERMITE_MOUND.get().defaultBlockState().setValue(com.antcolonies.savanna.block.TermiteMoundBlock.AGE, 0), 3);
+        for (BlockPos pos : List.of(crust, cast, heap, remains)) {
+            helper.assertTrue(level.getBlockState(pos).is(com.antcolonies.block.WithheldTicks.TAG), "not given the held-back ticks: " + level.getBlockState(pos));
+        }
+        helper.assertTrue(!level.getBlockState(soil).is(com.antcolonies.block.WithheldTicks.TAG), "mound soil would be dried twice");
+        java.util.Set<BlockPos> scene = java.util.Set.of(crust, cast, heap, remains, soil);
+        // About 200 random ticks a cell: some ten days of a block's random ticks.
+        // (each chunk the scene's cells lie in: the arena's middle can straddle a chunk's edge)
+        scene.stream().map(net.minecraft.world.level.ChunkPos::new).distinct().forEach(chunk ->
+                com.antcolonies.block.WithheldTicks.give(level, level.getChunk(chunk.x, chunk.z), 4096 * 200, scene::contains));
+        helper.assertTrue(level.getBlockState(crust).getValue(com.antcolonies.savanna.block.MudCrustBlock.AGE) > 0, "the crust is still fresh: " + level.getBlockState(crust));
+        helper.assertTrue(level.getBlockState(cast).isAir(), "the cast nobody needs still stands");
+        BlockState sunk = level.getBlockState(heap);
+        helper.assertTrue(!sunk.is(com.antcolonies.savanna.registry.TreeBlocks.PULP_HEAP.get())
+                || sunk.getValue(com.antcolonies.savanna.block.PulpHeapBlock.LAYERS) < 8, "the pulp heap did not sink: " + sunk);
+        BlockState weathered = level.getBlockState(remains);
+        helper.assertTrue(!weathered.is(SavannaBlocks.TERMITE_REMAINS.get())
+                || weathered.getValue(com.antcolonies.block.SeedPileBlock.LAYERS) < com.antcolonies.block.SeedPileBlock.MAX_LAYERS,
+                "the remains did not weather: " + weathered);
+        helper.assertTrue(level.getBlockState(soil).getValue(com.antcolonies.savanna.block.TermiteMoundBlock.AGE) == 0, "the mound soil was ticked: " + level.getBlockState(soil));
         helper.succeed();
     }
 

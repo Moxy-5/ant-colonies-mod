@@ -320,12 +320,8 @@ public class Nest {
         if (plant != null) {
             return plant;
         }
-        // A closed hole is opened before more garden rooms are dug: a big colony wants all its gardens at once (with the
-        // brain its headcount is mostly numbers), and its foragers were shut in until every room was dug.
-        BlockPos hole = live ? colony.foragingHoles().holeToOpen(level) : null;
-        if (hole != null) {
-            return hole;
-        }
+        // (The night's closed holes are not on this list: each digger takes one of them first, its own job,
+        // ForagingHoles.pickHoleToOpen, review R5-63.)
         for (NestPlan.Chamber chamber : gardens) {
             next = firstDiggable(level, chamber.cells());
             if (next != null) {

@@ -378,11 +378,13 @@ final class HoleTurns {
     /** As {@link #foodNear}, from the plants the brain remembers (while away: no block is read). */
     private Map<BlockPos, Double> rememberedFoodNear(ServerLevel level, List<BlockPos> holes, int radius) {
         List<BlockPos> plants = colony.field().knownPlants();
+        int[] reach = reaches(level, plants, radius, true);
         Map<BlockPos, Double> food = new HashMap<>();
         for (BlockPos hole : holes) {
             double count = 0;
-            for (BlockPos plant : plants) {
-                count += Galleries.flat(plant, hole) <= radius && Math.abs(plant.getY() - hole.getY()) <= radius ? 1 : 0;
+            for (int i = 0; i < plants.size(); i++) {
+                BlockPos plant = plants.get(i);
+                count += Galleries.flat(plant, hole) <= reach[i] && Math.abs(plant.getY() - hole.getY()) <= reach[i] ? 1 : 0;
             }
             food.put(hole, count);
         }
@@ -401,11 +403,13 @@ final class HoleTurns {
      */
     Map<BlockPos, Double> foodNear(ServerLevel level, List<BlockPos> holes, int radius) {
         List<BlockPos> plants = colony.food().plants(level).stream().filter(plant -> colony.foodMap().knows(plant, null)).toList();
+        int[] reach = reaches(level, plants, radius, false);
         Map<BlockPos, Double> food = new HashMap<>();
         for (BlockPos hole : holes) {
             double count = 0;
-            for (BlockPos plant : plants) {
-                count += Galleries.flat(plant, hole) <= radius && Math.abs(plant.getY() - hole.getY()) <= radius ? 1 : 0;
+            for (int i = 0; i < plants.size(); i++) {
+                BlockPos plant = plants.get(i);
+                count += Galleries.flat(plant, hole) <= reach[i] && Math.abs(plant.getY() - hole.getY()) <= reach[i] ? 1 : 0;
             }
             food.put(hole, count);
         }
@@ -416,6 +420,29 @@ final class HoleTurns {
             }
         }
         return food;
+    }
+
+    /**
+     * How far out from a hole the colony goes for the food at each of these spots: the one rule of the foragers
+     * ({@code FieldLife.reachOf}, review R5-61: grass the graze, rich food a runway's length), so a hole by rich food
+     * counts as fed as far as its foragers would go for it; {@code radius} where the kind is not known. {@code remembered}:
+     * the kinds the brain remembers (while away no block is read).
+     */
+    private int[] reaches(ServerLevel level, List<BlockPos> plants, int radius, boolean remembered) {
+        List<com.antcolonies.species.SpeciesProfile.PlantFood> kinds = colony.profile().food().plants();
+        int[] reach = new int[plants.size()];
+        for (int i = 0; i < plants.size(); i++) {
+            BlockPos plant = plants.get(i);
+            com.antcolonies.species.SpeciesProfile.PlantFood kind = null;
+            if (remembered) {
+                com.antcolonies.colony.FieldLife.Plant known = colony.field().known().get(plant);
+                kind = known != null && known.kind() >= 0 && known.kind() < kinds.size() ? kinds.get(known.kind()) : null;
+            } else if (LandReady.at(level, plant)) {
+                kind = colony.profile().food().plantFor(level.getBlockState(plant));
+            }
+            reach[i] = kind == null ? radius : Math.max(radius, colony.field().reachOf(kind));
+        }
+        return reach;
     }
 
     /** The holes' part of the galleries' save (the names as before the split). */

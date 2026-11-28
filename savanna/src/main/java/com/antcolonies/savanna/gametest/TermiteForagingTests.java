@@ -252,6 +252,28 @@ public class TermiteForagingTests {
                         helper.assertTrue(galleries.tonight().size() == wanted, "on the dry night " + galleries.tonight().size()
                                 + " holes had their turn, not 1 per 6 of the " + foragers + " foragers (" + wanted + ")");
                         helper.assertTrue(galleries.isInTurn(food[0]), "the hole by the known food had no turn");
+                        // Review R5-63: opening the night's holes is each worker's own job. Two workers asking at once (the
+                        // real builders' claims let go first) are given two different holes of the night's, each in turn,
+                        // and one that found its hole out of reach is given a third.
+                        for (com.antcolonies.savanna.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, com.antcolonies.savanna.entity.TermiteWorkerEntity.class)) {
+                            holes.releaseOpen(worker.getUUID());
+                        }
+                        long closed = galleries.tonight().stream().filter(hole -> !ForagingHoles.isOpen(level, hole)).count();
+                        java.util.UUID one = java.util.UUID.randomUUID();
+                        java.util.UUID two = java.util.UUID.randomUUID();
+                        BlockPos first = holes.pickHoleToOpen(level, one, colony.getCenter(), hole -> false);
+                        BlockPos second = holes.pickHoleToOpen(level, two, colony.getCenter(), hole -> false);
+                        if (closed >= 2) {
+                            helper.assertTrue(first != null && second != null && !first.equals(second) && galleries.isInTurn(first) && galleries.isInTurn(second),
+                                    "two workers were not given two of the night's holes: " + first + ", " + second + " (in turn " + galleries.tonight() + ")");
+                        }
+                        if (closed >= 3) {
+                            BlockPos third = holes.pickHoleToOpen(level, one, colony.getCenter(), hole -> hole.equals(first));
+                            helper.assertTrue(third != null && !third.equals(first) && !third.equals(second),
+                                    "a worker that found its hole out of reach was not given another: " + third);
+                        }
+                        holes.releaseOpen(one);
+                        holes.releaseOpen(two);
                         firstNight.addAll(galleries.tonight());
                         clock.skipTo(colony, TestClock.Phase.DAY);
                         since[0] = tick;

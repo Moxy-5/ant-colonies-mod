@@ -324,6 +324,9 @@ public class TermiteSoldierTests {
             trail[1] = trail[0].relative(intoArena(tunnels.get(0).side().getClockWise()), 11);
             colony.foodMap().knowForTests(trail[1]); // (finding it is tested in TermiteFoodTests)
             level.setBlock(trail[1], Blocks.HAY_BLOCK.defaultBlockState(), 3);
+            // (On the plant list before the night's hole is picked, 2 s from now: the list is renewed only every 5 s, and
+            // since review R5-61 the foragers go only round the night's holes, so the turn must go to the hole by the hay.)
+            colony.food().rescanPlantsSoon();
             List<BlockPos> room = colony.nest().getHomeChamber(level).room();
             for (int i = 0; i < 5; i++) {
                 minors.add(put(level, SavannaEntities.TERMITE_MINOR_SOLDIER.get(), room.get(i)));

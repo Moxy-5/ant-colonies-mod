@@ -76,7 +76,12 @@ public class DigGoal extends Goal {
         if (colony != null && soilWaits(level)) {
             return false;
         }
-        target = colony == null ? null : colony.nest().findDigTarget(level, ant.getUUID());
+        // At foraging time a worker first opens one of the night's holes, the nearest nobody has taken and that it has
+        // not found out of reach (review R5-63: its own job, as plugging them is); then the work list.
+        target = colony == null || !ant.isColonyWorker() ? null : colony.foragingHoles().pickHoleToOpen(level, ant, errand::isLeftAlone);
+        if (target == null) {
+            target = colony == null ? null : colony.nest().findDigTarget(level, ant.getUUID());
+        }
         return target != null && !errand.isLeftAlone(target);
     }
 
@@ -111,6 +116,9 @@ public class DigGoal extends Goal {
         // carry a pellet and the block is still half dug.
         errand.stop();
         ant.setActivity(AbstractAntEntity.ACTIVITY_NONE);
+        if (colony != null) {
+            colony.foragingHoles().releaseOpen(ant.getUUID());
+        }
         target = null;
         colony = null;
     }

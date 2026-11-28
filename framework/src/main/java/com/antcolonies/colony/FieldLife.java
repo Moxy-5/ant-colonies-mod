@@ -527,7 +527,7 @@ public class FieldLife {
             }
             BlockPos hole = null;
             if (galleries != null && !entry.getValue().fromInside()) {
-                hole = grazedFrom(entry.getKey(), galleries);
+                hole = grazedFrom(entry.getKey(), kinds.get(entry.getValue().kind()), galleries);
                 if (hole == null) {
                     continue; // no hole open near it tonight
                 }
@@ -547,13 +547,20 @@ public class FieldLife {
 
     /**
      * Termites underground step 4: the open hole (the night's turns, a runway's hole, a hole by rich food) nearest the
-     * plant within the graze ({@code food_radius}) that the numbers go out of, or null: no hole open near it, so the
-     * plant waits for a night its hole has its turn (as the real foragers graze only round the holes they opened).
+     * plant within its reach that the colony goes out of, or null: no hole open near it, so the plant waits for a night
+     * its hole has its turn (as the real foragers graze only round the holes they opened). The reach is the graze
+     * ({@code food_radius}) for grass; rich food (hay, dead wood) draws a trail out from a hole as far as a runway of
+     * sheeting may run ({@code nest.sheeting.max_length}), which the termites will roof it with (real Macrotermes lay
+     * open trails to a rich find, lined by their minor soldiers, and sheet them over); farther rich food waits for its
+     * gallery piece (step 3).
+     * <b>The one rule of where a colony with galleries forages</b> (review R5-61): the numbers ask it here, the real
+     * foragers' pick ({@link FoodStore#findGrass}) and the scouts' spot ({@code ScoutGoal}, at the graze) ask it too;
+     * before, only the numbers kept to it, and the real ones were sent 20 or 40 blocks over open ground once the tufts
+     * by the open holes were taken. Null with no web (a species without galleries forages anywhere in its reach).
      */
     @Nullable
-    private BlockPos grazedFrom(BlockPos plant, List<BlockPos> holes) {
-        ColonyHooks.Underground web = colony.underground();
-        int radius = web == null ? 0 : web.grazeRadius();
+    public BlockPos grazedFrom(BlockPos plant, SpeciesProfile.PlantFood kind, List<BlockPos> holes) {
+        int radius = reachOf(kind);
         BlockPos best = null;
         double bestDistance = Double.MAX_VALUE;
         for (BlockPos hole : holes) {
@@ -564,6 +571,16 @@ public class FieldLife {
             }
         }
         return best;
+    }
+
+    /** How far out from one of tonight's holes the colony goes for this food (see {@link #grazedFrom}); 0 with no web. */
+    public int reachOf(SpeciesProfile.PlantFood kind) {
+        ColonyHooks.Underground web = colony.underground();
+        if (web == null) {
+            return 0;
+        }
+        int graze = web.grazeRadius();
+        return kind.rich() ? Math.max(graze, colony.profile().nest().sheeting().map(SpeciesProfile.Sheeting::maxLength).orElse(graze)) : graze;
     }
 
     /** Room left in the food store this second (as last seen), and whether anything changed this second. */

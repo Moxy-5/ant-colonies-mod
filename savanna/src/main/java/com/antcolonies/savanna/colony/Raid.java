@@ -763,11 +763,6 @@ public final class Raid implements FightDiary {
         return hiddenCatch;
     }
 
-    @Nullable
-    UUID hiddenFrom() {
-        return hiddenFrom;
-    }
-
     /** Hurt nestmates carried home so far, and the hurt raiders waiting at the spot for a nestmate. */
     public int rescued() {
         return rescued;
@@ -1930,6 +1925,7 @@ public final class Raid implements FightDiary {
                 if (taken >= wanted) {
                     break;
                 }
+                remembered(level, ColonyManager.get(level).getColony(insect.getColonyId()), insect.blockPosition(), 1, insect.getUUID());
                 insect.carriedOff(level);
                 taken++;
             }
@@ -1947,6 +1943,7 @@ public final class Raid implements FightDiary {
             countLost = RaidCatch.take(level, termites, under);
             taken += under;
             hiddenFrom = termites.getId();
+            remembered(level, termites, find.at(), under, null);
             if (asNumbers) {
                 // the soldiers within earshot come to the break and hold the gallery from inside; about a quarter of
                 // them are stung and carried home with the workers (the alarm rework, step 5)
@@ -1959,6 +1956,7 @@ public final class Raid implements FightDiary {
                     termites.population().loseToHunters(level, termites.population().inside(minor) > 0 ? minor : major, stungSoldiers,
                             AwayReport.What.TAKEN_BY_RAIDERS);
                     taken += stungSoldiers;
+                    remembered(level, termites, find.at(), stungSoldiers, null);
                 }
             }
         } else if (byTheLand) {
@@ -1984,6 +1982,25 @@ public final class Raid implements FightDiary {
                 say("the fight cost " + dead + " raider(s) dead and " + hurt + " hurt");
             }
             ColonyManager.get(level).markChanged();
+        }
+    }
+
+    /**
+     * The termites taken by raiders going as numbers are remembered by their colony's danger map when they are taken, one
+     * entry a termite, through the call a stung body makes ({@code DangerMap.hurt}, as a member hurt: a sting), so a
+     * raid nobody watched is remembered as a watched one is (review R5-68). It used to be one death written when the
+     * raid got home, and nothing for a raid that never did: an unwatched raid shut its spot for about two days, a
+     * watched one for three and a half, and the holes there were given up for good only after two watched raids.
+     * {@code member}: the one taken, if it was a body (counted once, as its stings would be).
+     */
+    private static void remembered(ServerLevel level, @org.jetbrains.annotations.Nullable Colony termites, BlockPos where, int count,
+            @org.jetbrains.annotations.Nullable java.util.UUID member) {
+        if (termites == null) {
+            return;
+        }
+        String by = com.antcolonies.savanna.registry.SavannaEntities.MATABELE_MAJOR.get().toShortString();
+        for (int i = 0; i < count; i++) {
+            termites.danger().hurt(level, where, by, false, member);
         }
     }
 

@@ -10,12 +10,12 @@ for the number there).
 | Part | Left |
 |---|---|
 | In the game: A, it breaks play | 1 |
-| In the game: B, it looks or plays wrong | 25 |
+| In the game: B, it looks or plays wrong | 22 |
 | In the game: C, small or rare | 54 |
 | Waiting for your call | 27 |
 | Behind the scenes (code review) | 204 |
 | Tool faults | 6 |
-| *Test flakes, in `docs/TEST-FLAKES.md`* | *59* |
+| *Test flakes, in `docs/TEST-FLAKES.md`* | *61* |
 
 ## A: it breaks play (1)
 
@@ -23,7 +23,7 @@ Something a player meets goes wrong in a way that matters: a crash, a freeze, a 
 
 - **306** The raids were rewritten from scratch (2026-11-24) and three long unattended runs are done: every raid ends, none hangs or crashes, and since the fix of the tail left behind (BUGS 450) the raiding colonies bring home enough to hold their size (151 termites in the last run, 23 and 57 before). Still to do: you watch raids in-game; the smaller raid bugs left are on this list.
 
-## B: it looks or plays wrong (25)
+## B: it looks or plays wrong (22)
 
 A player will likely see it, and the game goes on.
 
@@ -45,12 +45,9 @@ A player will likely see it, and the game goes on.
 - **R5-7** A short hitch as each mound of new land appears while exploring, worst for big living mounds and for old dead ones; one can go in every half second while places wait. *(half fixed)*
 - **R5-56** At a raided feeding spot the termite workers stay in the roofed part of the gallery beside the break, some still feeding, and are stung and carried off one by one; they do not pour back down the gallery while the soldiers hold the opening, as real Macrotermes workers do. *(half fixed)*
 - **R5-59** A server that gets slower beside grown termite mounds whose web has used up its length while known logs or hay lie farther out, the usual state of a grown colony. Not measured. *(half fixed)*
-- **R5-61** At night beside a grown mound termites trail far across open ground away from any open hole, and lone scouts wander tens of blocks out, where the design means a tight ring of grazers round each open hole; these far walkers are the ones caught out at dawn.
-- **R5-63** At dusk by a growing colony few or no holes open for minutes while the builders dig; by a grown one the holes open one after another across the land instead of together; and a hole no builder can reach leaves the holes after it shut all night, with builders standing idle.
-- **R5-68** The same raid on the same colony is a hard fight unwatched (60% of the soldiers answer, up to 12, a quarter of them taken) and a light one watched (the one to three soldiers at the spot); and a watched raid shuts the spot for about three and a half days where an unwatched one shuts it for two.
+- **R5-68** The same raid on the same colony is a hard fight unwatched (60% of the soldiers answer, up to 12, a quarter of them taken) and a light one watched (the one to three soldiers at the spot). (What the termites remember of it is the same now, watched or not.) *(half fixed)*
 - **R5-73** Colonies far from the player fill up and reach the cap of 200 however bare their land, while the colony the player watches is held by its real grass and wood; after a long absence the far colonies are the big ones.
 - **R5-75** A full mound keeps about 6 feeding spots at branches where 10 to 15 were chosen for a big colony, so there are fewer by-day places for the Matabele scouts to find; and its galleries stop at about 35 blocks out, not the 50 in the species file.
-- **R5-80** Watching in spectator, an eaten fallen tree leaves its log-shaped mud cast standing for good, leftover plates of a filled gallery stay, every crust stays fresh (lightest colour, softest to break), pulp heaps do not sink and remains do not weather.
 - **R8-3** Likely, not proven: with a biome mod that is a data pack (Terralith, say) its biomes may not appear at all.
 
 ## C: small or rare (54)
@@ -502,7 +499,7 @@ Faults in the test and film tools, not in the game.
 
 ## The code review so far
 
-519 findings: 281 left (above), 238 done (below). The plan: `docs/plans/code-review.md`.
+519 findings: 278 left (above), 241 done (below). The plan: `docs/plans/code-review.md`.
 
 | Round | System | Found | Left | Done |
 |---|---|---|---|---|
@@ -510,7 +507,7 @@ Faults in the test and film tools, not in the game.
 | 2 | the legs | 43 | 18 | 25 |
 | 3 | the insect body | 45 | 32 | 13 |
 | 4 | how bodies are drawn | 37 | 32 | 5 |
-| 5 | the termites | 97 | 73 | 24 |
+| 5 | the termites | 97 | 70 | 27 |
 | 6 | the Matabele ants (not raids) | 33 | 29 | 4 |
 | 7 | the giant trees | 36 | 15 | 21 |
 | 8 | the world | 20 | 14 | 6 |
@@ -634,9 +631,12 @@ Faults in the test and film tools, not in the game.
 - **R5-57** (A) The minors take every real soldier place first, so at night beside a full colony, and whenever a raid's drumming reaches the nest, every real major is sent into the numbers
 - **R5-58** (A) A creature in a gallery puts the hidden termites back, and they go under again on the very next tick, so they blink and slip past it unseen
 - **R5-60** (B) "it rains" is judged two ways along the same night, and in a savanna the two never agree
+- **R5-61** (B) The night's holes bind the counted foragers but not the real ones, so the watched colony and the unwatched one forage by two rules
+- **R5-63** (B) The night's holes are opened last, one at a time, from one fixed list
 - **R5-64** (B) By day the colony's record names where termites could feed, not where any termite is, and the raid stands termites also in cells no raider can get at
 - **R5-65** (B) The raid reads the termites' alarm as "they have given this spot up"
 - **R5-69** (B) Termite soldiers never starve and never die of age, so a colony whose workers are all gone lives on for ever as a handful of soldiers
+- **R5-80** (B) Mud crust, mud casts, pulp heaps and termite remains age and crumble only on random ticks, so near a spectator they stand still for good
 
 *Round 6, the Matabele ants (not raids)*
 

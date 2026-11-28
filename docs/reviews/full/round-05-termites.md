@@ -1167,6 +1167,9 @@ closed-for-danger cells only), `brokenInto` (`:260-285`: the only place that loo
 
 **In play (2026-11-27):** B. At night beside a grown mound termites trail far across open ground away from any open hole, and lone scouts wander tens of blocks out, where the design means a tight ring of grazers round each open hole; these far walkers are the ones caught out at dawn.
 
+**Status (2026-11-27, `claude/review-fix-b9`): fixed: one rule of where a colony with galleries forages, `FieldLife.grazedFrom` (a hole open to the foragers tonight within the plant's reach): grass within the graze (6 blocks), rich food (hay, dead wood, branches) as far as a runway may run (12, `nest.sheeting.max_length`: real Macrotermes lay an open trail to a rich find, lined by their minors, and roof it with sheeting; my pick, no new number), farther rich food waiting for its gallery piece. The numbers kept to the graze already (now to the rich reach too); the real foragers' pick (`FoodStore.findGrass`: outside, only a plant one of tonight's holes reaches, or food eaten from inside) and the scouts' spot (`ScoutGoal.pickSpot`: within the graze of one of tonight's holes picked at random, so the explore holes send real scouts out too) ask it now, and so does the night's turn picker (`HoleTurns.foodNear`, `rememberedFoodNear`: a hole counts as by food as far as its foragers would go for that food). First tried with the graze alone for all food: the approved trail of minors to a hay bale 11 blocks from its hole (`minorsGuardTheHolesAndLineTheForagersTrailThenGoInLast`) and the hay test failed, so rich food got the runway's reach. Tests: those two pass as they were (the minors test now asks for a fresh plant scan as it lays its hay, 2 s before the night: the night's one hole must go to the hole by it); `termitesGatherDeadPlantsIntoTheirFungusGardenAndRaiseTheQueensEggsOnIt` (plants all round under one endless night) runs with the galleries off.**
+
+
 - **What is wrong:** the design (termites underground, step 4) is that termites graze only round the holes opened
   that night. The numbers obey it (a plant is worked only if a hole in turn lies within 6.5 blocks,
   `FieldLife.grazedFrom`). The real ones do not: (1) a real forager takes the known plant worth the most, the walk
@@ -1207,6 +1210,8 @@ closed-for-danger cells only), `brokenInto` (`:260-285`: the only place that loo
 ### R5-63 (B, likely; the size of it to measure): the night's holes are opened last, one at a time, from one fixed list
 
 **In play (2026-11-27):** B. At dusk by a growing colony few or no holes open for minutes while the builders dig; by a grown one the holes open one after another across the land instead of together; and a hole no builder can reach leaves the holes after it shut all night, with builders standing idle.
+
+**Status (2026-11-27, `claude/review-fix-b9`): fixed: opening the night's holes is its own job, the shape the plugging has (`ForagingHoles.pickHoleToOpen`, asked first by `DigGoal` of every worker that digs): each worker takes the nearest closed hole in turn nobody else has taken and that it has not found out of reach, for 30 seconds; the hole is off the builders' one work list (`Nest.findDigTarget`). Test: `holesTakeTurnsNearFoodFirstAndMoreInTheRain` now asks that two workers get two holes of the night's and that one that found its hole out of reach gets a third.**
 
 - **What is wrong:** biting a hole open has no owner. It is the last-but-one entry of the builders' one work list
   (`Nest.findDigTarget`), which hands every builder the same single block. (1) Every gallery block still to dig comes
@@ -1323,7 +1328,9 @@ with no diary line) ask `keepsOff`.
 
 ### R5-68 (B, proven as code; a new side of R11-17): near and away disagree on how many soldiers answer a raid, and on what the termites remember of it
 
-**In play (2026-11-27):** B. The same raid on the same colony is a hard fight unwatched (60% of the soldiers answer, up to 12, a quarter of them taken) and a light one watched (the one to three soldiers at the spot); and a watched raid shuts the spot for about three and a half days where an unwatched one shuts it for two.
+**In play (2026-11-27):** B. The same raid on the same colony is a hard fight unwatched (60% of the soldiers answer, up to 12, a quarter of them taken) and a light one watched (the one to three soldiers at the spot). (What the termites remember of it is the same now, watched or not.)
+
+**Status (2026-11-27, `claude/review-fix-b9`): half fixed: the memory half. The termites taken by raiders going as numbers are remembered by their colony when they are taken, one entry a termite as a sting is (`Raid.remembered`, through `DangerMap.hurt`; a termite body in the open by its own id), so a raid nobody watched is remembered as a watched one (it was one death written when the raid got home, nothing for one that never did). Test: `aNearRaidsNumbersTakeTermitesFromTheColonyAndBringThemHome` asks it at the attack. Left: how many soldiers answer a raid as numbers (60%, up to 12) against as bodies (those within 16 blocks): decided with R5-67's call (the alarm passed soldier to soldier), which sets how many bodies hear.**
 
 - **What is wrong:** (1) as numbers a raid meets 60% of all the colony's soldiers, at most 12 (`Raid.takeHidden`); as
   bodies only those within 16 blocks of the break (R5-67). (2) The termites' memory of danger decides which holes
@@ -1419,6 +1426,8 @@ with no diary line) ask `keepsOff`.
 ### R5-73 (B, proven; the size of it to measure with a soak): a far termite colony forages "by the land" with no limit from the land, and one real plant left switches that free food off
 
 **In play (2026-11-27):** B. Colonies far from the player fill up and reach the cap of 200 however bare their land, while the colony the player watches is held by its real grass and wood; after a long absence the far colonies are the big ones.
+
+**Status (2026-11-27, `claude/review-fix-b9`): open: looked at and left as its own step. Read from the 6-day soak of `claude/review-fix-5a` (its `soak-others.txt` and `soak-sizes.txt`, 4 servers): all 12 far termite colonies sat at the cap (198 to 200 workers, 202 to 221 members), 5 of them with no plant remembered, and so did the 3 watched colonies not raided (217 to 221 members; the fourth was raided down to 72). So on the savanna the soaks make, near and far agree; the gap shows on bare land only, and the soak's colonies are full, so their food in a day is what they eat, not what the land gives. What is wanted is the land's own measure: each colony reads, when its land is loaded, how much food stands within the graze of its holes (and the bare patches' time to dry), and the free food out of sight takes from that after the remembered plants (the gate goes). That is a new saved number per colony and a balance change; to build with a soak on bare land, not guessed.**
 
 **Checked by the lead.** `FieldLife.forageByTheLand` (`framework/colony/FieldLife.java:278-294`) and its gate at
 `:470` (`placedNow == 0`). Its own comment calls it "a known departure" (BUGS 203: far colonies starved without it).
@@ -1535,6 +1544,8 @@ with no diary line) ask `keepsOff`.
 ### R5-80 (B, proven; a new side of R5-3): mud crust, mud casts, pulp heaps and termite remains age and crumble only on random ticks, so near a spectator they stand still for good
 
 **In play (2026-11-27):** B. Watching in spectator, an eaten fallen tree leaves its log-shaped mud cast standing for good, leftover plates of a filled gallery stay, every crust stays fresh (lightest colour, softest to break), pulp heaps do not sink and remains do not weather.
+
+**Status (2026-11-27, `claude/review-fix-b9`): fixed: one framework part, `block/WithheldTicks`: the blocks of the tag `colonyframework:ticks_beside_spectators` (the savanna's mud crust, mud cast, pulp heap and termite remains) get the random ticks Minecraft holds back in the chunks within 128 blocks of a spectator where no other player is that near, at Minecraft's own pace (each chunk once a second, its section's palette asked first, so plain ground costs almost nothing); none with the game rule at 0. Minecraft's own blocks and the others of the mod stay as the game has them. The mound's drying asks the same judge of where the game ticks (`WithheldTicks.givenByTheGame`). Test `theLeftoversAgeBesideASpectator`. Left as Minecraft has it: more than 128 blocks from every player these blocks stand still, as crops do (no catch-up on return).**
 
 - **What is wrong:** all of it runs in the blocks' own `randomTick` and nothing else does it, and Minecraft gives no
   random ticks near a spectator or 128 blocks from every player (R5-3). The runway crumbling is not hit: the colony's
