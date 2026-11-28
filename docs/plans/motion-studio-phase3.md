@@ -52,7 +52,7 @@ video. It checks the same frames as picture strips; the videos are for the user'
    animals with the ground and red marks for parts inside each other and for sliding feet. In seconds, without
    Minecraft, so Neon can watch every animation moving before filming it or building the user's viewer page.
    **Built 2026-11-28 for clips and clip changes (branch `claude/motion-clip-video`; the user: "Start phase 2 of the
-   animal maker engine", read as this step), below; the `--pair` and `--scene` videos left.**
+   animal maker engine", read as this step), then its pairs and scenes (the user: "I meant phase 3 part 2"), below.**
 3. **Real footage beside it (62, grows idea 47), small, last.** `--ref <video> --cycle <start>,<end>`: a trimmed video
    of the real animal the user gives (Claude downloads nothing without asking), its marked stride stretched to the
    clip's length (cycle-matched), side by side in one mp4, so the real cadence, weight shift, spine flow and wingbeat
@@ -131,9 +131,48 @@ Checks: each tool's self-test; the lion hunt film and the feast bench turned int
   (0.004 to 0.009 px a tick, the middle) but its hind feet settle up to 0.75 px a tick as they land and lift; the
   monitor's plan has no walking speed (no `checks.walks`, no stride note), so neither the walk check nor the video can
   judge its walk's feet (BUGS 480; the crocodile's and crab's walks too). The climbs: BUGS 479.
-- **Left:** the `--pair` and `--scene` videos (two or more animals posed by the spot tables, red where they are in each
-  other; the recording format holds any number of animals, so it is a second writer, not a new drawing); `--hold`;
-  a hop or leap's own travel (the bullfrog hops on the spot: its plan gives the hop no ground speed).
+- **Pairs and scenes, built the same day (the user: "I meant phase 3 part 2", phase 3's part B):**
+  `python tools/clip_check.py <holder> [holds] --pair <prey> [--spots a,b] --video` runs the pair check as before,
+  then a video of each prey clip with every spot checked held at once (`--spots` for fewer; my pick over a video a
+  spot: the same lioness on three spots is three videos with one finding): `<holder>/video/vid_pair_<hold>_<prey>
+  <size>_<clip>.mp4` (the prey's size in the name: one hold is paired with a grown buffalo and a calf).
+  `python tools/clip_check.py <prey> --scene <pose> --video` runs the scene check, then a video a size: the prey, each
+  spot taken by one of the forms its pairs allow there (my pick: the forms in turn, spot by spot; the check itself
+  tries every form at every spot, which no one video can show), and round a carcass the full lions lying where the
+  game lays them (`LionHunt.lieByKill`, the forms in turn, rank by rank, their `rest` loop playing; the check holds
+  them at its middle): `<prey>/video/vid_scene_<pose>[_size<s>].mp4`.
+- **One placing:** the animals are placed by the checker's own `Pair` (the spot tables, the holder's feet on the ground
+  facing in along its spot's way out, a holder riding its sinking prey), each a recording of its own in one folder
+  (the format always held several; the page and the video already show several), the prey drawn facing east from
+  the middle of a block. A holder's place between two ticks is the spot table's row between them, as the game draws
+  a rider. `clip_check.place_point` is now the one placing of a holder, a lion lying by the kill and the videos (it
+  was written twice in the checker).
+- **Red marks, one rule:** `clip_check.in_each_other` (taken out of the pair strip and made whole): each body's
+  points deeper than 1 px (`BODIES_IN`) in another, but a holder's head and the prey in each other (its bite). The
+  pair strips use it too, so they now also mark the prey's parts in a holder's body and one holder's in another (they
+  marked only a holder's parts in the prey).
+- **The cameras:** round the holder of the first spot (a scene: the prey), every other animal see-through (the user's
+  call of 2026-11-27, kept), fitted to the space the prey and every holder take up, in the picked animal's own frame
+  (the page's `Replay.fit(..., names)`, `replay_video.make(fit_with=...)`; fitted to the holder alone, a buffalo at
+  its jaws was cut off; fitted to everyone, the lions lying 5 to 8 blocks out made the carcass a speck, so they are
+  left out of the fit and show where they fall in view).
+- **Its own check, every time, stronger:** every animal's every corner at every whole tick read back against the
+  checker's own placing (`Pair.holder_posed`, `Pair.prey_posed`, `place_points`), now where it is in the world (the
+  recorded place as well as the bone's matrix: a check of the matrices alone passed an animal drawn from the wrong
+  place); all within 0.0001 of a sixteenth of a block. A new self-test: a lioness biting a buffalo read back where
+  the pair check puts them; the holder's place moved a sixteenth in the file is caught at that moment (28 tests).
+- **Tried:** the lioness's `bite` on an idle buffalo (rump and both flanks, 88 ticks, about 30 s), `hold_sink` with the
+  buffalo's `held_sink` (five holders riding it down; the red marks sit where the check flags the neck holders'
+  bodies 1.7 px in the buffalo, and the jaws 5.6 to 5.9 px over their spots, both known), and the buffalo's carcass scene at both sizes (a grown cow and a calf: four feeders, a lion, a lioness
+  and a cub in turn, and six lions lying round it, 128 ticks; about 10 minutes for the check and both videos, most of
+  it posing eleven animals and finding their parts in each other 385 times, 82 and 43 s drawing). All checks within
+  0.0001 of a sixteenth of a block.
+- **What they showed:** the rump lioness's hind feet slide 0.24 to 0.27 px a tick for a third of a tick at each bite
+  (clip tick 4 of `bite`: its lunge; about a fifth of a model pixel in all, too small to see; the clip's own, not the
+  placing's). The carcass videos show the scene check's own crowding (BUGS 467) where it happens: red on the carcass
+  between neighbouring feeders, legs and manes in each other; nothing new.
+- **Left:** `--hold` (a catch in the jaws); a hop or leap's own travel (the bullfrog hops on the spot: its plan gives
+  the hop no ground speed); step 3 (62), when the user gives a real animal's video.
 
 ### Part C: living motion (Neon's 63 and 64), measured first
 **What the code says (checked 2026-11-27):** the ants' `BodyTurn`, which Neon's 63 names as its pattern, bends no spine:

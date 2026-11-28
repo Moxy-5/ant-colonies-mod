@@ -236,7 +236,8 @@ Every idea above has one place here. **(Neon's)** marks an idea Neon wrote (57 t
 - **Phase 2, the glue** (2026-11-27): 51 to 56, and 57, 58, 59 (Neon's).
 - **Phase 3 part A, partner moves** (2026-11-26): 31 to 34, 36 to 41, and the tests 43 and 44.
 - **Phase 3 part B, step 1** (2026-11-27): 60 (Neon's).
-- **Phase 3 part B, step 2** (2026-11-28): 61 (Neon's) for one clip and a clip change; its `--pair` scene left.
+- **Phase 3 part B, step 2** (2026-11-28): 61 (Neon's) for one clip and a clip change, then (the same day, the
+  user: "I meant phase 3 part 2") its `--pair` and `--scene` videos: 61 whole.
 
 **Next, in this order**
 1. **Step 0, the branches in step** (Neon's "branch sync first"): **Claude's half is done** (2026-11-27, the user's yes,
@@ -245,7 +246,7 @@ Every idea above has one place here. **(Neon's)** marks an idea Neon wrote (57 t
    keeping both the Motion Studio's work and its own flier foundation (`motion_kit.py`, `clip_check.py`,
    `body_plan.py`, `viewer_common.js`); 58 (built) then keeps the plans' tables safe through Neon's exports. Part B
    step 1 and this list (`claude/motion-video`) are not in `master` yet, nor step 2 (`claude/motion-clip-video`).
-2. **Phase 3 part B, motion as video** (Neon's): 61's `--pair` scene, then 62 (47 folded into it). Neon's note: 60 and 61 are tools only,
+2. **Phase 3 part B, motion as video** (Neon's): 62 (47 folded into it), when the user gives a real animal's video. Neon's note: 60 and 61 are tools only,
    so they may run beside other work.
 3. **Phase 3 part C, living motion** (Neon's 63 and 64, promoting 27 and 28): the turning bench first (how fast the
    lion and buffalo really turn, start and stop in the game, and how far their feet slide then); then turns, then

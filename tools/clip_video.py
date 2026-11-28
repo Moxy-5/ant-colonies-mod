@@ -4,8 +4,12 @@
     python tools/clip_check.py <animal> <clips> --video [--cams side,front,above] [--slow 4] [--plays 2] [--fixed]
                                [--no-paths] [--size s] [--model <young model>]
     python tools/clip_check.py <animal> [clips] --switches --video ...      each clip change, a's end into b
+    python tools/clip_check.py <holder> [holds] --pair <prey> [--spots a,b] --video ...   a pair (2026-11-28)
+    python tools/clip_check.py <prey> --scene <pose> --video ...                          everyone round a prey
     e.g. python tools/clip_check.py lioness walk trot --video
          python tools/clip_check.py lioness walk --switches --video --cams side,three-quarter
+         python tools/clip_check.py lioness hold_sink --pair buffalo --video
+         python tools/clip_check.py buffalo --scene carcass --video
 
 The clip is posed exactly as the checker poses it (tools/clip_check.py: the clip files, the body plan, the move's path,
 the dragged tail, a thrown flight; a clip change through the checker's own Blend), written as a recording in the
@@ -26,7 +30,13 @@ Its own check, every time: the recording read back (tools/recording.py) gives ev
 poses it, within CHECK_PX model pixels (printed); so the video draws what clip_check judged.
 
     references/anim_lab/<animal>[_size<s>]/video/vid_<model>_<clip>.mp4   and   vid_sw_<a>_<b>.mp4
-    run-film/clip_video/<animal>[_size<s>]/<model>_<clip>/body_<clip>.jsonl.gz   (the recording)
+    references/anim_lab/<holder>/video/vid_pair_<hold>_<prey><size>_<clip>.mp4, <prey>/video/vid_scene_<pose>.mp4
+    run-film/clip_video/<animal>[_size<s>]/<model>_<clip>/body_<clip>.jsonl.gz   (the recording; a pair's or a
+    scene's one file an animal, in run-film/clip_video/<holder or prey>/<pair or scene>/)
+
+Two or more animals (a pair, a scene; the end of this file): posed and placed by the checker's own Pair, every
+animal a recording of its own in one folder, so the replay page and the video show them together; red where the parts
+of one are in another, by the pair strips' own rule (clip_check.in_each_other).
 
 Timing (my picks): three moments a game tick (the game's drawing at 60 frames a second, so 1x shows a new pose every
 frame); a loop plays --plays times (default 2), a clip played once plays once and holds its end HOLD_TICKS; a clip
@@ -36,6 +46,7 @@ clip b.
 import gzip
 import json
 import math
+from collections import namedtuple
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -67,17 +78,17 @@ def mul(m, v):
     return tuple(sum(m[r][i] * v[i] for i in range(3)) for r in range(3))
 
 
-def bone_rows(model, xf, bone, lift, w):
+def bone_rows(model, xf, bone, to):
     """The bone's 3x4 matrix as the recorder writes it (rows; a point in the recording's bone frame, the model's
-    file frame mirrored in x and over 16, as GeckoLib bakes it), from the lab's own steps (lab.place, an affine move)."""
+    file frame mirrored in x and over 16, as GeckoLib bakes it), from the lab's own steps (lab.place, an affine move)
+    and `to`, the affine move of a posed model point (model px) to its place from where the animal is drawn (blocks)."""
     steps = model._steps(bone, xf)
-    o = lab.place(steps, (0.0, 0.0, 0.0))
+    o = to(lab.place(steps, (0.0, 0.0, 0.0)))
     cols = []
     for e, sign in (((1.0, 0.0, 0.0), -16.0), ((0.0, 1.0, 0.0), 16.0), ((0.0, 0.0, 1.0), 16.0)):
-        p = lab.place(steps, e)
-        cols.append(mul(w, tuple((p[i] - o[i]) * sign for i in range(3))))
-    t = mul(w, (o[0], o[1] + lift, o[2]))
-    return [round(v, 6) for r in range(3) for v in (cols[0][r], cols[1][r], cols[2][r], t[r])]
+        p = to(lab.place(steps, e))
+        cols.append(tuple((p[i] - o[i]) * sign for i in range(3)))
+    return [round(v, 6) for r in range(3) for v in (cols[0][r], cols[1][r], cols[2][r], o[r])]
 
 
 def rec_corners(corners):
@@ -178,9 +189,34 @@ class World:
                 [[x, y, z, h] for (x, y, z), h in sorted(self.water.items())])
 
 
+class Flat:
+    """Flat ground under a pair or a scene (the top of the blocks at y 0), over x0..x1, z0..z1 (blocks) and MARGIN round."""
+
+    def __init__(self, x0, x1, z0, z1):
+        self.blocks = {(x, -1, z): [0, 0, 0, 1, 1, 1]
+                       for x in range(math.floor(x0) - MARGIN, math.ceil(x1) + MARGIN)
+                       for z in range(math.floor(z0) - MARGIN, math.ceil(z1) + MARGIN)}
+        self.water, self.in_water = {}, False
+
+    def entries(self):
+        return [[x, y, z, box] for (x, y, z), box in sorted(self.blocks.items())], []
+
+
 # --- the recording ------------------------------------------------------------------------------------------------
-def header(animal, label, world, px):
-    """The first line, as client/BodyRecorder writes it: the bones by the model's own names, their boxes."""
+# One moment of one animal: k its number (SUB a tick), its pose, `to` (a posed model point, model px, to its place
+# from pos, blocks), pos (blocks, where it is drawn from), its yaw, v (blocks a tick), its clip, how far in (ticks),
+# marks (the points to show red, blocks from pos)
+Moment = namedtuple('Moment', 'k pose to pos yaw v clip ticks marks')
+
+
+def scale_of(to):
+    """A model pixel in blocks under this move."""
+    return math.dist(to((0.0, 0.0, 0.0)), to((1.0, 0.0, 0.0)))
+
+
+def header(animal, label, world, px, number=0):
+    """The first line, as client/BodyRecorder writes it: the bones by the model's own names, their boxes; the blocks
+    and water of the world (None: none, another animal's recording has them)."""
     model = animal.model
     to_bone = model.plan.to_bone if model.plan else {}
     by_bone = {}
@@ -197,60 +233,63 @@ def header(animal, label, world, px):
         bones.append(entry)
     xs = [p[0] for _, cs, _ in model.cubes for p in cs]
     ys = [p[1] for _, cs, _ in model.cubes for p in cs]
-    blocks, water = world.entries()
-    return {'header': 1, 'entity': animal.checks.get('entity', f'antcolonies:{animal.name}'), 'id': 0,
-            'uuid': 'offline', 'name': label, 'width': round((max(xs) - min(xs)) * px, 4),
+    blocks, water = world.entries() if world else ([], [])
+    return {'header': 1, 'entity': animal.checks.get('entity', f'antcolonies:{animal.name}'), 'id': number,
+            'uuid': f'offline-{number}', 'name': label, 'width': round((max(xs) - min(xs)) * px, 4),
             'height': round((max(ys) - min(ys)) * px, 4), 'scale': round(px / animal.checks.get('px', 1 / 16), 4),
             'offline': 1,
             'bones': bones, 'blocks': blocks, 'water': water}
 
 
-def write(folder, animal, label, world, moments, px):
-    """The recording: moments [(k, pose, lift, travel, clip name, clip ticks, speed a tick, marks)], k the moment's
-    number (SUB a tick), the travel and speed in model px, marks the points to show red (model px, the clip's own
-    frame), drawn a model pixel px blocks. Returns its path."""
+def write(folder, world, actors):
+    """The recordings, one an animal: actors [(animal, label, moments)], moments [Moment]; the first carries the
+    world's blocks and water. Returns their paths."""
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     for old in folder.glob('body*.jsonl.gz'):
         old.unlink()
-    path = folder / f'body_{label}.jsonl.gz'
-    w = frame(YAW, px)
-    fwd = (-math.sin(math.radians(YAW)), math.cos(math.radians(YAW)))
-    x0, y0, z0 = world.start
-    model = animal.model
-    names = [b['name'] for b in model.bones]
-    with gzip.open(path, 'wt', encoding='utf-8') as f:
-        f.write(json.dumps(header(animal, label, world, px), separators=(',', ':')) + '\n')
-        for k, pose, lift, travel, clip, ticks, speed, marks in moments:
-            xf = model.transforms(pose)
-            tick, part = divmod(k, SUB)
-            m = {'t': tick, 'pt': round(part / SUB, 4),
-                 'pos': [round(x0 + fwd[0] * travel * px, 6), round(y0, 6), round(z0 + fwd[1] * travel * px, 6)],
-                 'yaw': YAW, 'pitch': 0, 'v': [round(fwd[0] * speed * px, 5), 0, round(fwd[1] * speed * px, 5)],
-                 'ground': 0 if world.in_water else 1, 'water': 1 if world.in_water else 0, 'fluid': 0,
-                 'clips': {'body': f'{clip} running'}, 'play': {'body': [1.0, round(ticks, 4)]},
-                 'ft': tick, 'ct': tick, 'b': [bone_rows(model, xf, n, lift, w) for n in names]}
-            if marks:
-                m['marks'] = [[round(v, 4) for v in mul(w, p)] for p in marks[:MARKS_MAX]]
-            f.write(json.dumps(m, separators=(',', ':')) + '\n')
-    return path
+    paths = []
+    for number, (animal, label, moments) in enumerate(actors):
+        path = folder / f'body_{label}.jsonl.gz'
+        model = animal.model
+        names = [b['name'] for b in model.bones]
+        px = scale_of(moments[0].to)
+        with gzip.open(path, 'wt', encoding='utf-8') as f:
+            f.write(json.dumps(header(animal, label, world if number == 0 else None, px, number),
+                               separators=(',', ':')) + '\n')
+            for mo in moments:
+                xf = model.transforms(mo.pose)
+                tick, part = divmod(mo.k, SUB)
+                m = {'t': tick, 'pt': round(part / SUB, 4), 'pos': [round(v, 6) for v in mo.pos],
+                     'yaw': round(mo.yaw, 4), 'pitch': 0, 'v': [round(v, 5) for v in mo.v],
+                     'ground': 0 if world.in_water else 1, 'water': 1 if world.in_water else 0, 'fluid': 0,
+                     'clips': {'body': f'{mo.clip} running'}, 'play': {'body': [1.0, round(mo.ticks, 4)]},
+                     'ft': tick, 'ct': tick, 'b': [bone_rows(model, xf, n, mo.to) for n in names]}
+                if mo.marks:
+                    m['marks'] = [[round(v, 4) for v in p] for p in mo.marks[:MARKS_MAX]]
+                f.write(json.dumps(m, separators=(',', ':')) + '\n')
+        paths.append(path)
+    return paths
 
 
-def check(path, animal, moments, px):
+def check(path, animal, moments, unit, wants):
     """The recording read back against the checker's own posing: the farthest any box corner lies from where
-    clip_check puts it (model px). Returns (worst, the moment)."""
+    clip_check puts it, in units (blocks) of a model pixel or a sixteenth of a block. wants {moment k: each posed box's
+    corners as the checker places them, in model.posed's order (blocks from the moment's pos)}; each corner compared
+    where it is in the world (the recorded place and the bone's matrix), so an animal drawn from the wrong place shows.
+    Returns (worst, the moment)."""
     head, rows, _, _, trouble = recording.read(path)
     if trouble:
         raise SystemExit(f'the recording {path} reads badly: {trouble}')
     model = animal.model
     to_bone = model.plan.to_bone if model.plan else {}
     index = {b['name']: i for i, b in enumerate(head['bones'])}
-    w = frame(YAW, px)
     worst = (0.0, 0)
-    for (k, pose, lift, travel, *_), row in zip(moments, rows):
-        posed = model.posed(pose)
-        seen = {}
-        for bn, corners, _ in posed:
+    for mo, row in zip(moments, rows):
+        if mo.k not in wants:
+            continue
+        seen, at = {}, row['pos']
+        for (bn, _, _), want in zip(model.posed(mo.pose), wants[mo.k]):
             i = index[to_bone.get(bn, bn)]
             n = seen.get(i, 0)
             seen[i] = n + 1
@@ -259,13 +298,11 @@ def check(path, animal, moments, px):
             for c in range(8):
                 kk = ((1 - (c & 1)) << 2) | (c & 2) | ((c >> 2) & 1)
                 x, y, z = cube[3 * c:3 * c + 3]
-                got = (m[0] * x + m[1] * y + m[2] * z + m[3], m[4] * x + m[5] * y + m[6] * z + m[7],
-                       m[8] * x + m[9] * y + m[10] * z + m[11])
-                p = corners[kk]
-                want = mul(w, (p[0], p[1] + lift, p[2]))
-                d = math.dist(got, want) / px
+                got = (m[0] * x + m[1] * y + m[2] * z + m[3] + at[0], m[4] * x + m[5] * y + m[6] * z + m[7] + at[1],
+                       m[8] * x + m[9] * y + m[10] * z + m[11] + at[2])
+                d = math.dist(got, [w + o for w, o in zip(want[kk], mo.pos)]) / unit
                 if d > worst[0]:
-                    worst = (d, k)
+                    worst = (d, mo.k)
     return worst
 
 
@@ -330,21 +367,43 @@ def flat_scene(cc, animal):
     return cc.Scene(lab.Clip('flat', {'animation_length': 1}), 'land', animal)
 
 
+def held_to(worst, at, unit_word):
+    """The check's line; no video when it failed."""
+    print(f'    the recording against the checker\'s posing: every corner within {worst:.4f} {unit_word}'
+          + ('' if worst <= CHECK_PX else f' (over {CHECK_PX} at moment {at}: FAILED)'))
+    if worst > CHECK_PX:
+        raise SystemExit('the offline recording does not hold the checker\'s pose; no video made')
+
+
+def placed(moments, world, px):
+    """One clip's moments [(k, pose, lift, travel, clip, ticks, speed a tick, marks)] (model px, the clip's own frame)
+    set in the world, facing YAW from world.start along its travel, a model pixel px blocks: [Moment]."""
+    w = frame(YAW, px)
+    fwd = (-math.sin(math.radians(YAW)), math.cos(math.radians(YAW)))
+    x0, y0, z0 = world.start
+    out = []
+    for k, pose, lift, travel, clip, ticks, speed, mk in moments:
+        out.append(Moment(k, pose, (lambda lift: lambda p: mul(w, (p[0], p[1] + lift, p[2])))(lift),
+                          (x0 + fwd[0] * travel * px, y0, z0 + fwd[1] * travel * px), YAW,
+                          (fwd[0] * speed * px, 0.0, fwd[1] * speed * px), clip, ticks, [mul(w, q) for q in mk]))
+    return out
+
+
+def own_wants(animal, moments):
+    """The checker's posing of one clip (model.posed, lifted as it flies) at every moment, for check."""
+    return {mo.k: [[mo.to(p) for p in cs] for _, cs, _ in animal.model.posed(mo.pose)] for mo in moments}
+
+
 def make(animal, name, label, sc, moments, cams, slow, fixed, no_paths, title, cc_kind):
     import replay_video
     # drawn at the size its scene is made for: a block is sc.block model px (a step or bank made for a small monitor
     # is a block at its size, as the game draws it; a young one's raised to a block at its size; else the plan's)
     px = 1.0 / sc.block
-    travel = max(m[3] for m in moments)
-    world = World(animal, sc, travel, cc_kind, px)
+    world = World(animal, sc, max(m[3] for m in moments), cc_kind, px)
+    ms = placed(moments, world, px)
     folder, video = out_paths(animal, name)
-    path = write(folder, animal, label, world, moments, px)
-    worst, at = check(path, animal, moments, px)
-    words = (f'    the recording against the checker\'s posing: every corner within {worst:.4f} px'
-             + ('' if worst <= CHECK_PX else f' (over {CHECK_PX} at moment {at}: FAILED)'))
-    print(words)
-    if worst > CHECK_PX:
-        raise SystemExit('the offline recording does not hold the checker\'s pose; no video made')
+    path, = write(folder, world, [(animal, label, ms)])
+    held_to(*check(path, animal, ms, px, own_wants(animal, ms)), 'px')
     out, _ = replay_video.make(folder, label, end=moments[-1][0] // SUB, cams=cams, slow=slow, fixed=fixed,
                                no_paths=no_paths, out=video, tick_word='clip tick', title=title)
     return out
@@ -369,3 +428,175 @@ def switch_video(cc, animal, a, b, ticks, phase, cams, slow, fixed, no_paths):
           + f', the ground {va * animal.px:.3f} to {vb * animal.px:.3f} blocks/s, {len(moments)} moments')
     return make(animal, f'sw_{a}_{b}', f'{a}-{b}', sc, moments, cams, slow, fixed, no_paths,
                 f'{animal.model_name} {a} -> {b} (offline)', 'land')
+
+
+# --- two or more animals: a pair and a scene round a prey (2026-11-28) ---------------------------------------------
+# Posed and placed by the checker's own Pair (tools/clip_check.py --pair, --scene: the spot tables, the holder's feet
+# on the ground facing in along its spot's way out, the lions lying by a kill where savanna LionHunt lays them), in
+# the prey's frame (a sixteenth of a block: x to its left, y up, z toward its tail); the prey drawn from P0 facing
+# YAW. Red: the parts of each in another (clip_check.in_each_other, the pair strips' own marks; a holder's head on
+# the hide is its bite). The cameras round the animal checked take in the prey and every holder (replay_video's
+# fit_with; not the lions lying 5 blocks and more out, which made the carcass a speck: they show where they fall in
+# view); every other animal see-through, as in every video (the user's call, 2026-11-27).
+P0 = (0.5, 0.0, 0.5)    # where the prey is drawn from (blocks): the middle of a block, on the ground
+W16 = frame(YAW, 1.0 / 16.0)       # the prey's frame (a sixteenth of a block) into the world's blocks
+
+
+def yaw_of(d):
+    """The yaw of a facing d (x, z in the prey's frame) in the world (forward (-sin yaw, cos yaw))."""
+    fx, _, fz = mul(W16, (d[0], 0.0, d[1]))
+    return math.degrees(math.atan2(-fx, fz))
+
+
+class Actor:
+    """One animal of a pair or a scene: at(tk) gives (pose, to the prey's frame, its feet (x, z), its facing (x, z),
+    its clip, how far in (ticks)) at any moment, tk ticks in; posed(k) the checker's own placing at a whole tick k
+    ([(bone, corners in the prey's frame, colour)]); head: None for the prey, else the bones whose overlap with the
+    prey is its bite."""
+
+    def __init__(self, animal, label, head, at, posed, framed=True):
+        self.animal, self.label, self.head, self.at, self.posed = animal, label, head, at, posed
+        self.framed = framed               # the cameras take it in
+
+
+def prey_actor(cc, pair, clip, kind):
+    held = pair.poses.get(clip)
+    pl = cc.Played(pair.prey, held['clip'] if held else clip)
+
+    def at(tk):
+        # (as clip_check.Pair.prey_posed: a still pose at its clip's end, a loop round, a clip played once held)
+        t = pl.length if held else ((tk / 20) % pl.length if kind == 'loop' else min(tk / 20, pl.length))
+        return pl.pose(t), pair.prey_point, (0.0, 0.0), (0.0, -1.0), clip, t * 20.0
+    return Actor(pair.prey, f'{pair.prey.name}_{clip}', None, at, lambda k: pair.prey_posed(clip, kind, k)[0])
+
+
+def row_at(pair, clip, kind, tk):
+    """The prey's spot table row tk ticks in, between two ticks the way the game draws a rider between them."""
+    if kind == 'loop' or clip in pair.poses:
+        return pair.prey_place(clip, kind, 0)
+    i = math.floor(tk)
+    a, b = pair.prey_place(clip, kind, i), pair.prey_place(clip, kind, i + 1)
+    f = tk - i
+    return [x + (y - x) * f for x, y in zip(a, b)]
+
+
+def holder_actor(cc, pair, clip, kind, spot, label):
+    def at(tk):
+        fr = pair.holder_frame(spot, row_at(pair, clip, kind, tk))
+        ht = pair.holder_tick(tk)
+        return (pair.h_play.pose(ht / 20), (lambda p: pair.holder_point(fr, p)), fr[0], fr[1], pair.spec['hold'], ht)
+
+    def posed(k):
+        return pair.holder_posed(pair.holder_frame(spot, pair.prey_place(clip, kind, k)), k)[0]
+    return Actor(pair.holder, label, pair.head, at, posed)
+
+
+def lying_actor(cc, pr, rank, wx, wz, label):
+    """A full lion lying by the kill (clip_check.run_scene's third part, the carcass not turned): its rest clip looping."""
+    pl = cc.Played(pr.holder, 'rest')
+    x, z = wx * 16, -wz * 16
+    L = math.hypot(x, z) or 1e-9
+    d = (-x / L, -z / L)
+    left = (-d[1], d[0])
+
+    def pose_at(tk):
+        return pl.pose((tk / 20) % pl.length)
+
+    def at(tk):
+        return (pose_at(tk), (lambda p: cc.place_point((x, z), d, left, pr.hs, pr.da_h, p)), (x, z), d, 'rest',
+                (tk % (pl.length * 20)))
+    return Actor(pr.holder, label, frozenset(), at,
+                 lambda k: cc.place_points(pr.holder.model.posed(pose_at(k)), pr.hs, pr.da_h, (x, z), d, left), False)
+
+
+def group_recording(cc, actors, ticks, folder):
+    """Every actor through `ticks` ticks, SUB moments a tick, written (the first carries the ground): (the recordings'
+    paths, each one's moments, each one's checker posing at every whole tick, for check)."""
+    per = [[] for _ in actors]
+    wants = [{} for _ in actors]
+    lo, hi = [math.inf, math.inf], [-math.inf, -math.inf]
+    prev = [None] * len(actors)
+    for k in range(ticks * SUB + 1):
+        tk = k / SUB
+        states = [a.at(tk) for a in actors]
+        placed = [[(bn, [st[1](p) for p in cs], col) for bn, cs, col in a.animal.model.posed(st[0])]
+                  for a, st in zip(actors, states)]
+        red = cc.in_each_other([(pl, a.head) for a, pl in zip(actors, placed)])
+        for i, (a, (pose, to, feet, d, clip, ct)) in enumerate(zip(actors, states)):
+            f3 = (feet[0], 0.0, feet[1])
+            pos = tuple(P0[j] + v for j, v in enumerate(mul(W16, f3)))
+
+            def rel(q, f3=f3):
+                return mul(W16, (q[0] - f3[0], q[1], q[2] - f3[2]))
+            v = (0.0, 0.0, 0.0) if prev[i] is None else tuple((pos[j] - prev[i][j]) * SUB for j in range(3))
+            prev[i] = pos
+            per[i].append(Moment(k, pose, (lambda p, to=to, rel=rel: rel(to(p))), pos, yaw_of(d), v, clip, ct,
+                                 [rel(q) for q in red[i]]))
+            if k % SUB == 0:
+                wants[i][k] = [[rel(q) for q in cs] for _, cs, _ in a.posed(k // SUB)]
+                for _, cs, _ in placed[i]:
+                    for q in cs:
+                        w = mul(W16, q)
+                        lo = [min(lo[0], w[0] + P0[0]), min(lo[1], w[2] + P0[2])]
+                        hi = [max(hi[0], w[0] + P0[0]), max(hi[1], w[2] + P0[2])]
+    world = Flat(lo[0], hi[0], lo[1], hi[1])
+    return write(folder, world, [(a.animal, a.label, ms) for a, ms in zip(actors, per)]), per, wants
+
+
+def group_video(cc, actors, ticks, folder, video, title, cams, slow, fixed, no_paths, **_):
+    """The recordings, checked against the checker's own placing, then drawn round the first actor."""
+    import replay_video
+    paths, per, wants = group_recording(cc, actors, ticks, folder)
+    worst = max(((*check(p, a.animal, ms, 1.0 / 16.0, ws),) for p, a, ms, ws in zip(paths, actors, per, wants)),
+                key=lambda w: w[0])
+    held_to(*worst, 'sixteenths of a block')
+    out, _ = replay_video.make(folder, actors[0].label, end=ticks, cams=cams, slow=slow, fixed=fixed,
+                               no_paths=no_paths, out=video, tick_word='tick', title=title,
+                               fit_with=[a.label for a in actors if a.framed])
+    return out
+
+
+def pair_video(pair, clip, kind, spots, cc, **filmed):
+    """A pair (clip_check.py <holder> --pair <prey> --video): the prey's clip with every spot named held at once, as
+    long as the pair check judges it (a clip played once, then HOLD_TICKS; a loop or a still pose, twice the holder's
+    clip and its blend, or the prey's loop if longer). The cameras round the first spot's holder."""
+    n = (round(cc.Played(pair.prey, clip).length * 20) + HOLD_TICKS if kind == 'once' and clip not in pair.poses
+         else max(2 * (pair.h_ticks + pair.h_blend), pair.loop_ticks(clip, kind)))
+    actors = [holder_actor(cc, pair, clip, kind, s, f'{pair.holder.name}_{s}') for s in spots] + [
+        prey_actor(cc, pair, clip, kind)]
+    every = spots == [s for s in pair.table['names'] if s in pair.spots]
+    # (named by the prey's size: one hold is paired with a grown buffalo and a calf)
+    name = (f'pair_{pair.spec["hold"]}_{pair.prey.name}' + ('' if pair.ps == 1.0 else f'{pair.ps:g}') + f'_{clip}'
+            + ('' if every else '_' + '+'.join(spots)))
+    folder = ROOT / 'run-film' / 'clip_video' / pair.holder.name / name
+    video = ROOT / 'references' / 'anim_lab' / pair.holder.name / 'video' / f'vid_{name}.mp4'
+    print(f'  video of {pair.holder.name} {pair.spec["hold"]} at {", ".join(spots)} of {pair.prey.name} {clip} '
+          f'({kind}, sizes {pair.hs:g} and {pair.ps:g}): {n} ticks, {n * SUB + 1} moments')
+    return group_video(cc, actors, n, folder, video,
+                       f'{pair.holder.name} {pair.spec["hold"]} on {pair.prey.name} {clip} (offline)', **filmed)
+
+
+def scene_video(prey, pose, kind, size, holders, allowed, spots_all, cc, **filmed):
+    """Everyone round a prey (clip_check.py <prey> --scene <pose> --video): each spot taken by one of the forms its
+    pairs allow there (my pick: the forms in turn, spot by spot; the check tries every form at every spot), and round a
+    carcass the full lions lying where the game lays them (the forms in turn, rank by rank), twice the longest
+    holder's clip. The cameras round the prey."""
+    any_pair = next(iter(holders.values()))
+    actors = [prey_actor(cc, any_pair, pose, kind)]
+    for i, s in enumerate(spots_all):
+        h = allowed[s][i % len(allowed[s])]
+        pr = holders[h]
+        actors.append(holder_actor(cc, pr, pose, kind, s, f'{pr.holder.name}_{s}'))
+    if pose == 'carcass':
+        lie = [pr for pr in holders.values() if 'rest' in pr.holder.data]
+        forms = list({pr.holder.name: pr for pr in lie}.values())
+        for rank, wx, wz in (cc.bystanders() if forms else ()):
+            pr = forms[rank % len(forms)]
+            actors.append(lying_actor(cc, pr, rank, wx, wz, f'{pr.holder.name}_lying{rank}'))
+    n = max(2 * (pr.h_ticks + pr.h_blend) for pr in holders.values())
+    name = f'scene_{pose}' + ('' if size == 1.0 else f'_size{size:g}')
+    folder = ROOT / 'run-film' / 'clip_video' / prey.name / name
+    video = ROOT / 'references' / 'anim_lab' / prey.name / 'video' / f'vid_{name}.mp4'
+    print(f'  video of the {prey.name} {pose} scene (size {size:g}): {len(actors) - 1} round it, {n} ticks, '
+          f'{n * SUB + 1} moments')
+    return group_video(cc, actors, n, folder, video, f'{prey.name} {pose}, everyone round it (offline)', **filmed)

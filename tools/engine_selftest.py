@@ -555,7 +555,9 @@ def offline_recording(animal, name, folder, stretch=1.0):
                for k, pose, lift, travel, clip, ticks, speed, marks in moments]
     px = 1.0 / pl.scene.block
     world = clip_video.World(animal, pl.scene, max(m[3] for m in moments), animal.kind(name), px)
-    return clip_video.write(folder, animal, name, world, moments, px), moments, px
+    moments = clip_video.placed(moments, world, px)
+    path, = clip_video.write(folder, world, [(animal, name, moments)])
+    return path, moments, px
 
 
 @test
@@ -569,7 +571,8 @@ def an_offline_recording_holds_the_checkers_pose_and_a_moved_bone_is_caught():
     animal = cc.Animal('buffalo')
     folder = tempfile.mkdtemp()
     path, moments, px = offline_recording(animal, 'walk', folder)
-    worst, _ = clip_video.check(path, animal, moments, px)
+    wants = clip_video.own_wants(animal, moments)
+    worst, _ = clip_video.check(path, animal, moments, px, wants)
     need(worst < clip_video.CHECK_PX, f'the real recording is {worst:.4f} px off the checker')
     with gzip.open(path, 'rt', encoding='utf-8') as f:
         lines = [json.loads(line) for line in f]
@@ -577,8 +580,8 @@ def an_offline_recording_holds_the_checkers_pose_and_a_moved_bone_is_caught():
     lines[5]['b'][bone][7] += px                         # (one bone with boxes, one moment, a model pixel up)
     with gzip.open(path, 'wt', encoding='utf-8') as f:
         f.write(''.join(json.dumps(line) + '\n' for line in lines))
-    worst, at = clip_video.check(path, animal, moments, px)
-    need(worst > 0.9 and at == moments[4][0], f'a bone moved a pixel read {worst:.4f} px off at moment {at}')
+    worst, at = clip_video.check(path, animal, moments, px, wants)
+    need(worst > 0.9 and at == moments[4].k, f'a bone moved a pixel read {worst:.4f} px off at moment {at}')
 
 
 @test
@@ -603,6 +606,34 @@ def the_moving_ground_keeps_a_walks_feet_still_and_shows_a_wrong_speed():
     need(n == 4 and good < 0.05, f'its own speed: {n} feet, a planted foot slides {good:.3f} px a tick (middle)')
     bad, _ = slides(1.5)
     need(bad > recording.SLIDE_PX, f'half as fast again: a planted foot slides only {bad:.3f} px a tick (middle)')
+
+
+@test
+def a_pair_recording_puts_both_where_the_pair_check_does_and_a_holder_moved_is_caught():
+    """The pair video (clip_check.py --pair --video) draws what the pair check judged: a lioness biting a buffalo and
+    the buffalo read back where clip_check.Pair places them (the spot tables), every corner where it is in the world;
+    the holder's place moved a sixteenth of a block in the file at one moment is caught there."""
+    import gzip
+    import json
+    import tempfile
+    import clip_video
+    prey = cc.Animal('buffalo')
+    spec = next(p for p in prey.plan_data['spots']['pairs'] if p['holder'] == 'lioness' and p['hold'] == 'bite')
+    pair = cc.Pair(cc.Animal('lioness'), 'buffalo', spec)
+    spot = next(s for s in pair.table['names'] if s in pair.spots)
+    actors = [clip_video.holder_actor(cc, pair, 'idle', 'loop', spot, 'holder'),
+              clip_video.prey_actor(cc, pair, 'idle', 'loop')]
+    paths, per, wants = clip_video.group_recording(cc, actors, 6, tempfile.mkdtemp())
+    for path, a, ms, ws in zip(paths, actors, per, wants):
+        worst, _ = clip_video.check(path, a.animal, ms, 1 / 16, ws)
+        need(worst < clip_video.CHECK_PX, f'the {a.label} is {worst:.4f} sixteenths of a block off the pair check')
+    with gzip.open(paths[0], 'rt', encoding='utf-8') as f:
+        lines = [json.loads(line) for line in f]
+    lines[1 + 6]['pos'][0] += 1 / 16                     # (the holder, moment 6 (tick 2), a sixteenth of a block)
+    with gzip.open(paths[0], 'wt', encoding='utf-8') as f:
+        f.write(''.join(json.dumps(line) + '\n' for line in lines))
+    worst, at = clip_video.check(paths[0], actors[0].animal, per[0], 1 / 16, wants[0])
+    need(worst > 0.9 and at == 6, f'a holder moved a sixteenth read {worst:.4f} off at moment {at}')
 
 
 # --- one film at a time (tools/film_run.py) ----------------------------------------------------------------------------

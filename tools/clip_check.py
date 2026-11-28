@@ -40,8 +40,13 @@ the game draws it, then in the game frame by frame.
                still ground at its own speed with the cameras following, so the ground moves under it like a
                treadmill and a sliding planted foot shows red; a move crosses its scene's real blocks. About half a
                minute a video: references/anim_lab/<animal>/video/vid_<model>_<clip>.mp4, vid_sw_<a>_<b>.mp4 (the
-               recording in run-film/clip_video/, which tools/replay.py opens as a page). Not yet with --pair,
-               --scene, --hold or --gait-changes.
+               recording in run-film/clip_video/, which tools/replay.py opens as a page). With --pair (2026-11-28)
+               a video of each prey clip with every spot checked held at once (--spots to show fewer), the holder
+               and its prey placed as the pair check places them, red where parts are in each other (a holder's
+               head on the hide is its bite): <holder>/video/vid_pair_<hold>_<prey><size>_<clip>.mp4; with --scene
+               everyone round the prey, one form a spot (the forms in turn) and round a carcass the full lions lying
+               by it: <prey>/video/vid_scene_<pose>[_size<s>].mp4. The cameras round the holder (a scene: the prey)
+               take in everyone. Not yet with --hold or --gait-changes.
   --gait-changes [--write]  (the Motion Studio, phase 2, step 3, 2026-11-25) for each change between two of the plan's
                gaits (its "gaits.order"), the moment of the old clip whose pose is nearest the new clip's first frame (the
                farthest any box corner is from its place in the other, model px), against the worst moment; --write
@@ -1472,6 +1477,42 @@ def with_edges_all(posed):
     return [(bn, q) for bn, cs, _ in posed for q in with_edges(cs)]
 
 
+def place_point(feet, d, left, size, da, p):
+    """A model point (its own pixels) set on the ground in the prey's frame (a sixteenth of a block): its feet at
+    feet (x, z), facing d, its left `left`, drawn da model px ahead, at this size. The one placing of a holder
+    (Pair.holder_point), a lion lying by the kill (place_points) and the pair videos (tools/clip_video.py)."""
+    a, side = (-p[2] + da) * size, p[0] * size
+    return (feet[0] + d[0] * a + left[0] * side, p[1] * size, feet[1] + d[1] * a + left[1] * side)
+
+
+def in_each_other(bodies):
+    """The red marks of a pair or a scene (its strips and its videos, tools/clip_video.py): each body's points deeper
+    than BODIES_IN inside another body. bodies [(posed, head)], all in one frame: head None for the prey, else the
+    body's head bones (a lion lying by the kill: none); a holder's head and the prey in each other is its bite, shown
+    by the jaw's own mark, not red. Returns each body's points, in the order given."""
+    boxes = [Boxes(posed) for posed, _ in bodies]
+    out = []
+    for i, (posed, head) in enumerate(bodies):
+        pts, got = with_edges_all(posed), {}
+        for j, (_, head_j) in enumerate(bodies):
+            if i == j or not boxes[i].overlaps(boxes[j]):
+                continue
+            into = boxes[j].near(boxes[i])
+            mine = pts
+            if head is not None and head_j is None:          # a holder's head in the prey: its bite
+                mine = [(bn, q) for bn, q in pts if bn not in head]
+            elif head is None and head_j is not None:        # the prey in a holder's head: its bite
+                into = Boxes(None, [b for b in into.boxes if b[0] not in head_j])
+            if not into.boxes:
+                continue
+            (x0, y0, z0), (x1, y1, z1) = into.lo, into.hi
+            for bn, q in mine:
+                if id(q) not in got and x0 <= q[0] <= x1 and y0 <= q[1] <= y1 and z0 <= q[2] <= z1                         and into.depth(q) > BODIES_IN:
+                    got[id(q)] = q
+        out.append(list(got.values()))
+    return out
+
+
 _PREY_POSED = {}     # a prey's posed boxes and their points by (prey, size, clip, kind, tick): several pairs share them
 
 
@@ -1559,9 +1600,7 @@ class Pair:
         return feet, d, left, sp
 
     def holder_point(self, frame, p):
-        (fx, fz), d, left, _ = frame
-        a, side = (-p[2] + self.da_h) * self.hs, p[0] * self.hs
-        return (fx + d[0] * a + left[0] * side, p[1] * self.hs, fz + d[1] * a + left[1] * side)
+        return place_point(frame[0], frame[1], frame[2], self.hs, self.da_h, p)
 
     def holder_posed(self, frame, k):
         pose = self.h_play.pose(self.holder_tick(k) / 20)
@@ -1682,17 +1721,16 @@ def pair_strip(pair, clip, kind, spot, ticks, views, path, others=()):
         out, marks = [], []
         prey = pair.prey_posed(clip, kind, k)[0]
         out += prey
-        pb = Boxes(prey)
+        bodies = [(prey, None)]
         for s in (spot,) + tuple(others):
             frame = pair.holder_frame(s, pair.prey_place(clip, kind, k))
             hposed, pose = pair.holder_posed(frame, k)
             out += hposed
+            bodies.append((hposed, pair.head))
             jaw = pair.jaw(frame, pose)
             marks.append((frame[3], GREEN, 4))
             marks.append((jaw, BLUE, 3))
-            for bn, q in with_edges_all(hposed):
-                if bn not in pair.head and pb.depth(q) > 1.0:
-                    marks.append((q, RED, 2))
+        marks += [(q, RED, 2) for pts in in_each_other(bodies) for q in pts]
         return out, marks
 
     pts = [p for k in ticks for _, cs, _ in scene(k)[0] for p in cs]
@@ -1885,8 +1923,9 @@ def switch_strip(animal, a, b, ticks, views, path, phase=None):
     return path
 
 
-def run_pairs(holder, prey_name, holds, spots_wanted, times, views, out_dir):
-    """--pair: every pair its prey's plan lists for this holder (spots.pairs), or those of the hold clips named."""
+def run_pairs(holder, prey_name, holds, spots_wanted, times, views, out_dir, filmed=None):
+    """--pair: every pair its prey's plan lists for this holder (spots.pairs), or those of the hold clips named. With
+    --video (filmed: its settings) a video of each prey clip with every spot checked held at once (tools/clip_video.py)."""
     prey = Animal(prey_name)
     specs = [p for p in prey.plan_data.get('spots', {}).get('pairs', [])
              if p['holder'] == holder.name and (not holds or any(fnmatch.fnmatch(p['hold'], h) for h in holds))]
@@ -1909,6 +1948,11 @@ def run_pairs(holder, prey_name, holds, spots_wanted, times, views, out_dir):
                 png = pair_strip(pair, clip, kind, names[0], ticks, views, os.path.join(
                     out_dir, f'pair_{holder.name}_{spec["hold"]}_{prey_name}_{clip}_all.png'), others=names[1:])
                 print('  wrote', png)
+        if filmed:
+            import clip_video
+            names = [s for s in pair.table['names'] if (not spots_wanted or s in spots_wanted) and s in pair.spots]
+            for clip, kind in spec['clips'].items():
+                print('    drew', clip_video.pair_video(pair, clip, kind, names, **filmed))
     print(f'  {flags} flagged')
     return 2 if flags else 0
 
@@ -1942,10 +1986,7 @@ def bystanders():
 def place_points(posed, size, da, feet, d, left):
     """A model's posed boxes set on the ground in the prey's frame (px = a sixteenth of a block): its feet there,
     facing d, its left `left` (as Pair.holder_point)."""
-    def at(p):
-        a, side = (-p[2] + da) * size, p[0] * size
-        return (feet[0] + d[0] * a + left[0] * side, p[1] * size, feet[1] + d[1] * a + left[1] * side)
-    return [(bn, [at(p) for p in cs], col) for bn, cs, col in posed]
+    return [(bn, [place_point(feet, d, left, size, da, p) for p in cs], col) for bn, cs, col in posed]
 
 
 def named(into, flag_heads=None):
@@ -1954,7 +1995,7 @@ def named(into, flag_heads=None):
     return ', '.join(f'{a} in {b} {v:.1f}' for (a, b), v in items[:4]) or 'none'
 
 
-def run_scene(prey, pose, times, views, out_dir):
+def run_scene(prey, pose, times, views, out_dir, filmed=None):
     """--scene: everyone the prey's plan lists round this pose at once (each feeding or holding spot taken by each
     form its pairs allow there, at the pairs' real sizes), every few ticks of their clips, and the full lions lying by
     the kill round it, saying which parts are in which."""
@@ -2081,6 +2122,9 @@ def run_scene(prey, pose, times, views, out_dir):
                               + ('  << lies in them' if bad else ''))
                     else:
                         print(f'    rank {rank} {h:8s} {where}: clear')
+        if filmed:
+            import clip_video
+            print('    drew', clip_video.scene_video(prey, pose, kind, size, holders, allowed, spots_all, **filmed))
     print(f'  {flags} flagged')
     return 2 if flags else 0
 
@@ -2164,17 +2208,19 @@ def main(argv):
             i += 1
     animal = Animal(animal_name, model, size)
     out_dir = out_dir or os.path.join(PROJECT, 'references', 'anim_lab', animal_name + ('' if size == 1.0 else f'_size{size:g}'))
-    if video and (pair_with or scene or hold or changes):
-        print('--video is made for clips and clip changes (--switches); not yet with --pair, --scene, --hold or '
-              '--gait-changes')
+    if video and (hold or changes):
+        print('--video is made for clips, clip changes (--switches), pairs (--pair) and scenes (--scene); not yet with '
+              '--hold or --gait-changes')
         return 1
+    filmed = None
     if video:
         import clip_video
         me = sys.modules[__name__]
+        filmed = dict(cc=me, cams=cams, slow=slow, fixed=fixed, no_paths=no_paths, plays=plays)
     if pair_with:
-        return run_pairs(animal, pair_with, names, spots_wanted, times, views, out_dir)
+        return run_pairs(animal, pair_with, names, spots_wanted, times, views, out_dir, filmed)
     if scene:
-        return run_scene(animal, scene, times, views, out_dir)
+        return run_scene(animal, scene, times, views, out_dir, filmed)
     every = list(animal.data)
     if changes:
         print(f'{animal_name}, clips of {animal.anim_stem}')

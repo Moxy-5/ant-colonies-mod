@@ -175,7 +175,8 @@ def take(page, a, cams, frames):
             try:
                 try:
                     first, last, rows = replay_strips.opened(b, page, a.pick, cams, a.start, a.end,
-                                                             ticks_after=DEFAULT_TICKS if a.end is None else None)
+                                                             ticks_after=DEFAULT_TICKS if a.end is None else None,
+                                                             fit_with=a.fit_with)
                 except SystemExit as e:
                     if gpu and 'did not open' in str(e):
                         continue                    # (no 3D on the graphics card here: the software drawing)
@@ -280,11 +281,12 @@ def check(page, a, cams, rows, video, work):
 
 
 def make(folder, pick, start=None, end=None, cams=('side', 'front', 'above'), slow=4.0, fixed=False, no_paths=False,
-         check_it=False, out=None, tick_word='game tick', title=None):
+         check_it=False, out=None, tick_word='game tick', title=None, fit_with=()):
     """One video of a scene folder's recordings (the command below, callable: tools/clip_video.py makes its offline
     recordings and hands them here, so a clip off the files and a game film are drawn by one drawing). out: the mp4's
     path (default references/replay/video/<made name>.mp4); tick_word names the bar's clock ("clip tick" offline);
-    title the animal's name on the bar (default its name in the recording). Returns (the mp4, its check passed)."""
+    title the animal's name on the bar (default its name in the recording); fit_with: the cameras take in these
+    animals (names) too, not the picked animal alone (an offline pair or scene). Returns (the mp4, its check passed)."""
     if slow < 1:
         raise SystemExit('--slow must be 1 or more')
     if start is not None and end is not None and start > end:
@@ -298,7 +300,7 @@ def make(folder, pick, start=None, end=None, cams=('side', 'front', 'above'), sl
     if not cams:
         raise SystemExit('name at least one camera')
     a = argparse.Namespace(pick=pick, start=start, end=end, slow=slow, fixed=fixed, no_paths=no_paths,
-                           tick_word=tick_word, title=title)
+                           tick_word=tick_word, title=title, fit_with=fit_with)
     started = time.time()
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as work:
         work = Path(work)

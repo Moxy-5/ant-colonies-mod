@@ -159,11 +159,12 @@ def tile_size(n):
     return w, int(w * 574 / 1246)          # (the page's drawing is about 1246 by 574 in the default browser size)
 
 
-def opened(b, page, pick, cams, start, end, ticks_after=None):
+def opened(b, page, pick, cams, start, end, ticks_after=None, fit_with=()):
     """The replay page opened in browser b (a viewer_shot.Browser), its cameras and the animal checked, the cameras
     fitted to the animal's moments between its game ticks start and end (None: its first; None: 40 of its moments
-    on, or with ticks_after that many game ticks after the first): (first, last, rows), the range's first and last
-    moments (indexes) and the page's row of every moment between. Shared with tools/replay_video.py."""
+    on, or with ticks_after that many game ticks after the first; fit_with: and to these animals (names) drawn then,
+    an offline pair or scene): (first, last, rows), the range's first and last moments (indexes) and the page's row of every moment
+    between. Shared with tools/replay_video.py."""
     b.call('Page.navigate', url=page.resolve().as_uri() + '#labels=0')
     t0 = time.time()
     while not b.evaluate('!!(window.Replay && window.Replay.ready)'):
@@ -187,7 +188,7 @@ def opened(b, page, pick, cams, start, end, ticks_after=None):
     if end is None and ticks_after is not None:
         first, last = span(b.evaluate(f'Replay.rows({json.dumps(pick)}, {first}, {first})')[0]['tick'] + ticks_after)
     rows = b.evaluate(f'Replay.rows({json.dumps(pick)}, {first}, {last})')
-    b.evaluate(f'Replay.fit({json.dumps(pick)}, {first}, {last})')   # (the cameras fitted to these moments)
+    b.evaluate(f'Replay.fit({json.dumps(pick)}, {first}, {last}, {json.dumps(list(fit_with))})')   # (the cameras fitted to these moments)
     return first, last, rows
 
 
