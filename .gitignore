@@ -54,3 +54,6 @@ run-film/
 
 # raw in-game film frames (2026-11-20): kept locally only; their contact sheets beside them are committed
 references/workshop/*/game/*_frames/
+
+# The test and soak scripts' console logs at the top folder (committed by mistake twice, 2026-11-27)
+/*console*.txt
