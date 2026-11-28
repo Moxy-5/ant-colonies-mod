@@ -9,7 +9,7 @@ for the number there).
 
 | Part | Left |
 |---|---|
-| In the game: A, it breaks play | 6 |
+| In the game: A, it breaks play | 1 |
 | In the game: B, it looks or plays wrong | 41 |
 | In the game: C, small or rare | 54 |
 | Waiting for your call | 28 |
@@ -17,16 +17,11 @@ for the number there).
 | Tool faults | 6 |
 | *Test flakes, in `docs/TEST-FLAKES.md`* | *58* |
 
-## A: it breaks play (6)
+## A: it breaks play (1)
 
 Something a player meets goes wrong in a way that matters: a crash, a freeze, a system that does not do its job.
 
 - **306** The raids were rewritten from scratch (2026-11-24) and three long unattended runs are done: every raid ends, none hangs or crashes, and since the fix of the tail left behind (BUGS 450) the raiding colonies bring home enough to hold their size (151 termites in the last run, 23 and 57 before). Still to do: you watch raids in-game; the smaller raid bugs left are on this list.
-- **R5-1** A freeze of one to two seconds, with no cause in sight, for each far termite colony asked: on `/antcolonies list`, when new land puts in a dead mound, when a Matabele scout looks round, and on the first tick of a colony the player is beside when the world opens.
-- **R5-2** A termite colony the player has not been near for a long time (a rough sum: one to three game weeks) comes back with no young, a garden of all-old comb and its queen dead of hunger, and dwindles to a dead mound; colonies near the player are fine.
-- **R5-3** Watching a mound in spectator, no block the termites lay ever sets, so they cannot stack soil on their own soil; the mound grows only when the "stuck" clocks fire (building from outside at night, stages moving on unfinished) and by the builder numbers.
-- **R5-52** In a world where the night is skipped by `/time set day` each evening, or the sun is held still with the daylight cycle off, no termite colony ever comes out; they eat their comb, the workers starve after about 3 days without a meal and the queens after 5, near and far alike. A bed, `/time add` and `/tick rate` are fine.
-- **R5-53** Watching in spectator, a colony strips the dry grass round its holes once and then walks past rings of green tufts for good; after about 3 to 5 weeks it lives on what fallen branches and dead wood it reaches, or shrinks. Near a survival player eaten grass is food again after about 6 days.
 
 ## B: it looks or plays wrong (41)
 
@@ -528,7 +523,7 @@ Faults in the test and film tools, not in the game.
 
 ## The code review so far
 
-519 findings: 307 left (above), 212 done (below). The plan: `docs/plans/code-review.md`.
+519 findings: 302 left (above), 217 done (below). The plan: `docs/plans/code-review.md`.
 
 | Round | System | Found | Left | Done |
 |---|---|---|---|---|
@@ -536,7 +531,7 @@ Faults in the test and film tools, not in the game.
 | 2 | the legs | 43 | 18 | 25 |
 | 3 | the insect body | 45 | 32 | 13 |
 | 4 | how bodies are drawn | 37 | 32 | 5 |
-| 5 | the termites | 97 | 97 | 0 |
+| 5 | the termites | 97 | 92 | 5 |
 | 6 | the Matabele ants (not raids) | 33 | 30 | 3 |
 | 7 | the giant trees | 36 | 15 | 21 |
 | 8 | the world | 20 | 14 | 6 |
@@ -635,6 +630,14 @@ Faults in the test and film tools, not in the game.
 - **R4-23** (A) A crocodile, a Nile monitor and an otter vanish at the screen's edge while most of their body is still in view
 - **R4-24** (A) A player or animal held by a crocodile gets a shadow stood on edge (and spun round in the death roll)
 - **R4-25** (A) On a slow or stalling server the crocodile's death roll jumps back, and a held player's view spins back with it
+
+*Round 5, the termites*
+
+- **R5-1** (A) Asking a far mound for its stage or its cells still grows its whole plan on the game's own thread, a freeze of one to two seconds a mound
+- **R5-2** (A) While a colony is away its fungus garden only "sees" the comb left over after eating, so nodules stop growing, the young starve and then the queen
+- **R5-3** (A) Mound soil sets and dries only on Minecraft's random ticks, so it stands still near a spectator, while the colony is away, and at random tick speed 0
+- **R5-52** (A) A night skipped with `/time set day`, or a day clock that stands still, takes the termites' foraging, and the fix for the slept night does not see it
+- **R5-53** (A) Eaten dry grass grows back green and only dries on Minecraft's random ticks, so near a spectator, and far from every player, a colony's grass never becomes food again
 
 *Round 6, the Matabele ants (not raids)*
 

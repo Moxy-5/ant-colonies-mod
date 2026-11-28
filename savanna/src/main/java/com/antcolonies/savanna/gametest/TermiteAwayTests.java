@@ -202,8 +202,8 @@ public class TermiteAwayTests {
                     + garden.freshKnown() + " fresh, " + garden.ripeKnown() + " ripe, " + garden.oldKnown() + " old");
             helper.assertTrue(colony.away().getFoodOwed() == 6, "the blocks are owed the net, 6 layers, not " + colony.away().getFoodOwed());
             int grown = garden.getNodulesGrown();
-            garden.setAgeingSpeedForTests(100000.0F);
-            for (int second = 0; second < 20000 && garden.getNodulesGrown() == grown; second++) {
+            garden.setAgeingSpeedForTests(20.0F); // (ripe in seconds; going old stays slow beside the nodules)
+            for (int second = 0; second < 3000 && garden.getNodulesGrown() == grown; second++) {
                 for (var work : colony.hooks().all(com.antcolonies.colony.ColonyHooks.AWAY_AFTER_NURSES)) {
                     work.work(level);
                 }
@@ -309,10 +309,10 @@ public class TermiteAwayTests {
      * numbers bring the 6 pieces in, and the tufts vanish out of sight after.
      * <p>Review R5-52, the same scene: the day clock's jump is read whole (a bed's jump forward, and {@code /time set
      * day} at night, a jump many days back, both give the rest of the night; a clock that just runs gives nothing),
-     * and before the night is jumped the day clock stands still at midday for 30 seconds: the numbers forage a night's
+     * and before the night is jumped the day clock stands still at midday for 90 seconds: the numbers forage a night's
      * share of that time, so pieces come in with no night at all.
      */
-    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 2700, skyAccess = true)
     public static void aNightSleptThroughIsForagedByTheTermiteNumbers(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TestScenes.deepGround(helper);
@@ -359,7 +359,7 @@ public class TermiteAwayTests {
                     "a day clock that just runs has not jumped");
             colony.field().setClockStandsForTests(true); // the daylight cycle is switched off at midday
         });
-        helper.runAfterDelay(900, () -> {
+        helper.runAfterDelay(2100, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(!colony.isForagingTime(level) && colony.food().getFood() > foodBefore[0],
                     "with the day clock standing still at midday the numbers should forage a night's share: " + colony.food().getFood() + ", was " + foodBefore[0]);
@@ -368,7 +368,7 @@ public class TermiteAwayTests {
             helper.assertTrue(colony.food().getFood() == foodBefore[0] + 6, "the night slept through should bring the 6 pieces in: "
                     + colony.food().getFood() + ", was " + foodBefore[0]);
         });
-        helper.runAfterDelay(1200, () -> {
+        helper.runAfterDelay(2400, () -> {
             for (BlockPos tuft : tufts) {
                 helper.assertTrue(level.getBlockState(tuft).isAir(), "a tuft eaten up in the night slept through should be gone: " + tuft);
             }

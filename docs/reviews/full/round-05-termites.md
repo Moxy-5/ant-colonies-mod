@@ -90,6 +90,8 @@ needs. After its first days a colony grows as fast as its forage, not its queen,
 
 **In play (2026-11-27):** A. A freeze of one to two seconds, with no cause in sight, for each far termite colony asked: on `/antcolonies list`, when new land puts in a dead mound, when a Matabele scout looks round, and on the first tick of a colony the player is beside when the world opens.
 
+**Status (2026-11-27, `claude/review-fix-5a`): fixed: `Mound.getStage` only reads; the stage moves in the near tick (`moveStageOn`) and with the builder numbers (`nextStage`), and never while the plan is missing or a cell lies in land not loaded (`stageKnown`). `getParts` never grows a plan: it asks in the background and answers with what it has; `partsNow` waits where the cells are needed at once (a colony's end, a mound of new land, a mound put up by command). `Mound.tick` returns while the plan is on its way; the colony list line shows `?` for soil counts not known yet; `livingMoundNear` measures the distance first. Test `aMoundAskedWithNoPlanKeptNeverGrowsItOnTheGamesOwnThread`. Not measured in a world with far mounds after a restart.**
+
 **Checked again by the lead.** Read `Mound.getStage` (`savanna/colony/Mound.java:345-369`), `isStageDone`
 (`:410-417`), `getParts` (`:443-459`), `stages`/`stage` (`:278-285`), `tick` (`:465-476`), `keepShapes` (`:292-299`),
 `MoundPlan.growth` (`savanna/colony/MoundPlan.java:133-156`), `growthSoon` (`:198`), and
@@ -123,6 +125,8 @@ needs. After its first days a colony grows as fast as its forage, not its queen,
 
 **In play (2026-11-27):** A. A termite colony the player has not been near for a long time (a rough sum: one to three game weeks) comes back with no young, a garden of all-old comb and its queen dead of hunger, and dwindles to a dead mound; colonies near the player are fine.
 
+**Status (2026-11-27, `claude/review-fix-5a`): fixed: `NestLedger` keeps the layers that cancel in what the blocks are owed (`turnover`, saved; `storePutOn`, `storeTakenOff`), so the garden knows every piece brought in as fresh comb and every layer eaten as an old one gone (`FungusGarden.freshKnown`, `oldKnown`); the blocks are still owed only the net, and the pairs are dropped when the blocks catch up. Pieces laid away count as comb with no comb block seen (`combsKnown`), so the second door is shut too. Test `aGardenAwayKnowsEveryPieceBroughtInAsFreshCombThoughAsManyOldLayersAreEaten`. Left: the 30-day soak of a far colony (how the sums run over weeks is not measured).**
+
 **Checked again by the lead.** Read `FungusGarden.freshKnown`, `ripeKnown`, `oldKnown`
 (`savanna/colony/FungusGarden.java:323-336`), `GardenAway.grow` (`savanna/colony/GardenAway.java:37-85`) and the
 writers of the one number (`framework/colony/FoodStore.java:1014-1023` eating, `FieldLife.java:288`, `:563` and
@@ -151,6 +155,8 @@ the away life).
 ### R5-3 (A, proven): mound soil sets and dries only on Minecraft's random ticks, so it stands still near a spectator, while the colony is away, and at random tick speed 0
 
 **In play (2026-11-27):** A. Watching a mound in spectator, no block the termites lay ever sets, so they cannot stack soil on their own soil; the mound grows only when the "stuck" clocks fire (building from outside at night, stages moving on unfinished) and by the builder numbers.
+
+**Status (2026-11-27, `claude/review-fix-5a`): fixed: `MoundDrying`: once a second, while the mound holds its plan and its land is loaded, the mound gives its own cells (and the footing under its foot) the random ticks Minecraft withholds (no player but a spectator within 128 blocks, or the game rule at 0), at Minecraft's own pace, so the average 23 minutes to set is unchanged; after a pause (the colony left alone, the game closed) the whole mound dries by the time that passed, 400 cells a second, starting when a watcher comes within 128 blocks (`MoundSoil.agedBy`; the time is saved). Near a survival player nothing changes. Test `moundSoilSetsWhereMinecraftGivesNoRandomTicks`. Left: a mound between 64 and 128 blocks from a survival player for a long time dries a little fast (the game's ticks and the pause's both count); dead mounds and soil outside a living mound's plan still dry on random ticks only; the other random-ticking termite blocks (mud crust, casts, mushrooms) are not looked at.**
 
 **Checked again by the lead, with Minecraft's own code.** In the mod: the only place that raises a standing block's
 age is `MoundSoil.age` (`savanna/block/MoundSoil.java:45-50`), called only from the blocks' `randomTick`;
@@ -886,6 +892,8 @@ planks, logs and living trees never are.
 
 **In play (2026-11-27):** A. In a world where the night is skipped by `/time set day` each evening, or the sun is held still with the daylight cycle off, no termite colony ever comes out; they eat their comb, the workers starve after about 3 days without a meal and the queens after 5, near and far alike. A bed, `/time add` and `/tick rate` are fine.
 
+**Status (2026-11-27, `claude/review-fix-5a`): fixed: `FieldLife.forageUnseenTime` and `clockJump`: any jump of the day clock of 10 seconds or more, forward or back, is read as the time of day going forward from the old hour to the new one, and the foraging time between is foraged by the numbers in one pass; while the day clock stands still outside foraging time the numbers forage a night's share of every second. For a foraging time that never began for real the web picks its holes (`Underground.foragingTimeUnseen`, `HoleTurns.unseenRound`; once a game day while the clock stands). Test: `aNightSleptThroughIsForagedByTheTermiteNumbers` now checks the jump's reading (a bed, `/time set day` at night, a running clock) and a clock standing at midday. Left: a clock stopped at night keeps one night's pick of holes for good (the termites forage all the time there, so nothing starves); a rewind of the clock gives the numbers one free night.**
+
 **Checked again by the lead.** Read `FieldLife.nightJumpedOver` (`framework/colony/FieldLife.java:372-384`), its only
 caller `tick` (`:104-127`), `Colony.isForagingTime` and `isDay` (`framework/colony/Colony.java:433-470`). Minecraft's
 `TimeCommand.setTime` was read for part A (R5-19): it sets the plain number, so "day" is 1000. It holds.
@@ -914,6 +922,8 @@ caller `tick` (`:104-127`), `Colony.isForagingTime` and `isDay` (`framework/colo
 ### R5-53 (A, proven; a new side of R5-3): eaten dry grass grows back green and only dries on Minecraft's random ticks, so near a spectator, and far from every player, a colony's grass never becomes food again
 
 **In play (2026-11-27):** A. Watching in spectator, a colony strips the dry grass round its holes once and then walks past rings of green tufts for good; after about 3 to 5 weeks it lives on what fallen branches and dead wood it reaches, or shrinks. Near a survival player eaten grass is food again after about 6 days.
+
+**Status (2026-11-27, `claude/review-fix-5a`): fixed: `BarePatches` keeps an eaten tuft until it is food again: grown back green after 3 days as before, it dries a step every day and a half by the part's own clock (`DryGrassBlock.STEP_TICKS`, `dryOneStep`), and once dry the colony is told of it (`FoodMap.learn`). So eaten grass is food again 6 days after, whoever watches (my pick, as the finding proposed); near a survival player random ticks may dry it a little sooner. Test: `dryGrassEatenByAHoleLeavesBareGroundAndGrowsBack` walks it round (green, drying, dry, known again) with no random tick. Left: grass the colony never ate still dries on random ticks only, so beside a spectator the world's own green tufts stay green.**
 
 **Checked again by the lead.** Read `DryGrassBlock` (`savanna/block/DryGrassBlock.java:61-100`: drying only in
 `randomTick`, 1 time in 27), `BarePatches.tick` (`savanna/colony/BarePatches.java:109-140`: puts back the species

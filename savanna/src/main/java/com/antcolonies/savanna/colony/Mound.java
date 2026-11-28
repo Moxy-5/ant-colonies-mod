@@ -159,8 +159,10 @@ public class Mound {
             return "";
         }
         int h = getStage(level);
-        return String.format(" | mound stage %d (earned %d) of %d, %d/%d blocks finished, earned %.1f blocks", h, getEarnedStage(level),
-                numbers().maxHeight(), countFinished(level), wallsAt(h), getAllowance(level));
+        // (never waits for a plan, R5-1: a mound whose soil counts are not known yet shows "?" until they are)
+        String walls = wallsKnown(numbers(), waits(level)) ? String.valueOf(wallsAt[Math.max(1, Math.min(h, numbers().maxHeight()))]) : "?";
+        return String.format(" | mound stage %d (earned %d) of %d, %d/%s blocks finished, earned %.1f blocks", h, getEarnedStage(level),
+                numbers().maxHeight(), countFinished(level), walls, getAllowance(level));
     }
 
     Colony colony() {
