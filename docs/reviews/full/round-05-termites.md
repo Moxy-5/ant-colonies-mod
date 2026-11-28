@@ -1230,7 +1230,7 @@ closed-for-danger cells only), `brokenInto` (`:260-285`: the only place that loo
 
 **In play (2026-11-27):** B. A raid at a log where the termites had stopped feeding still finds termites; at a spot with one open cell most of the termites brought out stand shut in under the wood, counted as there, with raiders pacing above them (the picture of BUGS 452).
 
-**Status (2026-11-27, `claude/review-fix-b8`): fixed (its first half): the raid's feeders stand only in the cells of the by-day places that a raider can get into (`Raid.feedersOut`, `MatabeleEntity.wayInto`), the nearest the spot first; none are shut in under whole wood. Test `theTermitesFeedingUnderTheMudStandInTheirGalleryWhenRaidersBreakIn` now asks 3 and gets the 2 under the mud. Left: one judge of "termites feed here now" owned by the termite colony, and Q-9's tenth taken twice.**
+**Status (2026-11-27, `claude/review-fix-b8`): fixed (its first half): the raid's feeders stand only in the cells of the by-day places that a raider can get into (`Raid.feedersOut`, `MatabeleEntity.wayInto`), the nearest the spot first; none are shut in under whole wood. Test `theTermitesFeedingUnderTheMudStandInTheirGalleryWhenRaidersBreakIn` now also calls feeders before the mud is put on, with no way in, and gets none (with the mud open the whole gallery joined to it is reachable, and three come out as before). Left: one judge of "termites feed here now" owned by the termite colony, and Q-9's tenth taken twice.**
 
 - **What is wrong:** by day three questions have three answers. Who really feeds: nobody, when the store is full (the
   usual state of a well-fed colony), the food cannot be eaten from inside or no pieces are left. What the record says

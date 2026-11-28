@@ -178,7 +178,8 @@ public final class AwayKit {
         // Colony parts steps 6 and 7, the colony questions: each kind is answered by the parts the colony has that used
         // to be asked by name, in the order they were asked; a kind nobody answers is "no" at once.
         Map<com.antcolonies.colony.ColonyQuestions.Kind<?>, List<String>> asked = Map.ofEntries(
-                Map.entry(com.antcolonies.colony.ColonyQuestions.KEEP_OFF, List.of("neighbours", "closed_holes", "danger_map", "trunk_trails", "alarm")),
+                // (review R5-65: the alarm no longer answers "keep off", only "alarmed": keep off is for the lasting reasons)
+                Map.entry(com.antcolonies.colony.ColonyQuestions.KEEP_OFF, List.of("neighbours", "closed_holes", "danger_map", "trunk_trails")),
                 Map.entry(com.antcolonies.colony.ColonyQuestions.HOLE_KEPT_SHUT, List.of("closed_holes")),
                 Map.entry(com.antcolonies.colony.ColonyQuestions.ANY_HOLE_KEPT_SHUT, List.of("closed_holes")),
                 Map.entry(com.antcolonies.colony.ColonyQuestions.NO_GALLERY_THROUGH, List.of("closed_holes")),
