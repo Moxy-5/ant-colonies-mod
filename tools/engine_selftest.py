@@ -545,6 +545,66 @@ def feet_rule_sees_a_carried_foot_slide_and_leaves_a_still_or_lifted_one_alone()
     need(st[20] == recording.SLIDING, f'not judged again after the catch-up: {st[19:22]}')
 
 
+# --- a clip off the files as a video (tools/clip_video.py; phase 3 part B step 2, idea 61) ------------------------------
+def offline_recording(animal, name, folder, stretch=1.0):
+    """The buffalo's clip written as clip_video writes it (one play), its moving ground's travel times stretch."""
+    import clip_video
+    pl = cc.Played(animal, name)
+    moments, _ = clip_video.clip_moments(cc, animal, pl, 1)
+    moments = [(k, pose, lift, travel * stretch, clip, ticks, speed * stretch, marks)
+               for k, pose, lift, travel, clip, ticks, speed, marks in moments]
+    px = 1.0 / pl.scene.block
+    world = clip_video.World(animal, pl.scene, max(m[3] for m in moments), animal.kind(name), px)
+    return clip_video.write(folder, animal, name, world, moments, px), moments, px
+
+
+@test
+def an_offline_recording_holds_the_checkers_pose_and_a_moved_bone_is_caught():
+    """The video draws what the checker judged: the recording read back puts every corner where clip_check poses it;
+    one bone's matrix moved a pixel in the file is caught by the same check."""
+    import gzip
+    import json
+    import tempfile
+    import clip_video
+    animal = cc.Animal('buffalo')
+    folder = tempfile.mkdtemp()
+    path, moments, px = offline_recording(animal, 'walk', folder)
+    worst, _ = clip_video.check(path, animal, moments, px)
+    need(worst < clip_video.CHECK_PX, f'the real recording is {worst:.4f} px off the checker')
+    with gzip.open(path, 'rt', encoding='utf-8') as f:
+        lines = [json.loads(line) for line in f]
+    bone = next(i for i, b in enumerate(lines[0]['bones']) if b['cubes'] and i > 2)
+    lines[5]['b'][bone][7] += px                         # (one bone with boxes, one moment, a model pixel up)
+    with gzip.open(path, 'wt', encoding='utf-8') as f:
+        f.write(''.join(json.dumps(line) + '\n' for line in lines))
+    worst, at = clip_video.check(path, animal, moments, px)
+    need(worst > 0.9 and at == moments[4][0], f'a bone moved a pixel read {worst:.4f} px off at moment {at}')
+
+
+@test
+def the_moving_ground_keeps_a_walks_feet_still_and_shows_a_wrong_speed():
+    """The treadmill: the buffalo's walk on ground moving at its own speed keeps its planted feet still by the one feet
+    rule (tools/recording.py); the same walk carried half as fast again makes them slide (so a slide in the video is
+    the clip's, not the ground's)."""
+    import tempfile
+    import recording
+    import replay
+    animal = cc.Animal('buffalo')
+
+    def slides(stretch):
+        path, _, _ = offline_recording(animal, 'walk', tempfile.mkdtemp(), stretch)
+        h, ms, bl, _, _ = recording.read(path)
+        keys = [recording.clock(m) for m in ms]
+        feet = recording.feet(h, ms, recording.plan_legs(replay.plan_of(h['entity'])), recording.Ground(bl), keys,
+                              [99] * len(ms))
+        down = [s for f in feet for s, st in zip(f['slide'], f['state']) if s is not None]
+        return sorted(down)[len(down) // 2], len(feet)
+    good, n = slides(1.0)
+    need(n == 4 and good < 0.05, f'its own speed: {n} feet, a planted foot slides {good:.3f} px a tick (middle)')
+    bad, _ = slides(1.5)
+    need(bad > recording.SLIDE_PX, f'half as fast again: a planted foot slides only {bad:.3f} px a tick (middle)')
+
+
 # --- one film at a time (tools/film_run.py) ----------------------------------------------------------------------------
 @test
 def the_clip_maps_ways_are_checked_with_the_plans_own_list():

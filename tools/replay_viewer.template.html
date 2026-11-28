@@ -263,6 +263,7 @@ function show(t) {
   }
   placeGhosts();
   placePaths();
+  placeMarks();
   drawChartNow();
   info();
   writeState();
@@ -716,6 +717,26 @@ function placePaths() {
   });
   pathSets.forEach((set, i) => { if (i >= feet.length) set.line.visible = set.dots.visible = false; });
   pathGroup.visible = true;
+}
+
+// --- red marks: the points a recording says are faults at this moment (the Motion Studio, phase 3 part B step 2: an
+// offline clip's parts inside a block, as the checker's strips mark them, tools/clip_video.py; a game film has none)
+const MARKS_MAX = 600;
+const markGeo = new THREE.BufferGeometry();
+markGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MARKS_MAX * 3), 3));
+const markDots = new THREE.Points(markGeo, new THREE.PointsMaterial({color: '#ff1d0d', size: 6, sizeAttenuation: false, depthTest: false}));
+markDots.renderOrder = 21; markDots.frustumCulled = false; markDots.visible = false;
+st.scene.add(markDots);
+function placeMarks() {
+  const pos = markGeo.attributes.position;
+  let n = 0;
+  animals.forEach(a => {
+    if (!a.marks || !a.on || a.now < 0) return;
+    for (const p of a.marks[a.now] || []) if (n < MARKS_MAX) pos.setXYZ(n++, p[0], p[1], p[2]);
+  });
+  markGeo.setDrawRange(0, n);
+  pos.needsUpdate = true;
+  markDots.visible = n > 0;
 }
 
 // --- controls (none answer before the recording is unpacked) ------------------------------------------------------

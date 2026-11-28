@@ -99,8 +99,8 @@ def pass_words(slow):
 class Bar:
     """The bar under the pictures: the same for every frame of a moment in one pass."""
 
-    def __init__(self, width, rows, name):
-        self.w, self.rows, self.name = width, rows, name
+    def __init__(self, width, rows, name, tick_word='game tick'):
+        self.w, self.rows, self.name, self.tick_word = width, rows, name, tick_word
         self.big, self.mid, self.small = replay_strips.font(22), replay_strips.font(17), replay_strips.font(14)
         drawn = [r['tick'] for r in rows if r['drawn']]
         self.ends = (drawn[0], drawn[-1]) if drawn else (rows[0].get('sceneTick'), rows[-1].get('sceneTick'))
@@ -127,15 +127,15 @@ class Bar:
         x = 24 + lw
         if r['drawn']:
             c = replay_strips.clip_of(r)
-            head = f"{self.name}   game tick {r['tick']}   {seconds:.2f} s   {replay_strips.clip_words(c)}"
+            head = f"{self.name}   {self.tick_word} {r['tick']}   {seconds:.2f} s   {replay_strips.clip_words(c)}"
         else:
-            head = f"{self.name} not drawn here   game tick {r.get('sceneTick')}   {seconds:.2f} s"
+            head = f"{self.name} not drawn here   {self.tick_word} {r.get('sceneTick')}   {seconds:.2f} s"
         d.text((x, 13), head, fill=INK, font=self.mid)
         gap = r.get('gapBefore', 0)
         if gap > replay_strips.GAP:
             note = f'after {gap} game ticks not recorded'
             d.text((self.w - 14 - d.textlength(note, font=self.mid), 13), note, fill=BLUE, font=self.mid)
-        span = f'the line: game ticks {self.ends[0]} to {self.ends[1]}'
+        span = f'the line: {self.tick_word}s {self.ends[0]} to {self.ends[1]}'
         right = self.w - 14 - d.textlength(span, font=self.small)
         d.text((right, 50), span, fill=MUTED, font=self.small)
         x = 10
@@ -188,7 +188,7 @@ def take(page, a, cams, frames):
                 b.evaluate(f'Replay.traces({json.dumps(not a.no_paths)}, 0)')
                 b.evaluate('Replay.fadeOthers(true)')
                 width = TILE[0] * len(cams)
-                bar = Bar(width, rows, a.pick)
+                bar = Bar(width, rows, a.title or a.pick, a.tick_word)
                 starts, _ = times_of(rows)
                 passes = [1.0] + ([a.slow] if a.slow != 1 else [])
                 label = replay_strips.font(16)
@@ -279,31 +279,26 @@ def check(page, a, cams, rows, video, work):
     return True
 
 
-def main(argv=None):
-    ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
-    ap.add_argument('folder', help="the scene's folder, e.g. run-film/screenshots/feast_bench")
-    ap.add_argument('--pick', required=True, help='the animal, by name (as the page lists them)')
-    ap.add_argument('--from', dest='start', type=int, help="its first game tick (default: its first moment)")
-    ap.add_argument('--to', dest='end', type=int, help=f'its last game tick (default: {DEFAULT_TICKS} ticks on)')
-    ap.add_argument('--cams', default='side,front,above', help='cameras round it, side by side (side, front, behind, '
-                                                              'above, three-quarter, wide)')
-    ap.add_argument('--slow', type=float, default=4, help='the second pass this many times slower (1: none)')
-    ap.add_argument('--fixed', action='store_true', help='each camera stays where it stood at the first moment')
-    ap.add_argument('--no-paths', action='store_true', help='no foot paths drawn')
-    ap.add_argument('--check', action='store_true', help="the video's own check against the strips' picture")
-    a = ap.parse_args(argv)
-    if a.slow < 1:
-        ap.error('--slow must be 1 or more')
-    if a.start is not None and a.end is not None and a.start > a.end:
-        ap.error(f'--from {a.start} is after --to {a.end}')
+def make(folder, pick, start=None, end=None, cams=('side', 'front', 'above'), slow=4.0, fixed=False, no_paths=False,
+         check_it=False, out=None, tick_word='game tick', title=None):
+    """One video of a scene folder's recordings (the command below, callable: tools/clip_video.py makes its offline
+    recordings and hands them here, so a clip off the files and a game film are drawn by one drawing). out: the mp4's
+    path (default references/replay/video/<made name>.mp4); tick_word names the bar's clock ("clip tick" offline);
+    title the animal's name on the bar (default its name in the recording). Returns (the mp4, its check passed)."""
+    if slow < 1:
+        raise SystemExit('--slow must be 1 or more')
+    if start is not None and end is not None and start > end:
+        raise SystemExit(f'--from {start} is after --to {end}')
     if not shutil.which('ffmpeg'):
         raise SystemExit('ffmpeg is needed for the video and was not found')
-    folder = Path(a.folder) if Path(a.folder).is_absolute() else ROOT / a.folder
+    folder = Path(folder) if Path(folder).is_absolute() else ROOT / folder
     if not folder.is_dir():
         raise SystemExit(f'no folder {folder}')
-    cams = [c.strip() for c in a.cams.split(',') if c.strip()]
+    cams = [c.strip() for c in cams if c.strip()]
     if not cams:
-        ap.error('name at least one camera')
+        raise SystemExit('name at least one camera')
+    a = argparse.Namespace(pick=pick, start=start, end=end, slow=slow, fixed=fixed, no_paths=no_paths,
+                           tick_word=tick_word, title=title)
     started = time.time()
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as work:
         work = Path(work)
@@ -316,17 +311,41 @@ def main(argv=None):
         if not drawn:
             raise SystemExit('no moments drawn to show')
         t0, t1 = drawn[0]['tick'], drawn[-1]['tick']
-        name = replay_strips.safe(f'{folder.name}_{a.pick}_{t0}-{t1}_{"+".join(cams)}'
-                                  + ('_fixed' if a.fixed else '') + f'_s{a.slow:g}')
-        OUT.mkdir(parents=True, exist_ok=True)
-        out = OUT / f'{name}.mp4'
+        if out is None:
+            name = replay_strips.safe(f'{folder.name}_{pick}_{t0}-{t1}_{"+".join(cams)}'
+                                      + ('_fixed' if fixed else '') + f'_s{slow:g}')
+            out = OUT / f'{name}.mp4'
+        out = Path(out)
+        out.parent.mkdir(parents=True, exist_ok=True)
         encode(frames, rows, passes, out)
         starts, lengths = times_of(rows)
         seconds = (starts[-1] + lengths[-1]) * sum(passes) + (END_HOLD if len(passes) > 1 else 0)
         made = time.time() - started
-        print(f'wrote {viewer_shot.shown(out)} ({len(rows)} moments, game ticks {t0} to {t1}, {len(cams)} camera{"s" if len(cams) > 1 else ""}, '
+        print(f'wrote {viewer_shot.shown(out)} ({len(rows)} moments, {tick_word}s {t0} to {t1}, {len(cams)} camera{"s" if len(cams) > 1 else ""}, '
               f'{seconds:.1f} s of video, {out.stat().st_size // 1024} KB, made in {made:.0f} s, drawn by {drew})')
-        ok = check(page, a, cams, rows, out, work) if a.check else True
+        ok = check(page, a, cams, rows, out, work) if check_it else True
+    return out, ok
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
+    ap.add_argument('folder', help="the scene's folder, e.g. run-film/screenshots/feast_bench")
+    ap.add_argument('--pick', required=True, help='the animal, by name (as the page lists them)')
+    ap.add_argument('--from', dest='start', type=int, help="its first game tick (default: its first moment)")
+    ap.add_argument('--to', dest='end', type=int, help=f'its last game tick (default: {DEFAULT_TICKS} ticks on)')
+    ap.add_argument('--cams', default='side,front,above', help='cameras round it, side by side (side, front, behind, '
+                                                              'above, three-quarter, wide)')
+    ap.add_argument('--slow', type=float, default=4, help='the second pass this many times slower (1: none)')
+    ap.add_argument('--fixed', action='store_true', help='each camera stays where it stood at the first moment')
+    ap.add_argument('--no-paths', action='store_true', help='no foot paths drawn')
+    ap.add_argument('--check', action='store_true', help="the video's own check against the strips' picture")
+    ap.add_argument('--out', help='the mp4 to write (default references/replay/video/<made name>.mp4)')
+    a = ap.parse_args(argv)
+    if a.slow < 1:
+        ap.error('--slow must be 1 or more')
+    if a.start is not None and a.end is not None and a.start > a.end:
+        ap.error(f'--from {a.start} is after --to {a.end}')
+    _, ok = make(a.folder, a.pick, a.start, a.end, a.cams.split(','), a.slow, a.fixed, a.no_paths, a.check, a.out)
     return 0 if ok else 1
 
 

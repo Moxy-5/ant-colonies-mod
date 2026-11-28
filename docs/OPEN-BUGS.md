@@ -11,10 +11,10 @@ for the number there).
 |---|---|
 | In the game: A, it breaks play | 1 |
 | In the game: B, it looks or plays wrong | 34 |
-| In the game: C, small or rare | 54 |
+| In the game: C, small or rare | 55 |
 | Waiting for your call | 27 |
 | Behind the scenes (code review) | 206 |
-| Tool faults | 6 |
+| Tool faults | 7 |
 | *Test flakes, in `docs/TEST-FLAKES.md`* | *59* |
 
 ## A: it breaks play (1)
@@ -62,7 +62,7 @@ A player will likely see it, and the game goes on.
 - **R6-20** Likely, not proven: one block you put in a Matabele nest's chimney (a torch) makes the colony lose all its rooms.
 - **R8-3** Likely, not proven: with a biome mod that is a data pack (Terralith, say) its biomes may not appear at all.
 
-## C: small or rare (54)
+## C: small or rare (55)
 
 Hard to notice, or it needs an unusual case.
 
@@ -85,6 +85,7 @@ Hard to notice, or it needs an unusual case.
 - **462** Walk away from a raid in the middle of its attack and the attack can last half a minute longer than its limit before the ants turn home.
 - **466** When lions let a buffalo go, its tail and ears snap to a new place in a moment as it starts to get up.
 - **467** At a kill, lions feeding side by side push legs and manes a little into each other, and the full ones lying nearby can lie into a feeder's tail.
+- **479** The Nile monitor's climb up and down a block shuffles its feet along the ground and lets them slide while it pushes itself up; seen in the new offline video, for the animation rework.
 - **R3-10** Big fights cost the server more than they need: a fighter with no foe near still looks round once a second. *(half fixed)*
 - **R3-30** Some ants lose one try (a short pause) when they set off to go in, wait at the nest or follow the queen. *(half fixed)*
 - **R4-13** Fly clouds go silent after F3+T or a new sound device, until you walk 48 blocks away and back.
@@ -501,7 +502,7 @@ given; *half fixed* says what is left; no word means nobody has started it.
 - **R12-69** The dragged tail does all its ground reading even when it has no say
 - **R12-73** The hippo's climb-out paths are not one row a tick, and the move writer never checks
 
-## Tool faults (6)
+## Tool faults (7)
 
 Faults in the test and film tools, not in the game.
 
@@ -511,6 +512,7 @@ Faults in the test and film tools, not in the game.
 - **429** On the course the monitor, the bullfrog and the crocodiles stop short of where a scene sends them
 - **435** The six walker guard scenes come out different on every launch
 - **449** The lion hunt film misses the hold; its "hold" burst films the feast instead
+- **480** The monitor's, crocodile's and crab's walks have no walking speed written in their plans, so the tools cannot tell whether their feet slide.
 
 ## The code review so far
 
