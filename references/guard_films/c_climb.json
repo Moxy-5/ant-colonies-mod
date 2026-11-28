@@ -146,63 +146,54 @@
   136
  ],
  "findings": {
-  "jump leg_r3_foot": [
+  "jump leg_r2": [
    1,
-   0.19
+   0.106
   ],
-  "jump at up_30": [
+  "jump at down_03": [
    1,
-   0.19
+   0.106
   ],
-  "jump leg_l1_foot": [
+  "jump thorax": [
    1,
-   0.2
+   0.037
   ],
-  "jump at up_28": [
-   1,
-   0.2
-  ],
-  "jump postpetiole": [
-   1,
-   0.059
-  ],
-  "jump at down_57": [
-   2,
-   0.154
-  ],
-  "inside abdomen": [
+  "jump at up_31": [
    3,
-   0.036
+   0.037
   ],
-  "inside at up_67": [
+  "jump mandible_r": [
    1,
-   0.023
+   0.107
   ],
-  "inside at up_68": [
-   1,
-   0.036
-  ],
-  "inside at down_24": [
-   1,
-   0.026
-  ],
-  "jump abdomen": [
+  "jump at up_34": [
    4,
-   0.154
+   0.107
   ],
-  "jump at up_32": [
+  "jump antenna_l_1": [
    1,
-   0.151
+   0.107
   ],
-  "jump at up_69": [
+  "jump mandible_l": [
    1,
-   0.128
+   0.107
   ],
-  "jump at down_25": [
+  "jump antenna_r_1": [
    1,
-   0.13
+   0.105
+  ],
+  "jump petiole": [
+   1,
+   0.033
+  ],
+  "jump gaster_front": [
+   1,
+   0.033
   ]
  },
- "body_findings": {},
- "known_bugs": "the ant's gaster lies on the ground the hind feet walked, so crossing the edge it grazes the corner up to 0.03 blocks (half a pixel; a straight gaster across a corner, docs/BUGS.md 54)"
+ "body_findings": {
+  "tipped": 1
+ },
+ "camera_checked": true,
+ "known_bugs": "the ant's gaster lies on the ground the hind feet walked, so crossing the edge it grazes the corner up to 0.03 blocks (half a pixel; a straight gaster across a corner, docs/BUGS.md 54); the Matabele minor: at the pillar's top its head, antennae and jaws jump about 0.11 blocks in a tick, and starting down its body tips 30 degrees in a tick (BUGS 308b); its pictures differ on every launch (BUGS 435), so only its body checks guard it"
 }

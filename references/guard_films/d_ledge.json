@@ -156,35 +156,60 @@
   136
  ],
  "findings": {
-  "inside abdomen": [
-   3,
-   0.039
-  ],
-  "inside at off_edge_47": [
+  "jump leg_l2": [
    1,
-   0.026
+   0.049
   ],
-  "inside at back_up_40": [
+  "jump at back_up_33": [
+   9,
+   0.066
+  ],
+  "jump thorax": [
    1,
-   0.023
+   0.04
   ],
-  "inside at back_up_41": [
+  "jump head": [
    1,
-   0.039
+   0.054
   ],
-  "jump abdomen": [
+  "jump mandible_r": [
+   1,
+   0.059
+  ],
+  "jump antenna_l_1": [
+   1,
+   0.06
+  ],
+  "jump antenna_l_2": [
+   1,
+   0.066
+  ],
+  "jump mandible_l": [
+   1,
+   0.059
+  ],
+  "jump antenna_r_1": [
+   1,
+   0.059
+  ],
+  "jump leg_r1": [
+   1,
+   0.065
+  ],
+  "jump petiole": [
+   1,
+   0.037
+  ],
+  "jump at off_edge_47": [
    2,
-   0.134
+   0.043
   ],
-  "jump at off_edge_48": [
+  "jump gaster_front": [
    1,
-   0.134
-  ],
-  "jump at back_up_42": [
-   1,
-   0.132
+   0.043
   ]
  },
  "body_findings": {},
- "known_bugs": "the ant's gaster lies on the ground the hind feet walked, so crossing the edge it grazes the corner up to 0.03 blocks (half a pixel; a straight gaster across a corner, docs/BUGS.md 54)"
+ "camera_checked": true,
+ "known_bugs": "the ant's gaster lies on the ground the hind feet walked, so crossing the edge it grazes the corner up to 0.03 blocks (half a pixel; a straight gaster across a corner, docs/BUGS.md 54); at one moment of a launch the head, antennae or a leg jump up to 0.07 blocks in a tick; its pictures differ on every launch (BUGS 435), so only its body checks guard it"
 }

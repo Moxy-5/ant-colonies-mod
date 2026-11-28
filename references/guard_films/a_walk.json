@@ -106,5 +106,7 @@
   136
  ],
  "findings": {},
- "body_findings": {}
+ "body_findings": {},
+ "camera_checked": true,
+ "known_bugs": "the Matabele minor on the harvester's old scene: at the change to the fast walk a leg moves about 0.06 blocks in a tick (BUGS 308a); its pictures differ on every launch (BUGS 435), so only its body checks guard it"
 }
