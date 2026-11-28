@@ -19,6 +19,9 @@ commit 7ca907b2): every idea of Neon's is there (57 to 59 built in phase 2, 60 t
 - **Part B, motion as video** (Neon's 60 to 62): steps 1 to 3.
 - **Part C, living motion** (Neon's 63 and 64), measured first and rethought as clips: steps 4 to 6.
 - First, **step 0**, the branch sync Neon asked for.
+- **The Motion Studio's whole phase list was remade 2026-11-27 with all of Neon's ideas written out in full** (the
+  user: "Could remake the phase list with all of neons ideas"): `docs/plans/motion-studio.md`, "The phases". Every
+  idea from 1 to 64 has one place there (built, next, later, or not kept); parts B and C below carry Neon's own words.
 
 ### Step 0: the branches in step (before Neon is back, about 2026-12-02; no code)
 Neon's note asked for this first and it has not happened. `neon/studio` has none of the Motion Studio's work since
@@ -27,6 +30,8 @@ phase 0 (149 commits behind: no `tools/recording.py`, `replay.py`, `spots.py`, n
 re-export there would drop the `spots`, `holds`, `strikes` and `postures` tables that phase 2's `keep_sections` now
 keeps. So: the full run and the whole guard set (the rules before a merge into `master`), the merge into `master` (the
 user's yes first), and a line on `docs/HANDOFF.md` asking Neon to merge `master` into `neon/studio` before any new clip.
+**Claude's half done 2026-11-27** (another session, the user: "Start step 0"; branch `claude/master-step0`, now
+`master`; the note on `docs/HANDOFF.md` written). Left: Neon's merge of `master` into `neon/studio`.
 
 ### Part B: motion as video (Neon's 60 to 62)
 **Why first:** making animations faster comes first (the user), and the animation rework (every clip redone) comes
@@ -40,11 +45,16 @@ video. It checks the same frames as picture strips; the videos are for the user'
    Its own check: one frame matches `replay_strips.py`'s picture of the same tick.
    **Built 2026-11-27 (branch `claude/motion-video`; the user: "Start step 1 of phase 3"), below.**
 2. **A clip to video, no game (61).** `python tools/clip_check.py <animal> <clips> --video` (my pick over a new tool:
-   the checker already poses every clip as the game draws it, with `--switches`, `--pair`, `--scene` and `--size`): the
-   clip on a floor whose lines move at the clip's own stride (a planted foot that slides shows against them), the
-   faults in red as on its strips, 1x then slowed, in seconds.
-3. **Real footage beside it (62), small, last.** `--ref <video> --cycle <start>,<end>`: a video the user gives (Claude
-   downloads nothing without asking), its marked stride stretched to the clip's length, side by side.
+   the checker already poses every clip as the game draws it, with `--switches`, `--pair`, `--scene` and `--size`).
+   Neon's full idea: the same mp4 as step 1 (several cameras side by side, 1x then slowed, the bar) straight from the
+   model and clip files: one clip on a floor whose lines move under it at the clip's own stride (a treadmill: a planted
+   foot that slides shows against them), a `--switches` blend from one clip into the next, a `--pair` scene of two
+   animals with the ground and red marks for parts inside each other and for sliding feet. In seconds, without
+   Minecraft, so Neon can watch every animation moving before filming it or building the user's viewer page.
+3. **Real footage beside it (62, grows idea 47), small, last.** `--ref <video> --cycle <start>,<end>`: a trimmed video
+   of the real animal the user gives (Claude downloads nothing without asking), its marked stride stretched to the
+   clip's length (cycle-matched), side by side in one mp4, so the real cadence, weight shift, spine flow and wingbeat
+   timing are set against the clip directly, not from slices of stills.
 Checks: each tool's self-test; the lion hunt film and the feast bench turned into videos and sent to the user.
 
 #### Step 1, built (2026-11-27)
@@ -84,7 +94,8 @@ straight blend. Neon's 63 and 64 add live layers on top of the clips (a bend, th
 `accel_stride`). Bending a body live and fixing the feet after is the starting idea that failed twice on the monitor
 (method M1), and three new numbers in every plan pushing on each other is the warning sign "fewer rules" names.
 **My pick (to confirm with step 4's numbers): turns, starts and stops become clips the game picks, as it already picks
-a gait by speed.** One rule grown, no new live layer.
+a gait by speed.** One rule grown, no new live layer. **Neon's way stays beside it as option B** (63 and 64 as Neon
+wrote them, in `docs/plans/motion-studio.md`): the user picks between the two once step 4's numbers and video are in.
 4. **Measure first: the turning bench.** A film bench in phase 2's way (`until <facts> freeze`, one take per moment): a
    lioness and a cow walking a curve, a sharp turn at the trot, a start from standing to the gallop, a stop out of the
    gallop. Read from the recording: how fast they really turn (degrees a tick), how often and how long, and how far
@@ -96,14 +107,20 @@ a gait by speed.** One rule grown, no new live layer.
    motion kit, the spine bent into the curve over planted feet as the monitor's S-curve already is, at the turn rate
    each is made for). The game reads its own turn rate as it reads its speed and changes clip on the matching
    footfall, the gait change that exists; the checker and the pace report read the same rows. Proved on the lioness
-   (the most filmed). Fallback if clips cannot cover the turns step 4 measures: a drawing-only lag of the hips behind
-   the shoulders, said as a live rule and filmed.
+   (the most filmed). **Option B, Neon's 63:** one shared rule in the framework's body code bending each animal's
+   spine, neck and tail chain (from its body plan) into the arc of the turn, eased on `DrawClock` so films and play
+   agree; the feet then checked in the bench for skating (the live bend's risk, M1). Its smallest form: the hips drawn
+   lagging behind the shoulders.
 6. **Starts and stops (64), my pick: clips that carry their own travel.** A `stop` out of the gallop (hind legs brought
    under, head up, a short skid) and a `start` (the first strides from standing), made as the strikes are (their
    travel in the clip with the kit's `travel`, `path_note`, `on_path`; the box follows the clip, `Strikes.Ride`'s way),
    and entered and left through the clip map (a gait gets ways in and out, as a posture has). The buffalo's heavy stop
    and the lion's springy one stay each animal's own clips (the engine's rule 5). Fliers: the eagle's `bank_left`,
    `bank_right` and `land_flare` are clips already, picked the same way once the eagle is in the game (not before).
+   **Option B, Neon's 64:** an optional layer per body plan (limits `stop_pitch`, `turn_lean`, `accel_stride`) adding a
+   small wind-up and settle on quick starts, sudden stops and sharp banked turns, for runners and fliers alike, eased on
+   `DrawClock`, each animal's weight (the heavy buffalo, the springy lion, the banking eagle) from its own plan, no
+   species rules in the code.
 Checks: `clip_check.py` with `--switches`, the bench again (the slide in turns, starts and stops against step 4's
 numbers), the course scenes and the `land` tests the lion and the buffalo touch.
 
@@ -117,7 +134,10 @@ numbers), the course scenes and the `land` tests the lion and the buffalo touch.
   save, the dead buffalo's head 4.5 px over the ground, the calf's mother standing over the carcass through the feast.
 - **BUGS 378** (a calf's feet slide when it runs): the young clips, for the animation rework (phase 2 step 6 made
   their slots).
-- **Phase 4** (the replay key, idea 9, and the motion tests 43 to 46): still on hold.
+- **Phase 4** (the replay key 9, a recording turned into a test 10, the server's ghost 18, the tests 45 and 46; 43 and
+  44 were built in part A): still on hold.
+- **Phase 5, the studio and the user's eye** (new 2026-11-27, Neon's lane): 4, 48, 49, 50, and the overlays 17 and 19
+  on the replay page.
 - **At the end:** reviewers read the phase's code as in phase 2 (at most four, the agent budget), findings checked
   and fixed.
 
