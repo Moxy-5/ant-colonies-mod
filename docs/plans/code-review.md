@@ -64,17 +64,22 @@ and 11). **Part A, the mound, read:** `Mound`, `MoundPlan`, `MoundGrowth`, `Moun
 `Mushrooms`, `KingCare`, the king and queen, the two building goals and the mound, tunnel, comb and mushroom blocks
 (about 9,100 lines): 51 findings, 8 of grade A, 4 waiting for the user's call
 (`docs/reviews/full/round-05-termites.md`, the readers' own files in `round-05a-readers/`); fixes not started.
-**Part B, not read yet** (about 9,900 lines; its findings go at the end of the same file and carry on the numbers
-from R5-52): `GalleryWeb`, `GalleryUpkeep`, `Galleries`, `GalleryCatchUp`, `HiddenTrips`, `SavannaParts`;
+**Part B, outside the mound, read 2026-11-27** (about 10,200 lines with the framework's side; its findings are at the
+end of the same file, R5-52 to R5-97: 46 findings from 68 in the readers' files, 8 of grade A, 5 waiting for the
+user's call; the readers' own files in `round-05b-readers/`; fixes not started): `GalleryWeb`, `GalleryUpkeep`, `Galleries`, `GalleryCatchUp`, `HiddenTrips`, `SavannaParts`;
 `HoleTurns`, `ClosedHoles`, `FeedingGallery`, `FeedingSpots`, `DeadWoodCall`, `PlugHoleGoal`, the worker, the food
 blocks (dry grass, branches, dead wood, pulp, frass, the hole, mud crust and casts), `SavannaNumbers`; `Alarm`,
 `Soldiers`, `SentryLine`, the soldier, `DefendGoal`, `WalkBeatGoal`, `RetreatGoal`, `TermiteCommands`,
 `SavannaEvents`. **How it was run (the user's count, 2026-11-27): 4 Opus readers with a slice each and 2 Fable
 readers on a thread each** (part A's threads: near against away and save and reload; every block placed or removed;
-part B's planned threads: the food loop over a day and night; alarm and defence meeting everything else, the seam with
+part B's threads: the food loop over a day and night; alarm and defence meeting everything else, the seam with
 the raids included), one half at a time in one chat, the lead checking each grade A finding itself. Part A cost
-about 1.6 million subagent tokens. For part B's readers: R5-3 (no random ticks near a spectator, read in Minecraft's
-own code) most likely holds for the mud crust, mud casts and remains too.
+about 1.6 million subagent tokens, part B about 1.7 million (its readers were cut once by the usage limit; each had
+saved its file after every finding and carried on from it when resumed, so nothing was lost: keep that rule in every
+reader's brief). R5-3 (no random ticks near a spectator, read in Minecraft's own code) does hold for the mud crust,
+mud casts, pulp heaps and remains (R5-80) and for the grass drying back into food (R5-53). **With round 5 every round
+of the review is read; what is left is fixing.** Not walked by part B's readers: a raid's march home and a raid cut
+short as the termites meet it, a colony going away in the middle of a trouble, an alarm during a hidden trip.
 
 ## What every round looks for (the user's order, 2026-11-23: lag first, then behaviours that fight, then bugs)
 

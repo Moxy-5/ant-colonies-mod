@@ -1,8 +1,9 @@
 # Full code review, round 5: the termites (reading round)
 
 The round is read in two halves (the user, 2026-11-27: "split this up, I'm expecting a lot of bugs"). **Part A, the
-mound itself, is below (read 2026-11-27).** Part B (galleries, hidden trips, foraging holes, feeding, alarm,
-soldiers) is not read yet; its findings will be added at the end of this file and carry on the numbers.
+mound itself, is first (read 2026-11-27).** **Part B, outside the mound (galleries, hidden trips, foraging holes,
+feeding, alarm, soldiers), follows it (read 2026-11-27) and carries on the numbers from R5-52.** The whole round: 97
+findings, 16 of grade A, 44 B, 37 C; nine wait for the owner's yes.
 
 # Part A: the mound (2026-11-27)
 
@@ -770,3 +771,979 @@ The readers' files have the full lists with lines; the main points:
   a colony of 200), comb turnover (weeks in life, days here). Scaled to a 20-minute day on purpose.
 - **Late game:** the cap of 200 workers is reached in perhaps 2 to 3 weeks of good foraging; after that nothing
   scales. Not a bug; for the balance work.
+
+# Part B: outside the mound (2026-11-27)
+
+Galleries, foraging holes, hidden trips, feeding, the food blocks, the alarm and the soldiers. Read in `C:\Ant Mod` on
+branch `claude/motion-glue` at commit `a7c0a9f0` (the termite code is the same as at part A's commit), by a session
+that did not write the code. Rule book: `docs/plans/code-review.md`. No code was changed; no gradle, game, game test or
+film was run, so **nothing here is measured**: every lag finding is "to measure" unless the path through the code
+proves its cost or an earlier measure is named.
+
+**What was read, every line** (about 10,200 lines): in `savanna/.../colony/`: `GalleryWeb`, `Galleries`,
+`GalleryUpkeep`, `GalleryCatchUp`, `SavannaParts`, `HoleTurns`, `ClosedHoles`, `HiddenTrips`, `FeedingGallery`,
+`FeedingSpots`, `DeadWoodCall`, `BarePatches`, `Alarm`, `Soldiers`, `SentryLine`, `RaidDefence` (round 11 read it as
+raid code; here for where the alarm and the soldiers hand over to it); `SavannaEvents`; in `entity/`:
+`TermiteWorkerEntity`, `TermiteSoldierEntity`; in `entity/goal/`: `PlugHoleGoal`, `DefendGoal`, `WalkBeatGoal`,
+`RetreatGoal`; in `block/`: `TermiteHoleBlock`, `MudCrustBlock`, `MudCastBlock`, `DryGrassBlock`, `TallDryGrassBlock`,
+`FallenBranchBlock`, `PulpHeapBlock`, `DeadWoodBlock`, `DeadTreeWoodBlock`, `SoftDeadWoodBlock`, `BleachedBranchBlock`,
+`FrassBlock`; `command/TermiteCommands`; the termite records of `species/SavannaNumbers`; the species file
+`macrotermes.json`; and the framework's side as far as each finding needed (`ForagingHoles`, `FieldLife`, `FoodStore`,
+`FoodMap`, `BuildLife`, `AwayLife`, `Nest`, `Population`, `DangerMap`, `FleeGoal`, `GoInsideGoal`, `DigGoal`,
+`ScoutGoal`, `ClipGrassGoal`, the navigator's hidden-trip part). Each reader's file ends with its exact list and with
+what it did not finish.
+
+**Who read it.** Six readers. Four with a slice each: **W** the gallery web and the termites' wiring, **H** the
+foraging holes, hidden trips, the worker and the mud, **E** feeding, the food blocks and the numbers (with the
+foraging side of the food sums), **S** the alarm and the soldiers (with the soldier's goal table). Two across all the
+files on one thread each: **P** one piece of food and one forager through a whole day and night, watched or not; **Q**
+trouble at the colony from the first sign to "all quiet", and its seam with the Matabele raids (with the tables "who
+has the termite"). Their own files are kept in `docs/reviews/full/round-05b-readers/` (their findings carry the letters
+W, H, E, S, P and Q there, with the full walk of every proof). The run was cut once by the usage limit; every reader
+had saved its file and carried on from it. The lead session then read the lines of every grade A finding itself (each
+says "checked again by the lead"), merged what two readers found from different sides (68 findings in the readers'
+files, 46 here), and changed two grades: Q-3 is grade B here (a narrow case, R5-65) and S-5 is part of the grade A
+finding R5-55.
+
+**Not finished by the readers** (said in their files): reader Q walked a raid from the scout's find to the regroup,
+not the march home, and did not walk a raid cut short (dusk, rain, a reload, the land unloading) or a colony going
+away in the middle of a trouble; an alarm during a hidden trip was walked by nobody. The game tests were read by
+name and scene, a few line by line.
+
+**Not written again here:** what rounds 1, 3, 6, 8 and 11 and part A already list. Where a finding is a new side of
+one of theirs it says so (R1-35, R1-36, R1-38, R2-2, R5-2, R5-3, R5-5, R5-6, R5-8, R5-11, R5-18, R5-19, R5-26, R6-2,
+R6-7, R11-17).
+
+**Count:** 46 findings: 8 A, 24 B, 14 C. Five of them wait for the owner's yes (R5-56, R5-62, R5-66, R5-67, R5-87).
+With part A the round has 97 findings: 16 A, 44 B, 37 C.
+
+## The short of it (part B)
+
+**The foraging works beside a player in survival or creative who lets the nights pass. It goes wrong on three
+clocks the termites do not own:**
+
+1. **The day clock (R5-52).** Termites forage by the time of day and get hungry by game time. A night skipped with
+   `/time set day`, or the daylight cycle switched off, is a night (or every night) nobody forages, for every termite
+   colony of the world at once. The fix made for a night slept in a bed does not see either.
+2. **Random ticks (R5-53, R5-80).** Eaten grass comes back green and only Minecraft's random ticks dry it into food
+   again, and Minecraft gives none near a spectator or far from every player (part A's R5-3). So beside a spectator a
+   colony eats the grass round its holes once. Mud crust, mud casts, pulp heaps and remains stand still the same way.
+3. **Whose eyes count (R5-62).** A plant a player can see is left to the real foragers, but a spectator does not
+   count as seeing. Beside a spectator the counted foragers cut the grass in plain view, faster than the real ones
+   reach it.
+
+**Watched and unwatched colonies live by different rules.** Real foragers and scouts roam the whole range where the
+counted ones keep to the holes open that night (R5-61); a far colony is fed "by the land" with no limit from the land
+(R5-73); real holes are opened one at a time at the bottom of the dig list (R5-63) and a far colony's hole blocks
+stay as they were left (R5-81); a raid meets up to 12 soldiers unwatched and one to three watched, and the
+termites remember the two differently (R5-68).
+
+**Trouble at the colony: every part ends by itself and nothing is walled in, but the parts do not agree.** "Is a foe
+near", "is this termite safe", "does the drumming reach" and "is the trouble over" are each judged in three to five
+places with different distances and clocks (R5-70). What a player can meet of it: an alarm that never ends while one
+enemy insect stays within 4 blocks, and walks along with it (R5-55); workers in a raided feeding gallery that do not
+run (R5-56); the minors taking every real soldier place so the majors vanish at a raid (R5-57); soldiers called out of
+the numbers that never hear the alarm (R5-67).
+
+**Leads for the open raid bugs** (BUGS 202, 361, 452; the raids themselves were rounds 6 and 11): the colony's by-day
+record names where termites *could* feed and the raid stands termites also in cells no raider can get at (R5-64); the
+raid asks "do the termites keep off this spot?" and the alarm of the raid's own arrival answers yes (R5-65); a stuck
+raider keeps the termites round it shut in for as long as it lives (R5-55); a raid can reach a colony that is still
+only numbers (R5-65, narrow).
+
+**The gallery web's planners are sound and pure; one gate is not.** Every gallery block must be dug before any tip
+may grow, and a block the diggers will never dig (anything that is not soil) stops the whole web for good (R5-54).
+"Is this gallery dug?" reads a piece's whole way from the shaft each time, and three places ask it for every piece or
+every hole (R5-59, R5-79, R5-92).
+
+**No part is a candidate for a rewrite.** Two shared things would remove whole families of findings: one small record
+per trouble that the alarm keeps and the seal, the flight and the raid's end all ask (R5-70; it mends R5-55, R5-65,
+R5-67 and R5-68 together), and one question "may the colony take this plant tonight?" for real and counted foragers
+alike (R5-61).
+
+**The foraging sums** (reader E with the file's numbers, reader P along the loop; the worldgen amounts are estimates):
+a full colony needs about 50 pieces a day (part A). Beside a survival or creative player its band of grass (about 250
+to 300 tuft spots round up to 200 blocks of gallery) gives about 175 to 200 pieces a day once regrowth runs, so grass
+alone feeds it for good; but eaten grass is food again after about 6 days, not the 3 part A used. Beside a spectator
+nothing regrows: the band's 900 to 1,600 pieces last about 3 to 5 weeks, then the colony lives on fallen branches and
+dead wood, or shrinks. Away, the land sets no limit at all. The walking is never the narrow place (about 1,800 pieces
+a night could be carried); the plants standing dry, the store's room and regrowth are. A young colony gets going
+easily. Hay bales are eaten (the design's "jackpot": a barn or a village's hay within about 50 blocks of a mound);
+planks, logs and living trees never are.
+
+## The five that matter most (part B)
+
+- **R5-52:** skip a night by command, or stop the sun, and no termite colony forages.
+- **R5-53:** beside a spectator eaten grass never becomes food again (the owner watches in spectator).
+- **R5-56 with R5-64 and R5-65:** the termites' side of a raid: workers that do not run, termites stood where no
+  raider can reach, and the raid misreading the alarm as "nobody feeds here".
+- **R5-55:** an alarm that never ends while an enemy stays close, the termites' side of BUGS 361.
+- **R5-57:** no major soldier is left real at night or at a raid that reaches the nest.
+
+## Grade A (part B)
+
+### R5-52 (A, proven; a new side of R1-35): a night skipped with `/time set day`, or a day clock that stands still, takes the termites' foraging, and the fix for the slept night does not see it
+
+**In play (2026-11-27):** A. In a world where the night is skipped by `/time set day` each evening, or the sun is held still with the daylight cycle off, no termite colony ever comes out; they eat their comb, the workers starve after about 3 days without a meal and the queens after 5, near and far alike. A bed, `/time add` and `/tick rate` are fine.
+
+**Checked again by the lead.** Read `FieldLife.nightJumpedOver` (`framework/colony/FieldLife.java:372-384`), its only
+caller `tick` (`:104-127`), `Colony.isForagingTime` and `isDay` (`framework/colony/Colony.java:433-470`). Minecraft's
+`TimeCommand.setTime` was read for part A (R5-19): it sets the plain number, so "day" is 1000. It holds.
+
+- **What is wrong:** the termites forage by the day clock but get hungry by game time, which never stops or jumps.
+  Round 1's fix (R1-35) lets the counted foragers forage a night the player slept through. It sees a jump only when
+  the day clock goes **forward** by 200 ticks or more (`jumped < 200 ? 0`). (1) `/time set day` at night sets the day
+  clock to 1000; on any day but the world's first that is a jump back by many days, the sum comes out far below zero
+  and the answer is "nothing jumped". The rest of that night is gone. (2) With `doDaylightCycle` off the day clock
+  never moves: stopped by day it is never night again (the termites forage only while the weather is rain); stopped
+  at night the one night's pick of holes is kept for ever (a new pick is made only when a foraging time starts,
+  `savanna/colony/HoleTurns.java:100-110`).
+- **Where:** as above; `macrotermes.json` (`forage_at`, the starve times).
+- **Unchecked link:** how many days the comb carries a full colony before the starving shows.
+- **The test would still pass:** `aNightSleptThroughIsForagedByTheTermiteNumbers`
+  (`savanna/gametest/TermiteAwayTests.java:273-319`) calls `forageSkippedNight` itself and never moves the day clock;
+  it would pass if `nightJumpedOver` always answered 0.
+- **The fix proposed:** make the one rule whole, no second rule: any jump of the day clock, forward or back, counts
+  as "the time of day went from the old hour to the new one" and the foraging time between the two, going forward (at
+  most one night), is foraged by the numbers, as for a bed. When the day clock has not moved for a whole day of game
+  time, the colony forages by game time (a night's share of every 24,000 ticks) until it moves again. My pick: both
+  count as nights foraged unseen, so a builder's "always noon" world does not starve the termites (they then feed out
+  of sight). A test that sets the day clock back and one with the cycle off.
+- **From:** P-1.
+
+### R5-53 (A, proven; a new side of R5-3): eaten dry grass grows back green and only dries on Minecraft's random ticks, so near a spectator, and far from every player, a colony's grass never becomes food again
+
+**In play (2026-11-27):** A. Watching in spectator, a colony strips the dry grass round its holes once and then walks past rings of green tufts for good; after about 3 to 5 weeks it lives on what fallen branches and dead wood it reaches, or shrinks. Near a survival player eaten grass is food again after about 6 days.
+
+**Checked again by the lead.** Read `DryGrassBlock` (`savanna/block/DryGrassBlock.java:61-100`: drying only in
+`randomTick`, 1 time in 27), `BarePatches.tick` (`savanna/colony/BarePatches.java:109-140`: puts back the species
+file's `grows_back` state) and `macrotermes.json:84-85` (only `growth: dry` is food) and `:105-111` (grows back
+`growth: green` after 72,000 ticks). The random tick rule was read in Minecraft's own code for R5-3. It holds.
+
+- **What is wrong:** a tuft the termites eat is put back green after three days by the bare patches part, on game
+  time. From green it becomes food only by drying two steps, and each step happens only on a random tick. So: (1)
+  near a spectator every eaten tuft stays green for good; (2) the world's own green and drying tufts (new land puts
+  4 tufts in 9 down green or drying) never become food there either; (3) near a survival or creative player one step
+  takes about 1.5 game days on average, so **from eaten to food again is about 6 days, not 3** (part A's sums used 3).
+- **One more clock in the row** (reader P): a tuft that is dry again is not known to the colony. The food map forgot
+  the spot when the plant went (`framework/colony/FoodMap.java:119`), and near a player only a real worker passing
+  within 5 blocks outside finds it again (`:151-157`). So "eaten, green, dry, eaten again" hangs on three clocks in a
+  row, and no test walks it round once.
+- **Where:** as above; `savanna/block/TallDryGrassBlock.java:55-71`; `framework/species/SpeciesProfile.java:619-628`.
+- **Unchecked link:** how many tufts a chunk really gets (the sums use an estimate).
+- **The fix proposed:** one clock in place of two. The bare patches part already keeps every eaten tuft with its own
+  game-time clock; let it keep the tuft until it is dry (green at 3 days, drying and dry at its own later times, in
+  loaded land) and tell the food map when it is. Grass the colony never ate keeps drying by random ticks (it is the
+  world's). My pick: green after 3 days, dry 3 days later, whoever watches. A test with `randomTickSpeed` 0: eat a
+  tuft, push the clock, and the colony eats it again. It is also the socket for the season later (R5-96).
+- **From:** E-1, P (its "already written" part), reader F's sums of part A corrected.
+
+### R5-54 (A, the path proven; how often likely): one gallery block the termites cannot dig stops the whole web from growing, for good
+
+**In play (2026-11-27):** B. A player digs into a gallery to watch, leaves a torch or a cobblestone in it and fills the hole; from then on that colony's galleries never spread again, however big it grows, and no piece out to food is planned from the pieces behind that block.
+
+**Checked again by the lead.** Read the gate in `GalleryWeb.growTips` (`savanna/colony/GalleryWeb.java:406-415`),
+`Nest.isDugOut` (`framework/colony/Nest.java:781-787`: air, a seed heap or a soil ramp), `Nest.firstDiggable`
+(`:1133-1151`: passes over anything that is not soil, and soil touching water) and `GalleryCatchUp.growNow`
+(`savanna/colony/GalleryCatchUp.java:52-74`: the same gate for the builder numbers). It holds.
+
+- **What is wrong:** before any tip may grow, every block of every piece must be "dug out". The diggers skip every
+  block that is not soil. So a gallery block holding anything else (a torch, a block a player placed, water from a
+  bucket, a block that fell in) is never dug and never counts as dug: the gate fails every second for the life of the
+  colony. Nothing notices, plans round it or drops the piece. The pieces grown from the bad one never count as dug
+  either (a piece's tunnel holds its parent's blocks), so no piece out to food starts from them
+  (`GalleryWeb.pieceTo`, `:765-781`). A raid's seal blocks the web the same way, but only until it is opened at night.
+- **Unchecked link:** whether a hole's opening also waits for the whole tunnel to count as dug (likely).
+- **The fix proposed:** no new rule; let the gate ask the diggers' own question. Today two judges answer "is there
+  digging left on the web?": the gate (`isDugOut` on every block) and the diggers (`firstDiggable`). The gate
+  becomes "the diggers have nothing left to dig in the web". A test: a web with a cobblestone and a water block put
+  into one piece; the next tip still grows.
+- **From:** W-1.
+
+### R5-55 (A, proven as code; its meeting with BUGS 361 likely): a termite alarm never ends while one living enemy insect stays within 4 blocks of it, and it walks along with that enemy
+
+**In play (2026-11-27):** B. After a raid has gone home, the termites round that feeding spot do not go back to work while a stuck or crippled raider is alive there: no worker comes out within 16 blocks, the soldiers stand at their places. A column walking home drags the alarm with it across the termites' land, and before a cover breaks the soldiers keep being sent to new places as the trouble jumps from raider to raider.
+
+**Checked again by the lead.** Read `Alarm.tick` (`savanna/colony/Alarm.java:334-370`: an enemy within
+`FOE_AT_TROUBLE`, 4 blocks, of any trouble that is not footsteps feeds it, line 362) and `Alarm.trouble`
+(`:206-250`: strength back to full at 233-234; a foe's trouble moved to the enemy's own place at 246-248). It holds.
+
+- **What is wrong:** once a second each enemy insect near a foe's or a breach's trouble fills it up to full strength,
+  and a foe's trouble is moved to where that enemy now stands. Nothing limits how long or how far. (1) An enemy that
+  cannot leave (BUGS 361's raiders stuck in termite holes, 13 at once in the soak; a raider with legs cut off) holds a
+  16-block trouble at full strength for as long as it lives. (2) An enemy walking slower than 4 blocks a second
+  carries the trouble with it, to the edge of the area the alarm looks at (the foraging range plus 8). (3) With 20
+  raiders round a feeding place the trouble ends each second at whichever raider the entity list gives last; the
+  places round it are worked out again (a walk over the whole nest, R5-83) and every soldier whose cell is no longer
+  in the ring gets a new one.
+- **The seal already has the cap the alarm lacks:** `RaidDefence.tick` (`savanna/colony/RaidDefence.java:211-212`,
+  "a foe stuck by the break for ever no longer keeps it shut for ever").
+- **Where:** as above; `Alarm.keepsIn` (`:441-443`); `framework/entity/AbstractAntEntity.java:2234` (`mayGoOut`);
+  `savanna/colony/Soldiers.java:577-584` (a trouble keeps soldiers real unwatched).
+- **Unchecked link:** that BUGS 361's stuck raiders sit within 4 blocks of a live trouble (likely: they are stuck in
+  the gallery they fought in); how far apart the raiders round one feeding place stand.
+- **No test** has a foe that stays; `TermiteAlarmTests` checks only that the alarm is calm once the foe is gone.
+- **The fix proposed:** treat a foe's trouble as a breach is treated: it stays where it began while it is fed. Only a
+  foe the termites can still feel at their own cells (within 4 blocks of a gallery or nest cell, or of a termite)
+  keeps it up, and no longer than the seal's own longest. My pick: keep "shut in while an enemy is at the galleries",
+  end it for one walking away or shut in a pocket. This does not mend BUGS 361, but 361 stops freezing the termites.
+  Best built as part of R5-70's one record per trouble.
+- **From:** Q-1, S-5.
+
+### R5-56 (A, proven): workers in a raided feeding gallery do not run down it, because three rules disagree on what "safe inside" means
+
+**In play (2026-11-27):** B. At a raided feeding spot the termite workers stay in the roofed part of the gallery beside the break, some still feeding, and are stung and carried off one by one; they do not pour back down the gallery while the soldiers hold the opening, as real Macrotermes workers do.
+
+**Checked again by the lead.** Read `FleeGoal.canUse` and `start` (`framework/entity/goal/FleeGoal.java:57-104`: no
+flight when `Nest.isInside`, line 67; the place to run to is any "inside" cell that is no doorway, line 101),
+`Nest.isInside` (`framework/colony/Nest.java:1038-1088`: every roofed feeding gallery cell is inside) and
+`AbstractAntEntity.isSheltered` (`framework/entity/AbstractAntEntity.java:1899-1904`: not in a feeding way). The
+comment on `Raid.bringOutFeeders` says "they feed, feel the raiders and flee" (`savanna/colony/Raid.java:1791-1792`).
+It holds.
+
+- **What is wrong:** the hunters ask "is it sheltered" (in its nest, not in a feeding gallery or runway, no opening
+  near): by that rule a termite in a feeding gallery is fair prey. The worker's own flight and its walk home
+  (`GoInsideGoal`, line 58) ask the nest "is this cell inside", and the nest counts every roofed feeding gallery cell
+  as inside. So a worker in the very gallery being raided is told "you are already inside": it does not flee, and one
+  whose roof was just bitten off flees only to the next cell that still has a roof. It may even keep feeding
+  (`ClipGrassGoal`, line 82). The only rule that sends workers deeper is `RetreatGoal`, for those within about 4.5
+  blocks of a break that lies within 2.5 blocks of a tunnel.
+- **The tests would still pass** with workers that never run: `aWorkerAtABreaksMouthIsStungAndOneDeeperInIsLeft` and
+  `theTermitesFeedingUnderTheMudStandInTheirGalleryWhenRaidersBreakIn` (`TermiteRaidDefenceTests`).
+- **Where:** as above; `savanna/colony/RaidDefence.java:137-189`; `savanna/colony/Raid.java:393-397`, `:1821-1854`.
+- **The fix proposed:** one shared judge, "out of the hunters' reach", asked by the flight, the walk home and the
+  hunters alike; the hunters' `isSheltered` is the right one, because it decides who is stung. `RetreatGoal`'s list
+  then shrinks to its real job (who packs the seal). It is the same one rule to tune for BUGS 452, this finding's
+  mirror, so it belongs in the raid work and is measured with the soaks (how many termites a raid still brings home).
+- **From:** Q-2.
+
+**Your call (2026-11-27):** should termite workers run down the gallery when ants break into their feeding spot? Today they mostly stay in the roofed part by the break and are taken one by one. Real workers run while the soldiers hold the opening, and the ants catch the slow ones and the soldiers. My pick: yes, they run, built together with the raid work and checked with a soak, because watched raids already catch little (13 of 27 stung nothing in the last soak) and this could make it less.
+
+### R5-57 (A, the sums proven; how often it shows to see in play): the minors take every real soldier place first, so at night beside a full colony, and whenever a raid's drumming reaches the nest, every real major is sent into the numbers
+
+**In play (2026-11-27):** B. Near a grown colony at night no major soldier is to be seen: the royal chamber's and the gardens' doorways stand unguarded. When a raid reaches the nest or the player breaks into the mound, the majors walking their beats vanish just as the alarm starts.
+
+**Checked again by the lead.** Read `Soldiers.wantReal` (`savanna/colony/Soldiers.java:571-589`): the real places are
+`cap / 4` and are handed out in the order of the ranks, minors first, each rank taking `min(posts, count, what is
+left)`; while a trouble reaches the nest `posts` is the rank's whole count. `macrotermes.json:8` has `real_cap` 50, so
+12 places; a full colony has 15 minors and 5 majors. It holds.
+
+- **What is wrong:** at foraging time the minors' beats include every post outside (one by each way out, a sentry
+  every 3 blocks along each trail, `Soldiers.java:222-241`, `SentryLine.java:49`), easily 12 or more, so the majors
+  get 0. When a foe's or a breach's drumming reaches the nest the minors ask for all 15 and again take all 12. The
+  population keeper then sends real majors out of a player's sight into the numbers, 2 a second
+  (`framework/colony/Population.java:493-576`). These are the ones BUGS 210 put first in line against insects.
+- **Unchecked link:** how many outside posts a grown colony really has at night. By day with fewer than 12 minor
+  beats the majors get the rest and nothing shows.
+- **The fix proposed:** no new number: share the quarter between the ranks in the colony's own ratio (the species
+  file's `minors_per_major`, 3 to 1: about 9 minors and 3 majors real) before filling either. My pick, from the real
+  split of the castes. A test: a full colony watched at night with a long trail keeps a real major on its beat; with a
+  breach reaching the nest no real major goes into the numbers.
+- **From:** S-1.
+
+### R5-58 (A, proven): a creature in a gallery puts the hidden termites back, and they go under again on the very next tick, so they blink and slip past it unseen
+
+**In play (2026-11-27):** B. Termites in a dug-open or raided gallery blink into view for a tick each second and are gone again, and walk "through" a raider or a player standing in the gallery; the rule "if anything breaks into a gallery, every insect travelling in it shows up as a real one" holds for one tick only.
+
+**Checked again by the lead.** Read `HiddenTrips.isHidden` (`savanna/colony/HiddenTrips.java:171-175`: blocks and the
+closed-for-danger cells only), `brokenInto` (`:260-285`: the only place that looks for a creature), `comeOut`
+(`:314-338`), and the navigator's `followRoute` (`framework/nav/AntNavigator.java:1073-1076`), `goUnder`
+(`:1173-1212`) and `cameUp` (`:1228-1246`, which sets the step clock to 0 so the next tick starts a step). It holds.
+
+- **What is wrong:** once a second the hidden trips look for a break-in; a creature that is not the colony's own
+  standing in the stretch puts each traveller back where its clock says it is. But the legs' question "is this cell
+  hidden?" looks only at blocks. So a termite put back because a raider stands in the gallery goes under again on its
+  next step, and a second later is put back again a little farther on, until its clock-based place is past the
+  creature. Each blink is an entity removed and added again, for every traveller in that gallery, every second.
+- **Unchecked link:** how many steps a termite usually has left past the creature (with fewer than 12 it stays out).
+- **The test allows it:** `hiddenTripsGoUnseenAndShowUpWhereTheyAreWhenTheGalleryIsBrokenInto`
+  (`TermiteNewHoleTests.java:342-498`) breaks in only by opening a roof block, and its last stage lets a termite put
+  back start a new hidden trip at once.
+- **The fix proposed:** one judge, not two: the once-a-second look keeps the cells it found broken into until the
+  next look finds them clear, and `isHidden` answers no for those cells, as it already does for the cells closed for
+  danger. A termite put back then walks for real past the creature and meets it. A chicken set into the gallery of
+  the existing scene tests it.
+- **From:** H-1.
+
+### R5-59 (A, to measure; a new side of R5-8 and R1-36): beside a grown colony the "new holes to food" check, with up to 6 route searches, runs every second instead of every 10 seconds
+
+**In play (2026-11-27):** B. A server that gets slower beside grown termite mounds whose web has used up its length while known logs or hay lie farther out, the usual state of a grown colony. Not measured.
+
+**Checked again by the lead.** Read `BuildLife.tickNear`, `slice` and `growGalleries`
+(`framework/colony/BuildLife.java:124-132`, `:187-205`, `:285-304`), `GalleryCatchUp.growNow`
+(`savanna/colony/GalleryCatchUp.java:52-74`, line 70: `checkNewHolesNow`, "food first") and `ForagingHoles`
+(`framework/colony/ForagingHoles.java:386-389`, `:396-483`). The path holds; its cost is not measured.
+
+- **What is wrong:** the check that plans gallery pieces out to rich food has its own clock (every 200 ticks). Since
+  R1-36 the builder numbers also work beside a player: every second their time is added, and once the nest and the
+  mound are done the galleries step runs, which starts the food check by hand and resets its clock. When nothing
+  grows the time is dropped and the next second starts again; while pieces grow it runs up to 4 times a second. Each
+  run tries up to 6 foods and each try plans a route through the ground (up to 6,000 columns). A food with no route
+  is remembered for a while; a food the workers "do not allow yet" is not, so the same routes are planned on every
+  run. Before each route `pieceTo` reads every block of every piece's whole way (about 2,000 block reads on a full
+  web, R5-92).
+- **Unchecked link:** how long one run takes on a grown web, and how often a grown colony's nest and mound are both
+  "done" (a mound still growing keeps the galleries step from running).
+- **The fix proposed:** remove the second caller, not add a limit: `growNow` grows tips only; the brain's own check
+  every 10 seconds already plans the food pieces. If food must come first on return, run the check once on coming
+  back. And remember "not allowed yet" foods as "no route" foods are remembered, until the workers or the web's
+  length change.
+- **From:** W-2.
+
+## Grade B (part B)
+
+### R5-60 (B, proven; a new side of R1-38): "it rains" is judged two ways along the same night, and in a savanna the two never agree
+
+**In play (2026-11-27):** B. On a grey day with no rain falling in the savanna the foraging holes open and termites walk out at noon, where the Matabele's day raids and the player find them; and there is never a rainy night with more holes open.
+
+- **What is wrong:** "is it foraging time" asks whether the **world's weather** is rain (`level.isRaining()`). "How
+  many holes tonight" asks whether rain **falls on the nest** (`Colony.rainsNow`: the weather is rain and the nest's
+  biome has rain). No savanna has rain: Minecraft's own (read in `OverworldBiomes.java:327`) and the mod's floodplain
+  (`savanna_floodplain.json:89`). So (1) when the weather turns to rain by day the termites of every savanna come out
+  under a dry sky; (2) the rule "half as many holes again in the rain" (`rain_more` 0.5) never runs in play, only in
+  tests that pretend rain; (3) round 1's fix for R1-38 as written (ask "rain on the nest" in both) would switch the
+  termites' rain foraging off for good. Also: a foraging time that starts on a rainy afternoon and runs into the
+  night is one round with one pick of holes, so that night brings no new holes.
+- **Where:** `framework/colony/Colony.java:433-440`, `:541-548`; `savanna/colony/HoleTurns.java:100-110`, `:324-325`;
+  `savanna/species/SavannaNumbers.java:395-408`.
+- **Unchecked link:** a mound on a river bank (the mod's `savanna_river` has rain) would get rule 2.
+- **The fix proposed:** one judge, `Colony.rainsNow`, for both steps. My pick for a dry biome: it says "wet weather"
+  when the world's weather is rain (real Macrotermes do come out on wet, overcast days, and the sky does darken), so
+  the daytime foraging stays and the extra holes start to work; the dry-sky look is for the seasons work to make
+  right. The two tests named in P-3 pretend rain and see none of this.
+- **From:** P-3.
+
+### R5-61 (B, proven in the code; how often it shows not measured): the night's holes bind the counted foragers but not the real ones, so the watched colony and the unwatched one forage by two rules
+
+**In play (2026-11-27):** B. At night beside a grown mound termites trail far across open ground away from any open hole, and lone scouts wander tens of blocks out, where the design means a tight ring of grazers round each open hole; these far walkers are the ones caught out at dawn.
+
+- **What is wrong:** the design (termites underground, step 4) is that termites graze only round the holes opened
+  that night. The numbers obey it (a plant is worked only if a hole in turn lies within 6.5 blocks,
+  `FieldLife.grazedFrom`). The real ones do not: (1) a real forager takes the known plant worth the most, the walk
+  counted from the nearest open way out with no limit, and the plants it may pick are scanned round every dug hole,
+  closed ones too; once the tufts by the open holes are taken the next forager is sent 20 or 40 blocks over open
+  ground. (2) A scout walks to a random spot anywhere in the whole range (up to 56 blocks), and one ask in six scouts
+  even with food known. (3) The two "explore" holes of a night explore only for the numbers: near, nothing sends a
+  real termite out of one.
+- **Where:** `framework/colony/FieldLife.java:431-495`; `framework/colony/FoodStore.java:291-330`, `:371-428`;
+  `framework/entity/goal/ScoutGoal.java:58-89`; `savanna/colony/GalleryWeb.java:342-358`;
+  `savanna/colony/HoleTurns.java:339-355`.
+- **Unchecked link:** how many far walks a night really happen (a watched night with a grown web).
+- **The fix proposed:** one shared question in place of two rules: "may the colony take this plant tonight?" = a hole
+  in turn (or a runway's hole, or a hole by rich food) within the graze of it. `FieldLife` already has it; the real
+  forager's pick and the scout's spot ask the same, the explore holes giving the new ground. No new number. My pick,
+  as the design already says and as real Macrotermes keep to the ground by their holes.
+  `holesTakeTurnsNearFoodFirstAndMoreInTheRain` checks which holes open, never where a real forager goes.
+- **From:** P-2.
+
+### R5-62 (B, proven in the code; how it looks to see in play): beside a spectator the counted foragers cut the grass in plain view, so most of a watched night's foraging is done by termites that are not there
+
+**In play (2026-11-27):** B. Watching in spectator at dusk, the holes open, a few termites come out, and the grass round the holes shrinks and vanishes by itself faster than they reach it; the termites that are seen walk far off across open ground (R5-61).
+
+- **What is wrong:** "a plant a player can see is left to the real foragers" (`framework/colony/FieldLife.java:533-536`)
+  asks for eyes that leave a spectator out (`Population.viewersInSight`, `Watchers.hiddenFrom`: the call of
+  2026-11-13, made for the raids). So beside a spectator every plant counts as out of sight: the numbers work every
+  tuft in the graze of the night's holes within the first minutes, the cuts are shown at once, and the real foragers
+  find the near tufts taken.
+- **Where:** `framework/colony/FieldLife.java:448`, `:523-575`, `:589-621`; `framework/colony/Population.java:413-450`;
+  `framework/colony/Watchers.java:41-50`.
+- **Unchecked link:** how many of the foragers are real bodies at a full colony beside a spectator.
+- **The fix proposed:** keep the 2026-11-13 call for what it was made for and give the forager numbers the other list
+  for this one question (`Population.viewers`, which counts spectators): one word in `forageWith` and `showCuts`.
+- **From:** P-6.
+
+**Your call (2026-11-27):** in spectator, should grass be cut by termites that are not there? Today the counted foragers eat the grass in front of a spectator's camera, because on 2026-11-13 you said things may appear in front of a spectator (for the raids). My pick: in front of any player, spectator too, only real termites cut grass; the numbers keep to what nobody looks at. Insects appearing for a raid in front of a spectator stay as you chose.
+
+### R5-63 (B, likely; the size of it to measure): the night's holes are opened last, one at a time, from one fixed list
+
+**In play (2026-11-27):** B. At dusk by a growing colony few or no holes open for minutes while the builders dig; by a grown one the holes open one after another across the land instead of together; and a hole no builder can reach leaves the holes after it shut all night, with builders standing idle.
+
+- **What is wrong:** biting a hole open has no owner. It is the last-but-one entry of the builders' one work list
+  (`Nest.findDigTarget`), which hands every builder the same single block. (1) Every gallery block still to dig comes
+  before any hole, and the web plans its next piece within a second of the last block dug, so while a web grows a
+  hole can be opened only in the second between two pieces. (2) `holeToOpen` returns the first closed hole in turn in
+  list order to every builder that asks; the night's 10 to 15 holes lie spread over the whole web. (3) It does not
+  ask whether a builder can stand under the hole; a builder that finds no way leaves it alone for 400 ticks, and its
+  next ask gets the same hole. The holes after it, the garden rooms and the mound's digging wait until the night ends.
+  The numbers wait for none of it: they graze round a hole in turn whether its block is open or not.
+- **Where:** `framework/colony/Nest.java:213-337`; `framework/colony/ForagingHoles.java:236-258`;
+  `framework/entity/goal/DigGoal.java:63-81`, `:119-147`; `savanna/colony/GalleryWeb.java:391-468`.
+- **Unchecked link:** how long the gaps between pieces are in play, and whether a hole with a dug tunnel can in fact
+  be out of reach (sand fallen in, a piece walled off against a neighbour).
+- **The fix proposed:** fewer rules: opening the night's holes becomes its own small job in the shape the plugging
+  already has (`ForagingHoles.pickHoleToPlug`: each builder takes the nearest one nobody has claimed, a hole it found
+  no way to is skipped by that builder), before new gallery pieces at the start of a foraging time. The long test
+  `termitesOpenTheirForagingHolesAtNightAndPlugThemByDay` waits any number of nights and would not notice.
+- **From:** P-4.
+
+### R5-64 (B, proven for the record; its part in BUGS 452 likely): by day the colony's record names where termites could feed, not where any termite is, and the raid stands termites also in cells no raider can get at
+
+**In play (2026-11-27):** B. A raid at a log where the termites had stopped feeding still finds termites; at a spot with one open cell most of the termites brought out stand shut in under the wood, counted as there, with raiders pacing above them (the picture of BUGS 452).
+
+- **What is wrong:** by day three questions have three answers. Who really feeds: nobody, when the store is full (the
+  usual state of a well-fed colony), the food cannot be eaten from inside or no pieces are left. What the record says
+  (`FeedingSpots.byDayPlaces`): every feeding gallery and closed runway that is built right, a question about blocks.
+  What the raid is told (`Raid.byRecord`): a by-day place within reach with a way in counts as "termites there"; then
+  `bringOutFeeders` takes workers out of the termites' numbers and `feedersOut` stands them in that place's cells,
+  those with a way in first and **then the others** (the sort only orders them).
+- **Where:** `savanna/colony/FeedingSpots.java:60-104`; `savanna/colony/Raid.java:354-390`, `:1796-1854`;
+  `framework/colony/FoodStore.java:291-330`; `framework/colony/FieldLife.java:417-446`.
+- **Unchecked link:** whether BUGS 452's termites were ones stood in cells with no way in (the bug entry says this is
+  not measured). The soak diaries can say.
+- **The fix proposed:** in `feedersOut` only cells with a way in (a termite the raiders cannot reach is no prey). And
+  one judge of "termites feed here now" owned by the termite colony. My pick: keep "always a few there" as the stated
+  rule (real Macrotermes keep workers under their sheeting by day), but only in cells the raiders can reach.
+- **Also (Q-9):** a watched raid with some raiders along as numbers applies "never more than a tenth of the termite
+  colony" twice, once to the numbers' catch and once to the feeders brought out (`Raid.java:1810`, `:1942-1944`); one
+  count of "taken by this raid so far" for both.
+- **From:** P-5, Q-9.
+
+### R5-65 (B, proven as code; how often it bites to measure): the raid reads the termites' alarm as "they have given this spot up"
+
+**In play (2026-11-27):** B. A raid whose arrival alarms the termites before the attack starts (a hole still open at dawn, a forager still out) is told nobody feeds there: the column looks round and goes home and the find is forgotten, or it attacks and the termites under the mud are not brought out for it.
+
+**Checked by the lead.** `SavannaParts.java:257` answers the question `KEEP_OFF` with `Alarm::keepsIn` (line 121 is
+the lasting answer, the closed holes); `Raid.java:378` (the judge) and `:1801` (`bringOutFeeders`, which returns
+with no diary line) ask `keepsOff`.
+
+- **What is wrong:** the raid asks the termite colony "do you keep off this spot?" in three places and means the
+  lasting answer (attacked here before, the place shut). The alarm answers the same question with "a trouble is felt
+  here right now", which lasts seconds. With a trouble of strength 16 at the raiders every place within 16 blocks
+  answers "kept off". Then the judge at the halt says "no termite at the spot", or the BUGS 202 fix (feeders brought
+  out) is skipped without a word, and raiders going as numbers take nothing (`Raid.java:1936`).
+- **When:** the alarm rises before the first bite only when a raider comes within 3 blocks of an open way out or 4 of
+  a termite outside. By day the holes are plugged, so most raids do not meet it; a raid in the first raid hour (6:00)
+  can. The soak diaries can say: "(the termites keep off the spot)" or "no termite at the spot now" at a find no
+  earlier raid went to.
+- **The fix proposed:** fewer answers: the alarm stops answering `KEEP_OFF` (it already answers `ALARMED`, and the
+  food goals ask that themselves), so "keep off" means only the lasting reasons again, as `Colony.keepsOff`'s own
+  comment says.
+- **Also (Q-3, graded A by its reader, B here as a narrow case):** a termite colony is "here" only with a player
+  within 64 blocks of its mound's middle; the Matabele colony is here wherever its raid is (the `OUT_THERE` socket,
+  `SavannaParts.java:302`), the termites plug nothing in for their feeding spots. A player who stands beyond a spot
+  that lies 50 blocks or more from the mound watches real raiders attack a colony of numbers: nobody is there
+  (`AwayLife.isHere`, `framework/colony/AwayLife.java:164-215`; `Raid.java:381-383`, `:1804-1807`). The fix: the
+  termites plug `OUT_THERE` too with the feeding places they use by day.
+- **From:** Q-8, Q-3.
+
+### R5-66 (B, proven as code): termite soldiers never bite a player, though the comments and the plan say they lunge
+
+**In play (2026-11-27):** C. A player can break the mound open or hit termites and the soldiers only gather, drum and stand round him.
+
+- **What is wrong:** a soldier bites only what the fight rules let its species attack. The termites' list of animal
+  foes is empty since the chickens went, and a player can be attacked only by a species with the `nest_defence` part,
+  which the termites do not have. `DefendGoal.java:131` says "At a player or an animal it still lunges", step 6 of
+  `docs/plans/termite-alarm-rework.md` the same; `docs/DESIGN.md:84` says players are not attacked (M8), so the code
+  may be what was chosen and only the comments wrong.
+- **Where:** `savanna/entity/goal/DefendGoal.java:181-200`, `:141`, `:211`; `framework/fight/Fights.java:55-103`;
+  `macrotermes.json` (`fight`).
+- **The fix proposed:** the comments say what the code does; then the call below.
+- **From:** S-10, Q-11.
+
+**Your call (2026-11-27):** should termite soldiers bite a player who breaks into the mound? Today they never do: they come, drum and stand. Real Macrotermes majors bite whatever comes into a breach and draw blood from a hand. My pick: yes, a soldier bites a player who stands within reach of a breach he made or who hit a termite, for small damage (1), through the nest defence part the Matabele already use (it leaves creative players and spectators alone).
+
+### R5-67 (B, proven in the code; how it looks to see in play): the drumming is felt 16 blocks round the trouble through solid ground and is never passed on, and the nest's "does it reach" is a second rule, so the colony calls out soldiers that never hear
+
+**In play (2026-11-27):** B. A raid or a player digging into a gallery 30 or 40 blocks out (most feeding places) is answered only by the one to three soldiers already on a beat there; no soldier comes from the nest, while a soldier in a separate gallery 10 blocks off through solid ground answers at once.
+
+- **What is wrong:** (1) every soldier within 16 blocks of the trouble in a straight line hears it, at once, through
+  soil and across unconnected galleries. A soldier that hears drums, but nobody hears that drumming: the reach is
+  measured from the trouble only (`Alarm.reached`, `listen`), though `listen`'s own comment says "the others feel that
+  in turn" and the plan's step 3 says it "relays outward". (2) The colony asks "does the trouble reach my nest" from
+  the trouble to the nest's whole box, 24 blocks to each side of the middle (`Alarm.reachesNest`); each soldier asks
+  by its own distance. For a break 24 to 40 blocks from the middle the first says yes and the second no for every
+  soldier in the mound: up to 12 soldier numbers become bodies in the nest rooms, none hears, none goes, and as many
+  workers are turned back into numbers to stay under the cap.
+- **Real biology:** Hager and Kirchner 2013 (as the design quotes it): one pulse fades within about 40 cm (about 13
+  blocks at the mod's scale), soldiers that feel it drum back within about 0.3 s, so the signal runs soldier to
+  soldier along the galleries over several metres at about 1.3 m a second. The mod has one soldier's own range and
+  no relay.
+- **Where:** `savanna/colony/Alarm.java:449-496`; `savanna/entity/TermiteSoldierEntity.java:427-433`;
+  `framework/colony/Colony.java:806-809`; `savanna/colony/Soldiers.java:578-584`; `macrotermes.json` (`alarm`).
+- **The fix proposed:** one rule in place of the fixed reach and the nest's box: a soldier hears a trouble when the
+  trouble, or a soldier that has heard it and drummed, is within one pulse's reach; the nest hears when a soldier in
+  it hears. Decided together with R5-68 (how many answer).
+- **From:** S-4, Q-4.
+
+**Your call (2026-11-27):** should the alarm be passed on from soldier to soldier, as real termites drum it along their galleries? Today a raid far out is answered only by the soldiers within 16 blocks of it. My pick: yes, the relay (it is the real behaviour), built with a balance check on a soak, because more soldiers would then reach far raids and too many soldiers at once wiped raids out before.
+
+### R5-68 (B, proven as code; a new side of R11-17): near and away disagree on how many soldiers answer a raid, and on what the termites remember of it
+
+**In play (2026-11-27):** B. The same raid on the same colony is a hard fight unwatched (60% of the soldiers answer, up to 12, a quarter of them taken) and a light one watched (the one to three soldiers at the spot); and a watched raid shuts the spot for about three and a half days where an unwatched one shuts it for two.
+
+- **What is wrong:** (1) as numbers a raid meets 60% of all the colony's soldiers, at most 12 (`Raid.takeHidden`); as
+  bodies only those within 16 blocks of the break (R5-67). (2) The termites' memory of danger decides which holes
+  stay shut and which are given up for good. A watched raid writes into it at every sting (a small real wound, 2
+  points, up to 12 at one place); an unwatched raid writes once, as one death (4 points), and only when the raid has
+  got home; a raid that never gets home writes nothing. A hole is given up for good after two attacks that once
+  reached 6: two watched raids do it within four to five days of each other, two unwatched only within about a day.
+- **Where:** `savanna/colony/Raid.java:1887-1890`, `:1947-1959`; `savanna/colony/Raids.java:579-596`;
+  `framework/fight/Fights.java:129-133`; `framework/colony/DangerMap.java:140-290`; `macrotermes.json:27-44`, `:266`.
+- **Unchecked link:** the real counts in play (the numbers come from the measuring scene
+  `aDaytimeRaidOnAFullColonyIsMeasured`); the days are arithmetic from the file's numbers.
+- **The fix proposed:** decide once how many soldiers answer a raid at a feeding spot and how fast (those at the spot
+  at once, more down the gallery over the next minute) and let numbers and bodies read that one rule; and the
+  unwatched raid tells the memory what it took when it takes it, one entry a termite, through the call the bodies use.
+- **From:** Q-5, Q-6.
+
+### R5-69 (B, proven; a new side of R5-18 and R6-2): termite soldiers never starve and never die of age, so a colony whose workers are all gone lives on for ever as a handful of soldiers
+
+**In play (2026-11-27):** B. A mound that should be dead (no workers, no queen, no building, no foraging) stays listed as a living colony with slow soldiers walking its beats for good, and never becomes a dead mound for the Matabele to move into.
+
+- **What is wrong:** a soldier cannot feed itself; the workers bring it fungus. Without them it only slows
+  (`slow_after_ticks`), as a mob and as a number: every caste but the workers has "never" as its starve time
+  (`framework/colony/Meals.java:49-57`, on purpose by its comment), and only workers die of old age. A colony ends
+  only when nobody is counted, and soldiers are counted.
+- **Where:** as above; `framework/colony/Population.java:220-232`, `:653-667`;
+  `savanna/entity/TermiteSoldierEntity.java:310-321`, `:438-449`; `framework/colony/Colony.java:724-734`.
+- **The fix proposed:** one rule, not two: soldiers get the workers' starve time (they eat what the workers bring, so
+  they starve when nobody brings it), as R6-2 made a Matabele queen with no workers starve. The soldier-only colony
+  then ends through the rule that exists. My pick, from the real animal (soldiers depend wholly on being fed; how
+  many days one lasts unfed I do not know). R5-18's king is the same question.
+- **From:** S-2.
+
+### R5-70 (B, proven as code): "a foe is near", "is this termite safe", "does the trouble reach" and "the trouble is over" are each judged in three to five places with different distances and clocks
+
+- **What is wrong:** no part can ask "is there trouble here, and is it over". *A foe is near:* the alarm (within 3
+  blocks of an open way out, 4 of a forager outside, 4 of a trouble), the raid seal (16 of the break), the body
+  carriers (`Refuse.foeNear`), a worker's flight (a hunter within 3), a soldier's bite (`DefendGoal`, and
+  `WalkBeatGoal`, which needs no alarm at all). *The trouble is over:* the alarm fades 80 seconds after it was last
+  fed; the seal opens at night, 30 seconds after the last foe within 16 blocks, or after a day; a worker that fled
+  stays in 60 seconds by its own clock; the holes stay shut by the danger memory's half-life; the raid ends its attack
+  after 15 quiet seconds. *Safe:* R5-56. *Reaches:* R5-67. *Is this soldier fit:* `getSoldiers` and `Alarm.places`
+  ask only "alive", so a paralysed or staggering soldier still hears, drums and keeps a place at the break while a
+  fit one is put farther back (`savanna/colony/Soldiers.java:173-177`; its neighbour `soldierComing` does ask).
+- **What it costs:** R5-55, R5-56, R5-65, R5-67 and R5-68 are each two such answers disagreeing, and the termites'
+  side of BUGS 361, 452 and 453 will need a sixth answer unless there is one to ask.
+- **Where:** `savanna/colony/Alarm.java:354-368`; `savanna/colony/RaidDefence.java:211-212`, `:301-304`;
+  `framework/colony/Refuse.java:231-239`; `framework/entity/goal/FleeGoal.java:122-131`;
+  `savanna/entity/goal/DefendGoal.java:181-200`; `savanna/entity/goal/WalkBeatGoal.java:148-154`. Reader Q's file has
+  the table of every question and where it is judged.
+- **The fix proposed:** one small record per trouble kept by the alarm (where, what made it, when last felt, over or
+  not) that the seal, the flight, the body carriers and the soldiers ask, and that a raid's end can close.
+  `RaidDefence`'s breaches and the alarm's troubles are already nearly the same list (both: at most 8, a place, a
+  last-foe time). "Is this soldier fit" asked once, in `getSoldiers`.
+- **From:** Q-7, Q-10.
+
+### R5-71 (B, proven): a soldier already answering one trouble cannot hear a second one, however near and however bad
+
+**In play (2026-11-27):** C. A player running about on the mound while a raid breaks into a gallery 10 blocks off: the soldiers stand at the mound drumming and the breach gets only the soldiers that had heard nothing yet.
+
+- **What is wrong:** a soldier listens only while it answers nothing (`Alarm.listen` returns early on `hasHeard`). It
+  does not hear a worse trouble until its first has faded (30 seconds after the last footstep, 80 after the last foe).
+  Troubles join only within 8 blocks.
+- **Where:** `savanna/colony/Alarm.java:483-506`, `:540-569`.
+- **The fix proposed:** a soldier answers the worst trouble whose drumming reaches it now (breach over foe over
+  felt). No new number. A test: footsteps on the mound, then a breach 10 blocks off.
+- **From:** S-3.
+
+### R5-72 (B, likely; to measure; R5-8's shape): a soldier with no way to its alarm place is handed the next place at once, one failed route search after another
+
+**In play (2026-11-27):** C. A lag spike while a trouble lasts, only when soldiers that heard cannot reach it (a minor outside at night with the holes shut). Not measured.
+
+- **What is wrong:** `DefendGoal` walks the soldier by asking the legs straight, not through the shared `Errand`. With
+  no route to its place it marks the cell bad for 10 seconds and drops its task; 5 to 10 ticks later the alarm hands
+  it the next place, another full search. The places are the ring round the trouble plus every covered nest cell
+  within 24 blocks, so there can be dozens. BUGS 99 measured such failed searches at about 1 ms each. `stand` also
+  plans again whenever the legs are done but the soldier is not in its cell, without asking whether the legs gave up
+  (R2-2).
+- **The same shape at a raid seal (S-7, Q-12):** `Soldiers.claimPost` hands a shut-out soldier its beat by the seal
+  before it looks at the soldier's "no way there" list, so one that cannot reach it tries again every second or two
+  until the seal opens (at most a day); and the list of shut-out soldiers is not saved, so after a reload they take
+  ordinary posts whose way lies through the seal.
+- **Where:** `savanna/entity/goal/DefendGoal.java:79-89`, `:254-275`; `savanna/colony/Alarm.java:595-608`,
+  `:695-722`; `savanna/colony/Soldiers.java:465-470`; `savanna/entity/goal/WalkBeatGoal.java:98-106`, `:260-269`;
+  `savanna/colony/RaidDefence.java:274-283`, `:397-435`.
+- **The fix proposed:** walk with the shared `Errand`; on a failed search the soldier gets "no way to this trouble"
+  for the trouble's life, or one search to the nearest of all free places (`Errand.setOff(Collection)`). `claimPost`
+  skips a seal beat in the "no way" list as it skips every other; "shut out" is worked out when asked (outside the
+  nest with a shut seal between it and home), not kept.
+- **From:** S-6, S-7, Q-12.
+
+### R5-73 (B, proven; the size of it to measure with a soak): a far termite colony forages "by the land" with no limit from the land, and one real plant left switches that free food off
+
+**In play (2026-11-27):** B. Colonies far from the player fill up and reach the cap of 200 however bare their land, while the colony the player watches is held by its real grass and wood; after a long absence the far colonies are the big ones.
+
+**Checked by the lead.** `FieldLife.forageByTheLand` (`framework/colony/FieldLife.java:278-294`) and its gate at
+`:470` (`placedNow == 0`). Its own comment calls it "a known departure" (BUGS 203: far colonies starved without it).
+
+- **What is wrong:** while a colony is away and its forager numbers find no remembered plant to work this second,
+  each free forager brings a piece about every 15 seconds out of nothing. The only limit is the room in the garden:
+  with about 60 foragers about 1,900 pieces a night against the 50 a day a full colony eats. And the gate fights the
+  rule it stands in for: the free food runs only when no forager worked any real plant this second, so one remembered
+  tuft near tonight's holes switches it off for all the other free foragers that second. The more real plants the
+  brain still remembers, the hungrier the colony. (Part A's R5-2 pulls the other way: it bites when forage only keeps
+  up with eating, so it bites far colonies less than feared until this is mended.)
+- **Unchecked link:** the real forager share of 200 workers.
+- **The fix proposed:** one rule: the land out of sight gives what the land near would give. A pieces-a-day
+  allowance for the colony's grazed area, measured once from a soak of a watched colony, that `forageByTheLand` takes
+  from after the real plants, not instead of them (the gate goes). My pick; it needs the soak first, and R5-53 mended
+  so the watched colony's number is the right one.
+- **From:** E-2.
+
+### R5-74 (B, proven; how often to measure): each colony keeps its own count of the pieces cut off a plant, so a plant two colonies share gives nearly twice its pieces
+
+**In play (2026-11-27):** C. A little food from nothing where two colonies' ranges meet (mounds 42 to 82 blocks apart, each foraging out to about 56).
+
+- **What is wrong:** the pieces cut are kept per colony (`FoodStore.grassClips`). The block shows it only for the
+  plants eaten in stages, and a colony reads the block's stage only on its first cut; dry grass, tall grass, hay and
+  the bleached branch show nothing. Colony A cuts 2 of a tuft's 4 pieces, colony B cuts 3, A cuts 2 more: 7 pieces
+  off a 4-piece tuft. A 48-piece hay bale shared by two gives up to 95.
+- **Where:** `framework/colony/FoodStore.java:67`, `:623-652`, `:696-702`; `savanna/block/BleachedBranchBlock.java:31-34`.
+- **The fix proposed:** one truth per block: the pieces cut per position kept once for the whole level (the colony
+  manager's saved data), read and written by every colony. No new number.
+- **From:** E-3.
+
+### R5-75 (B, proven; a new side of R5-11): the feeding-spot and gallery numbers were set for colonies of 600 to 700 workers and not looked at again when the cap became 200
+
+**In play (2026-11-27):** B. A full mound keeps about 6 feeding spots at branches where 10 to 15 were chosen for a big colony, so there are fewer by-day places for the Matabele scouts to find; and its galleries stop at about 35 blocks out, not the 50 in the species file.
+
+- **What is wrong:** `nest.new_holes` says "a full colony of 600 to 700 workers keeps 15, a half-grown one of 200
+  keeps 6". Since the honest sizes (2026-11-11) a full colony is 200 workers: `mostFor(200)` = 6. `reach_min`,
+  `reach_max` and `reach_full_at_workers` 500 are read only when the galleries are off. `galleries.max_length` 600
+  never binds: at one block a worker the web is at most 200 blocks, which (4 arms of 16, then the shortest tip first,
+  a fork every 8 to 12) takes the tips to about 35 blocks out; `reach` 50 is met only by pieces pulled straight to
+  food. With mounds 42 to 82 blocks apart, webs of 35 meet when mounds are closer than about 70.
+- **A lead for the open flake BUGS 167** (a web at 70 blocks against 58 allowed): "allowed" is not one number; a
+  piece to food may go one piece over, big dead wood 32 over, a fork's second piece a little over.
+- **Where:** `macrotermes.json:132-133`, `:145-149`; `framework/species/SpeciesProfile.java:872-905`;
+  `savanna/species/SavannaNumbers.java:395-397`; `savanna/colony/GalleryWeb.java:361-364`.
+- **The fix proposed:** numbers, not code: `per_workers` about 14 (14 spots at the cap, the "10 to 15" chosen
+  before), the three dead reach numbers out of the termite file, `max_length` with a note. `tools/raid_balance.py`
+  was worked out for 8 to 14 spots, so check it against 200 workers. My pick for the galleries: keep about 35 (it
+  fits the mound spacing).
+- **From:** E-4, W-12.
+
+### R5-76 (B, proven): filling in a piece out to small food gives back its full length, though that length never counted, so every eaten branch shrinks the web's room to spread
+
+**In play (2026-11-27):** C. Over many days a colony that eats many fallen branches stops spreading its galleries though its web is far shorter than its workers allow.
+
+- **What is wrong:** a piece out to a fallen branch counts 0 of its length (`small_food.share` 0.0). Ten days after
+  the branch is eaten the piece is filled in and its **full** length is added to "length given back"
+  (`filledLength`), which the even spreading may not use. Each branch eaten and left takes its length out of the
+  spreading for good.
+- **Where:** `savanna/colony/GalleryUpkeep.java:379-383`, `:402-404`; `savanna/colony/GalleryWeb.java:282-289`,
+  `:441-443`, `:876`.
+- **The fix proposed:** one rule for "how long is this piece" that `length()` and the fill both call. My pick on the
+  same path: the given-back length returns to the spreading after `fill_days` more days (real Macrotermes keep
+  exploring all their lives; today that length is for growth toward food only, for ever).
+- **From:** W-3.
+
+### R5-77 (B, the path proven; how often likely): a tip turned back by a remembered attack is picked again every second and holds up the growth of the whole web for days
+
+**In play (2026-11-27):** C. After a Matabele raid near the galleries the termites' web stops growing everywhere for days, not only toward the raid.
+
+- **What is wrong:** each second the tip pulled hardest by grass, or else the shortest, is picked. When every way on
+  from it runs toward a place where members were attacked, growth stops for that second and no try is counted, so the
+  same tip is picked the next second, until the attack is forgotten (about four days from its top). A tip turned back
+  by a neighbour is counted (three tries), but the tries are not saved; and a turned-back pull toward grass still
+  answers "done", so the even spreading never gets its turn.
+- **Where:** `savanna/colony/GalleryWeb.java:456-492`, `:603-605`, `:704-751`, `:92-93`.
+- **The fix proposed:** one rule for "turned back", by an attack or a neighbour, counted in both branches and faded
+  by game time (dropped after a day) so nothing new is saved; the pull answers "nothing grown" when it grew nothing.
+- **From:** W-4.
+
+### R5-78 (B, proven): a piece out to rich food is planned with neither the neighbour walls nor the attack check, and the walls between neighbours look only at the other web's pieces
+
+**In play (2026-11-27):** C. Two colonies' galleries joined by a piece out to a log lying between them, or a new gallery dug straight across the place a raid just hit; the upkeep never walls the joined piece off while its food lasts.
+
+- **What is wrong:** "may a gallery go here?" is answered twice. The tips ask three things (not toward an attack,
+  not toward a neighbour the colony yields to, never within reach of a neighbour's gallery). A piece out to rich food
+  asks only that the food itself is not kept off. And the neighbour check looks only at the other colony's pieces'
+  own blocks, not its nest's own tunnels, feeding galleries or shaft. A new side of R5-26.
+- **Where:** `savanna/colony/GalleryWeb.java:543-556`, `:765-781`, `:825-881`;
+  `framework/colony/ForagingHoles.java:810-813`; `framework/colony/GroundReader.java:74-79`.
+- **Unchecked link:** whether a tip in a real world gets within 3 blocks of a neighbour's nest tunnels (a soak with
+  two colonies at the close end of the spacing).
+- **The fix proposed:** one question for the web, asked by the tips and by `pieceTo` alike, answered from the other
+  colony's whole list of tunnels (`Nest.getForagingTunnels`).
+- **From:** W-5.
+
+### R5-79 (B, to measure): all day every idle builder reads every cell of every gallery, about every two seconds, to find a hole to plug, though every hole is plugged
+
+**In play (2026-11-27):** C. A steady cost by day beside a big colony, growing with the web and the number of real builders. Not measured.
+
+- **What is wrong:** `PlugHoleGoal.canUse` → `ForagingHoles.pickHoleToPlug` walks every hole of the web and for each
+  asks first "is the whole gallery out to it dug?" (one block read a cell of its whole way from the nest) and only
+  then "is the hole open?" (one read, and false by day). A grown web is in the order of 50 holes times 20 to 40 cells.
+  `holeToOpen` and `HoleTurns.pickTurns` have the same order.
+- **Where:** `savanna/entity/goal/PlugHoleGoal.java:57-66`; `framework/colony/ForagingHoles.java:208-215`,
+  `:251-269`, `:314-337`; `savanna/colony/HoleTurns.java:308-317`.
+- **The fix proposed:** only the order: ask `isOpen(hole)` first. The answers do not change. The root is R5-92.
+- **From:** H-2.
+
+### R5-80 (B, proven; a new side of R5-3): mud crust, mud casts, pulp heaps and termite remains age and crumble only on random ticks, so near a spectator they stand still for good
+
+**In play (2026-11-27):** B. Watching in spectator, an eaten fallen tree leaves its log-shaped mud cast standing for good, leftover plates of a filled gallery stay, every crust stays fresh (lightest colour, softest to break), pulp heaps do not sink and remains do not weather.
+
+- **What is wrong:** all of it runs in the blocks' own `randomTick` and nothing else does it, and Minecraft gives no
+  random ticks near a spectator or 128 blocks from every player (R5-3). The runway crumbling is not hit: the colony's
+  own check does it on the colony dice (`framework/colony/ForagingHoles.java:679-722`), two clocks for one kind of
+  block. Nothing reads a crust's or cast's age for play but the player's breaking speed.
+- **Where:** `savanna/block/MudCrustBlock.java:140-164`; `savanna/block/MudCastBlock.java:44-59`;
+  `savanna/block/PulpHeapBlock.java:78-100`; `savanna/block/TermiteRemainsBlock.java:25-34`.
+- **The fix proposed:** the one clock R5-3 proposes for the mound soil: the part that already walks these cells (the
+  runway `crumble`, `DeadWorks` for the casts) dries and clears them by game time. One fix covers all the mud.
+- **From:** H-5, P (its spectator list).
+
+### R5-81 (B, likely): a far colony's hole blocks stay as the last real night left them, open by day for good
+
+**In play (2026-11-27):** C. Standing 70 to 120 blocks from a mound, its holes left open from the last night stay open by day, day after day; on coming within 64 blocks by day a row of workers plugs holes in front of the player, and by night tonight's holes are bitten open as the player walks up.
+
+- **What is wrong:** the night's turns are picked near and away alike, but only real workers open and plug the
+  blocks. A colony counts as away also when its land is loaded and no player is within 64 blocks; then nothing
+  touches its holes, and nothing on return sets them right out of sight, as the rooms are set right.
+- **Where:** `savanna/colony/Galleries.java:369-379`; `savanna/colony/HoleTurns.java:99-110`, `:295-370`;
+  `framework/colony/AwayLife.java:163-175`, `:553-580`.
+- **Unchecked link:** whether a raid's scouts read a far termite colony's open holes.
+- **The fix proposed:** no new rule: the return catch-up that sets the rooms right out of sight also sets each
+  loaded hole to what the brain says now (plugged by day, tonight's turns open, kept-shut plugged).
+- **Also (P-7):** for the 1,200 ticks of grace after the last player leaves neither the near nor the away parts run,
+  so each leaving costs the colony a minute of the numbers' foraging (`AwayLife.java:396-438`); the first away second
+  can stand for the whole grace (`FieldLife.seconds`, made for the slept night).
+- **From:** H-3, P-7.
+
+### R5-82 (B, proven): what the player sees of this half and no test checks
+
+- **The web:** `GALLERIES`, the biggest record a colony saves, has no `sample` for `AwayKit.everyPartSavesAndLoads`
+  (nor have `KING_CARE`'s numbers), and nothing reloads a web with tips, forks, small pieces and filled pieces in the
+  middle of growth.
+- **Holes and hidden trips:** no creature is ever put in a gallery with travellers (R5-58); no test runs a far
+  colony through a night and a day and looks at the hole blocks (R5-81); `holesTakeTurnsNearFoodFirstAndMoreInTheRain`
+  has a chicken sitting in a hole the builders try to plug but never checks it was not buried.
+- **Food:** `dryGrassEatenByAHoleLeavesBareGroundAndGrowsBack` stops at the green tuft (R5-53); no tall tuft is
+  eaten (R5-88); nothing bounds what `forageByTheLand` brings (R5-73); no two colonies at one plant (R5-74); the wood
+  call's edges (a small log not called, the reach's end) are untested.
+- **Alarm and soldiers:** no test that real majors stay real (R5-57), of a colony with soldiers and no workers
+  (R5-69), of two troubles more than 8 blocks apart (R5-71), of a foe that stays (R5-55), of a soldier that cannot
+  reach its place (R5-72); the raid defence tests would pass with workers that never run (R5-56).
+- **The night:** the slept-night test never moves the day clock (R5-52); the rain tests pretend rain (R5-60); the
+  long hole test waits any number of nights (R5-63).
+- **The fix proposed:** add the checks to the scenes that exist (each finding names its scene); a `sample` web grown
+  by hand. No new test classes.
+- **From:** W-6, H-4, E-5, S-12, and the "would still pass" notes of P and Q.
+
+### R5-83 (B, to measure): what a quiet colony pays for being ready, and what a trouble costs
+
+**In play (2026-11-27):** C. Part of the tick time beside a termite colony, more while a trouble lasts. Not measured.
+
+- **What is wrong:** `NestWalls.joinedCells` is a fresh flood through every nest cell with block reads, never kept;
+  `Alarm.cellsNear` calls it for each trouble every second (up to 8), again whenever a foe's trouble moves (R5-55),
+  and `Alarm.isBreakIn` for each block a player breaks beside the nest. A quiet colony that is here looks once a
+  second over every living thing in a box 128 by 49 by 128 blocks (`Alarm.tick`). `Nest.isInside` rebuilds its whole
+  set of inside cells on the first ask of every tick, and each worker's flight asks every 5 ticks, so with bodies
+  about it is rebuilt every tick. A soldier at an alarm task scans for foes every tick while none is near (the
+  field's comment says "every few ticks").
+- **Where:** `savanna/colony/Alarm.java:286-308`, `:348-350`, `:626-645`; `framework/colony/NestWalls.java:97-121`;
+  `framework/colony/Nest.java:1038-1081`; `savanna/entity/goal/DefendGoal.java:125-127`, `:181-200`.
+- **The fix proposed:** measure first with a grown nest. Then: one kept copy of the joined cells (refreshed when a
+  nest cell is dug or filled), the inside set kept until the nest changes, the soldier's scan every 4th tick.
+- **From:** S-8, S-9, Q (its "cost of being ready").
+
+## Grade C (part B)
+
+### R5-84 (C, likely): a hidden termite is put back without checking its cell is open
+
+**In play (2026-11-27):** C. Rarely, a termite put back inside a block a player placed in a gallery where a hidden termite "was"; it suffocates or walks out oddly.
+
+- **What is wrong:** a break-in "filled at" a cell puts the traveller at the floor its clock says it reached; nothing
+  checks that cell is still open. And if the insect is somehow already in the world, `comeOut` answers no and the
+  trip is folded into the numbers: one worker too many.
+- **Where:** `savanna/colony/HiddenTrips.java:93-101`, `:212-223`, `:314-353`.
+- **The fix proposed:** step back along the run to the last open floor before the first filled cell; when the insect
+  is already in the world, just drop the trip.
+- **From:** H-6.
+
+### R5-85 (C, proven): small leftovers in the web's and the holes' books
+
+- A tip's failed tries are never cleared when it grows on, and the set of small pieces never when one is filled
+  (`GalleryWeb.java:620-653`, `GalleryUpkeep.java:407-437`). `ClosedHoles.left` (saved) keeps a hole left for good
+  after its piece is filled in, so the colony list keeps counting it (`ClosedHoles.java:60`).
+  `HoleTurns.holesInTurn` can list a hole twice (`HoleTurns.java:117-130`). The hidden ways notice a changed web only
+  by its count of tunnels, so a piece filled and one added in the same 10 seconds go unseen
+  (`HiddenTrips.java:149-166`; `ClosedHoles` compares the list itself). `isLeaf` walks every piece each time it is
+  asked, once a piece in loops over the pieces (`GalleryWeb.java:135-137`).
+- **The fix proposed:** clear each where the piece leaves; compare the list as `ClosedHoles` does; a count of
+  children beside `parents` if the web ever grows.
+- **From:** W-7, W-11, H-7, H-9.
+
+### R5-86 (C, likely; a new side of R5-19): a closed hole stays shut by game time, the foraging hours run on the day clock
+
+- **What is wrong:** the danger that closes a hole fades on game time (`DangerMap`, half-life 24,000 ticks); sleeping
+  moves the day clock, not game time. The design's "shut for about two and a half days" is about five sun-days for a
+  player who sleeps each night. The turns themselves are safe.
+- **The fix proposed:** none now (real termites avoid a raided site for days; a few more is still real). Count it in
+  when R5-19's clock fix is built.
+- **From:** H-10.
+
+### R5-87 (C, proven; real biology): leaf litter is in the diet on paper only; in the mod's savannas there are almost no leaves it matches
+
+**In play (2026-11-27):** C. Termites eat no leaves in the mod's savannas, though real Macrotermes eat a great deal of leaf litter besides grass and wood.
+
+- **What is wrong:** the diet's `#minecraft:leaves` with `only_decaying` matches only vanilla leaves cut off their
+  tree. The giant savanna trees, which replaced the vanilla acacias in new savannas, have their own leaves and dead
+  leaves, and neither is food. `docs/DESIGN.md:15` also still lists vanilla short and tall grass, which the file
+  rightly does not.
+- **Where:** `macrotermes.json:87`; `savanna/block/TreeLeavesBlock.java:15`.
+- **From:** E-7.
+
+**Your call (2026-11-27):** should termites eat the giant trees' dead leaves? Today they eat no leaves in your savannas (only vanilla leaves cut off a tree count). Real Macrotermes eat a lot of leaf litter. My pick: yes, the dead leaves lying under the crowns, 2 pieces each, not "rich" food (no gallery is dug out to them).
+
+### R5-88 (C, proven): an eaten tall tuft grows back as a short one, so the tall grass round a colony is gone for good
+
+**In play (2026-11-27):** C. Over the first weeks the grazed band round a colony loses its tall dry grass; only short tufts come back.
+
+- **What is wrong:** the regrowth has one `grows_back` block, `dry_grass`. A tall tuft (8 pieces) comes back short (4)
+  and grows tall again only by bone meal. Perhaps a tenth to a fifth of the supply (an estimate).
+- **Where:** `savanna/colony/BarePatches.java:115`, `:137`; `SavannaNumbers.Regrowth`.
+- **The fix proposed:** the regrowth puts back the kind of plant that was eaten, from the tuft's own record. No new
+  number. My pick: tall comes back tall (real savanna grass regrows to its full height).
+- **From:** E-6.
+
+### R5-89 (C, to measure): the wood call measures every piece of dead wood in its ring every minute, known or not
+
+- **What is wrong:** `DeadWoodCall.listen` runs once a minute over every second column within 20 blocks of every dug
+  hole and tip, and for each dead wood block follows the whole piece of wood (up to 4,000 blocks, 6 neighbour reads
+  each) before it asks whether the colony knows it already. `isBig` measures again from scratch every 10 seconds while
+  a find past the budget waits. Land not loaded is never read. Likely well under a millisecond a minute.
+- **Where:** `savanna/colony/DeadWoodCall.java:60-113`, `:143-173`.
+- **The fix proposed:** skip the wood the colony already knows before measuring; `isBig` uses the size learnt when
+  the wood was called.
+- **From:** E-8.
+
+### R5-90 (C, proven): two lists that must be kept in step by hand
+
+- **"Small food"** is judged by `nest.new_holes.small_pieces` 8 for the spot count and by
+  `nest.galleries.small_food.pieces` 8 for the digging budget; change one and a branch is small for one rule and big
+  for the other (`ForagingHoles.java:889-899`, `GalleryWeb.java:292-295`). One number.
+- **"The wood termites eat"** is listed in the species file's food list, in the block tag `antcolonies:termite_wood`
+  (the mud plates and the dead works, which add fallen branches and hay by hand) and in the classes of
+  `DeadWoodCall.isDeadWood`. A new dead wood added to the file but not the tag gets eaten but no mud plate. The tag
+  becomes the one list.
+- **Checked and fine:** no vanilla log, plank or stripped log and no living tree's wood is in any of the three.
+- **From:** E-9, E-10.
+
+### R5-91 (C, proven): the savanna number records check no ranges, and some defaults in code differ from the file's sense
+
+- **What is wrong:** nothing in `SavannaNumbers` rejects a bad number. `soldiers.minors_per_major` -1 divides by 0 and
+  asks for about 2 billion majors (`SavannaNumbers.java:259-265`); `regrowth.grows_back` misspelt makes every eaten
+  tuft vanish for good with no message; `regrowth.ticks` 0 regrows at once (R5-34's family). `WoodCall.DEFAULT` has
+  `reach` 0 when the whole block is missing but 16 when the block is there without `reach`.
+- **The fix proposed:** a small check per record with a load message naming the field; one default a field.
+- **From:** E-11.
+
+### R5-92 (C, to measure): every gallery piece stores its whole way from the nest's shaft
+
+- **What is wrong:** a piece's record is its parent's whole tunnel plus its own blocks. A web of about 50 pieces
+  stores about 2,000 block positions (about 16 KB a colony in the save, written on every growth and fill) where its
+  own blocks are about 200, and every "is this piece dug?" reads the whole way again (R5-59, R5-79).
+- **Where:** `savanna/colony/GalleryWeb.java:995-1001`; `savanna/colony/Galleries.java:413-423`.
+- **The fix proposed:** measure first. If it matters: save each piece's own blocks and its parent, build the whole
+  way on load, and keep "dug" per piece.
+- **From:** W-8.
+
+### R5-93 (C, proven; a new side of R5-6): filling a piece in reads the blocks beside each filled block with no loaded-land check
+
+- **What is wrong:** `fillIn` checks each block it fills is in loaded land; `soilFor` then reads the block below and
+  the four beside it. On a chunk edge that reads the next chunk, which loads it on the spot; the write also tells the
+  neighbours. Only when a piece lies on the edge of loaded land (a low view distance).
+- **Where:** `savanna/colony/GalleryUpkeep.java:329-333`, `:373-400`.
+- **The fix proposed:** R5-26's shared question once it exists; until then `LandReady.at` on each side read.
+- **From:** W-9.
+
+### R5-94 (C, proven by Minecraft's source; a new side of BUGS 357): the termites' fight clocks run at half the speed their names say
+
+- **What is wrong:** Minecraft runs a mob's goals every other tick unless the goal asks for every tick
+  (`Mob.java:779-790`). `DefendGoal` and `RetreatGoal` do not ask and count in goal ticks: `BITE_INTERVAL` 20 is a
+  bite every two seconds, `GIVE_UP_TICKS` 300 is 30 seconds, while the seal beside it counts real ticks. The fights
+  were measured in play with these clocks, so the balance holds them; whoever tunes "20 ticks" gets double.
+- **Where:** `savanna/entity/goal/DefendGoal.java:36`, `:122-123`; `savanna/entity/goal/RetreatGoal.java:27`, `:81`.
+- **The fix proposed:** count these by game time, as the colony parts do (keeping today's real pace).
+- **From:** Q-13.
+
+### R5-95 (C, likely): beyond 256 mud casts the wood eaten through is no longer "inside", so a big dead giant's far parts stop being eaten by day
+
+- **What is wrong:** the casts joined to a feeding gallery are gathered by a search that stops at 256
+  (`savanna/colony/FeedingGallery.java:44`, `:85`, "a fallen tree is about 8 blocks"); a dead giant is hundreds of
+  blocks. Past the cap the wood beside the rest is not feedable from inside. 256 blocks of wood is about 160 days of
+  a full colony, so it may never show.
+- **The fix proposed:** none now; raise or drop the cap if a soak shows it.
+- **From:** E-13.
+
+### R5-96 (C, proven): the grass's drying and regrowth have no socket for the shared season
+
+- **What is wrong:** real savanna grass greens in the wet season and dries in the dry one. Here drying is a fixed
+  random-tick chance and regrowth a fixed 3 days. Nothing reads the season by itself (the rule is kept), but no
+  socket is left. R5-53's fix moves drying to the bare patches' clock, which is the natural place to ask the shared
+  season source.
+- **From:** E-12.
+
+### R5-97 (C, proven): comments that disagree with the code
+
+- `savanna/colony/Galleries.java:40-41`: the holes along the tunnels "stay usable for ever"; a filled piece's holes
+  are taken out for good. `GalleryWeb.java:465`: "(no dead end: it may grow there later)", but a try was just counted.
+- `savanna/SavannaEvents.java:200`: a comment about the raid view stands alone above the crocodile's handler; the
+  class comment (`:26-29`) names only the termites' strength and the trees.
+- `savanna/colony/Alarm.java:52-53` ("a major in the opening itself": the single holder went in step 5), `:55-56`
+  (`keepsShut` does not exist; the alarm plugs no hole), `:330-331` ("called by the queen": it is the part's tick),
+  `:480-481` ("the others feel that in turn": R5-67).
+- `savanna/entity/TermiteSoldierEntity.java:65-68` (a soldier holding a place "stands out in the open": its place is
+  under cover since step 5), `:154-167` and `:340-341` (damage 3 and 4; the species file's 1 and 1.5 count).
+- `savanna/command/TermiteCommands.java:60-62`, `:74-76`: two comments sit on the wrong command.
+- `savanna/colony/FeedingGallery.java:36`, `:43`: "a fallen tree is about 8 blocks" (the dead giants are far bigger);
+  `macrotermes.json:132`, the new-holes note (R5-75); `docs/DESIGN.md:15`, `:19` (R5-87, R5-90).
+- `savanna/block/TermiteHoleBlock.java:15-22` says it sits on every chimney; no game code places it any more (the
+  mouths are `TermiteMouthBlock`); it is kept for old worlds and tests.
+- `savanna/colony/Raid.java:1791-1792`: the feeders "feel the raiders and flee"; they do not (R5-56).
+- **From:** W-10, S-11, E-14, H-8, Q-2.
+
+## What is solid in part B (so no later session "fixes" what works)
+
+- **The web's planners are pure and proven:** `planArms`, `grow`, `pickTip`, `planPiece` on made-up landscapes
+  (`GalleryProofTest`); a route never opens to the air, never runs under the food, never two pieces at one hole.
+  Every block the web reads to plan goes through `GroundReader` with a loaded-land check; the away side reads no
+  block. Every random pick uses the colony's dice; no statics in the gallery classes.
+- **Nobody is walled in:** `fillIn` refuses while anything living stands in or next to the piece, while a hidden
+  traveller walks through it, while a hole of it is open or a player could see it; the raid seal waits while
+  anything living stands in its cell; the plug never buries anything not of the colony and nudges nestmates down
+  first. (A raider standing farther in than the hole being shut is BUGS 361's pocket.)
+- **One judge for "may this hole open?"** (`ForagingHoles.mayOpen`): the night's turns, the danger closing and the
+  plug goal never undo one another. Near and away pick the night's holes the same way with the colony's own dice; the
+  pick is saved. A plug claim lasts 600 ticks and cannot stick (not R5-5's shape). Dawn waits until nobody is outside
+  or 30 seconds.
+- **One question for "is it foraging time"**, near and away (`Colony.isForagingTime`); a bed, `/time add` and
+  `/tick rate` are right (R5-52 is the two cases that are not).
+- **A piece is never counted twice inside one colony:** one count of pieces cut a plant for real and counted
+  foragers, saved; a night that is near for its first half and away for its second keeps its holes and its counts.
+  Every food block is used up exactly; none gives pieces for ever.
+- **The diet is dead plant matter only:** dry grass only when dry, no living tree's wood, no vanilla log or plank; a
+  player's wooden house is never eaten. Hay bales are (on purpose). The food blocks burn as they should.
+- **Hidden trips keep the layers apart:** the navigator only asks "is this cell hidden?"; the same insect comes back
+  with its goal and route; it is saved with the colony, folded in when the colony goes away, and no wall closes
+  over a traveller.
+- **The alarm's own book is safe:** the list of troubles (at most 8) is never changed while walked; nothing a
+  soldier's goal holds is given back only in `stop` (held cells lapse, beats are freed when the holder is gone); a
+  spectator never sets off the alarm and no animal's steps do; walking and sneaking raise nothing; troubles are not
+  saved and the colony is calm after a load.
+- **The soldier's goal table does not flip-flop** (reader S's file has it), and `GoInsideGoal` and `WalkBeatGoal`
+  read one judge (`minorsOut`). The worker's plug, shape, nurse and seal goals share one priority, so none takes a
+  worker from another in mid-job.
+- **Counts across the raid's seam:** a termite taken by a raider leaves the count once, as a body or as a number; a
+  stung termite wanted by a raider and a nestmate is counted once.
+- **Reload in mid-night:** the night's holes, the round, the cut counts, the food map, the hidden travellers and a
+  packed seal are saved; what is not saved (the plug grace, claims, part-trips) times out or starts again harmlessly.
+- **The commands** all need permission 2, clamp their numbers and stay near the player.
+- **Layering and dice:** no goal here steers with vanilla navigation or `MoveControl`; the species reaches the brain
+  only through its parts, questions and news; nothing reads the season by itself.
+
+## Real biology, checked in part B (no finding)
+
+- **Foraging:** holes opened from inside at night and in wet weather, plugged before dawn with soil from inside, a
+  share of the holes used each night, food first with a few rested holes to explore at the web's edge, a raided hole
+  closed at once and avoided for days, a site raided twice left for new holes farther on, soil sheeting over what
+  they eat, one piece a trip: all as real Macrotermes. One hole per 6 foragers is a pick, not a measured figure.
+- **Soldiers:** 1 in 10 of the colony, 3 minors to a major, minors out with the foragers and along the trails, majors
+  at the nest's doorways; six taps in 24 ticks is about 10 a second, near the real 10 to 20.
+- **The web:** shallow galleries tens of metres out with many small holes, grown toward food and left where there is
+  none; ranges that meet their neighbours'. No paper was checked for a reach in metres.
+- **Scaled on purpose:** regrowth in days, danger fading in days, a colony of 200.
