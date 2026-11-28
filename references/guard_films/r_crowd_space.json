@@ -46,331 +46,328 @@
   136
  ],
  "findings": {
-  "jump leg_r2": [
-   9,
-   0.214
-  ],
-  "jump at spread_above_12": [
-   14,
-   0.265
-  ],
-  "jump leg_r2_lower": [
-   7,
-   0.217
-  ],
-  "jump leg_l2": [
-   6,
-   0.196
-  ],
   "jump thorax": [
-   11,
-   0.21
+   10,
+   0.107
   ],
-  "jump at spread_above_06": [
-   15,
-   0.357
-  ],
-  "jump at spread_above_27": [
-   17,
-   0.38
+  "jump at standing_side_04": [
+   6,
+   0.044
   ],
   "jump head": [
-   10,
-   0.264
+   11,
+   0.199
   ],
   "jump mandible_r": [
-   10,
-   0.295
+   11,
+   0.226
   ],
   "jump antenna_l_1": [
-   10,
-   0.303
-  ],
-  "inside antenna_l_2": [
-   75,
-   0.097
-  ],
-  "inside at spread_above_13": [
-   4,
-   0.021
-  ],
-  "jump antenna_l_2": [
-   8,
-   0.392
+   11,
+   0.229
   ],
   "jump mandible_l": [
-   10,
-   0.298
+   11,
+   0.226
   ],
   "jump antenna_r_1": [
-   10,
-   0.298
-  ],
-  "inside antenna_r_2": [
-   59,
-   0.036
-  ],
-  "inside at spread_above_11": [
-   4,
-   0.026
-  ],
-  "inside at spread_above_12": [
-   4,
-   0.024
-  ],
-  "jump antenna_r_2": [
-   8,
-   0.388
-  ],
-  "jump leg_r3_foot": [
-   6,
-   0.244
-  ],
-  "jump leg_r1": [
-   9,
-   0.249
-  ],
-  "jump leg_r1_lower": [
-   9,
-   0.285
-  ],
-  "jump leg_r1_foot": [
-   10,
-   0.334
-  ],
-  "jump leg_l1": [
-   7,
-   0.259
-  ],
-  "jump leg_l1_lower": [
-   9,
-   0.27
-  ],
-  "jump leg_l1_foot": [
-   8,
-   0.316
-  ],
-  "jump leg_l3": [
-   9,
-   0.173
-  ],
-  "jump leg_l3_lower": [
-   8,
-   0.248
+   11,
+   0.235
   ],
   "jump leg_l3_foot": [
-   7,
-   0.297
+   11,
+   0.171
   ],
-  "jump petiole": [
-   9,
-   0.157
+  "jump at standing_side_03": [
+   1,
+   0.056
   ],
-  "jump gaster_front": [
-   8,
-   0.149
+  "jump gaster_back": [
+   12,
+   0.171
+  ],
+  "jump at standing_side_05": [
+   1,
+   0.056
+  ],
+  "jump leg_r2": [
+   4,
+   0.085
   ],
   "jump at spread_above_03": [
-   100,
-   0.392
+   96,
+   0.194
   ],
-  "jump at spread_above_08": [
-   11,
-   0.214
-  ],
-  "jump at spread_above_14": [
-   1,
-   0.07
-  ],
-  "jump at spread_above_09": [
-   34,
-   0.301
-  ],
-  "jump leg_l2_lower": [
-   5,
-   0.198
-  ],
-  "jump leg_l2_foot": [
+  "jump leg_r2_lower": [
    6,
-   0.183
-  ],
-  "jump at spread_above_02": [
-   14,
-   0.219
+   0.091
   ],
   "jump leg_r2_foot": [
+   9,
+   0.101
+  ],
+  "jump leg_l2": [
    7,
-   0.214
+   0.089
+  ],
+  "jump leg_l2_lower": [
+   8,
+   0.133
+  ],
+  "jump leg_l2_foot": [
+   9,
+   0.148
+  ],
+  "jump at spread_above_02": [
+   24,
+   0.097
+  ],
+  "jump at spread_above_09": [
+   53,
+   0.309
+  ],
+  "jump antenna_l_2": [
+   7,
+   0.301
+  ],
+  "jump antenna_r_2": [
+   7,
+   0.309
   ],
   "jump leg_r3": [
    6,
-   0.155
-  ],
-  "jump at spread_above_18": [
-   2,
-   0.119
+   0.085
   ],
   "jump leg_r3_lower": [
    6,
-   0.176
+   0.147
   ],
-  "jump at spread_above_15": [
-   3,
-   0.187
+  "jump leg_r3_foot": [
+   6,
+   0.183
   ],
-  "jump gaster_back": [
+  "jump leg_r1": [
+   6,
+   0.139
+  ],
+  "jump leg_r1_lower": [
    7,
-   0.193
+   0.202
   ],
-  "jump at spread_above_10": [
+  "jump leg_r1_foot": [
    7,
-   0.232
+   0.236
   ],
-  "inside mandible_r": [
-   1,
-   0.02
+  "jump leg_l1": [
+   6,
+   0.134
   ],
-  "inside at spread_above_09": [
-   9,
-   0.097
+  "jump leg_l1_lower": [
+   6,
+   0.182
   ],
-  "inside antenna_l_1": [
-   1,
-   0.018
-  ],
-  "inside at spread_above_07": [
+  "inside leg_l1_foot": [
    2,
-   0.027
-  ],
-  "inside at spread_above_08": [
-   4,
-   0.027
-  ],
-  "inside at spread_above_15": [
-   3,
-   0.022
-  ],
-  "inside at spread_above_16": [
-   4,
    0.023
   ],
-  "inside at spread_above_17": [
+  "inside at standing_side_07": [
    4,
-   0.031
+   0.051
+  ],
+  "jump leg_l1_foot": [
+   8,
+   0.212
+  ],
+  "jump leg_l3_lower": [
+   9,
+   0.138
+  ],
+  "jump petiole": [
+   6,
+   0.062
+  ],
+  "jump gaster_front": [
+   8,
+   0.07
+  ],
+  "jump at spread_above_05": [
+   2,
+   0.041
+  ],
+  "jump at spread_above_06": [
+   25,
+   0.215
+  ],
+  "jump at spread_above_20": [
+   4,
+   0.048
+  ],
+  "jump at spread_above_21": [
+   5,
+   0.054
+  ],
+  "jump at spread_above_23": [
+   3,
+   0.048
+  ],
+  "jump leg_l3": [
+   6,
+   0.074
+  ],
+  "jump at spread_above_07": [
+   1,
+   0.03
+  ],
+  "inside antenna_l_2": [
+   50,
+   0.074
+  ],
+  "inside at spread_above_13": [
+   2,
+   0.084
+  ],
+  "inside at spread_above_14": [
+   2,
+   0.084
+  ],
+  "inside at spread_above_15": [
+   4,
+   0.085
+  ],
+  "inside at spread_above_16": [
+   5,
+   0.087
+  ],
+  "inside at spread_above_17": [
+   3,
+   0.088
   ],
   "inside at spread_above_18": [
-   4,
-   0.037
+   3,
+   0.089
   ],
   "inside at spread_above_19": [
-   4,
-   0.041
+   3,
+   0.09
   ],
   "inside at spread_above_20": [
    4,
-   0.044
+   0.09
   ],
   "inside at spread_above_21": [
-   5,
-   0.044
+   4,
+   0.088
   ],
   "inside at spread_above_22": [
-   5,
-   0.045
+   4,
+   0.085
   ],
   "inside at spread_above_23": [
-   5,
-   0.045
+   4,
+   0.08
   ],
   "inside at spread_above_24": [
-   6,
-   0.044
+   3,
+   0.076
   ],
   "inside at spread_above_25": [
-   6,
-   0.043
+   3,
+   0.075
   ],
   "inside at spread_above_26": [
-   6,
-   0.04
+   3,
+   0.071
   ],
   "inside at spread_above_27": [
-   6,
-   0.037
+   3,
+   0.066
   ],
   "inside at spread_above_28": [
-   6,
-   0.034
+   3,
+   0.065
   ],
   "inside at spread_above_29": [
-   6,
-   0.032
+   3,
+   0.064
   ],
-  "inside mandible_l": [
-   1,
-   0.02
+  "inside antenna_r_2": [
+   29,
+   0.09
   ],
-  "inside antenna_r_1": [
+  "inside at spread_above_09": [
    1,
-   0.024
+   0.064
   ],
   "inside at spread_above_10": [
+   1,
+   0.066
+  ],
+  "inside at spread_above_11": [
+   1,
+   0.071
+  ],
+  "inside at spread_above_12": [
+   2,
+   0.08
+  ],
+  "jump at spread_above_27": [
    3,
-   0.03
+   0.069
+  ],
+  "jump at spread_above_16": [
+   5,
+   0.107
+  ],
+  "inside antenna_l_1": [
+   1,
+   0.025
   ],
   "inside at standing_side_00": [
-   5,
-   0.036
-  ],
-  "inside at standing_side_01": [
-   3,
-   0.033
-  ],
-  "inside at standing_side_02": [
-   4,
-   0.029
-  ],
-  "inside at standing_side_03": [
-   4,
+   2,
    0.026
   ],
-  "inside leg_l1_foot": [
-   1,
-   0.036
+  "inside at standing_side_01": [
+   2,
+   0.032
   ],
-  "jump at standing_side_00": [
-   17,
-   0.23
+  "inside at standing_side_02": [
+   2,
+   0.039
   ],
-  "inside at spread_above_14": [
-   3,
-   0.022
+  "inside at standing_side_03": [
+   2,
+   0.044
   ],
   "inside at standing_side_04": [
-   3,
-   0.024
+   1,
+   0.048
+  ],
+  "inside at standing_side_05": [
+   1,
+   0.05
   ],
   "inside at standing_side_06": [
-   3,
-   0.021
-  ],
-  "inside at standing_side_07": [
-   3,
-   0.027
+   2,
+   0.051
   ],
   "inside at standing_side_08": [
-   3,
-   0.027
+   2,
+   0.049
   ],
   "inside at standing_side_09": [
    2,
-   0.028
+   0.048
   ],
-  "inside at standing_side_05": [
-   2,
-   0.022
+  "jump at spread_above_08": [
+   3,
+   0.089
+  ],
+  "inside at spread_above_08": [
+   1,
+   0.031
   ]
  },
  "body_findings": {},
+ "camera_checked": true,
  "known_bugs": "eight majors in a 2-block pen: the antenna tips (and now and then a head or jaw) of one standing against the pen's wall reach up to 0.08 blocks into it (personal space keeps the feet and the box off the wall, not the parts that stick out); the quick first shuffles apart and the jump from the above shot to the side shot count as jumps"
 }

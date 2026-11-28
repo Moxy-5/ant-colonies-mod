@@ -136,26 +136,40 @@
   136
  ],
  "findings": {
-  "inside abdomen": [
+  "jump leg_r2_foot": [
    1,
-   0.026
+   0.084
   ],
-  "inside at down_turn_26": [
+  "jump at down_turn_10": [
    1,
-   0.026
+   0.084
   ],
-  "jump abdomen": [
+  "jump leg_l3_lower": [
+   1,
+   0.112
+  ],
+  "jump at down_turn_108": [
    2,
-   0.156
+   0.127
   ],
-  "jump at down_turn_27": [
+  "jump leg_l3_foot": [
    1,
-   0.131
+   0.127
   ],
-  "jump at down_turn_42": [
+  "jump petiole": [
    1,
-   0.156
+   0.049
+  ],
+  "jump at down_turn_38": [
+   2,
+   0.049
+  ],
+  "jump gaster_front": [
+   1,
+   0.047
   ]
  },
- "body_findings": {}
+ "body_findings": {},
+ "camera_checked": true,
+ "known_bugs": "the Matabele minor's feet jump up to 0.13 blocks in a tick a few times (BUGS 308); its pictures differ on every launch (BUGS 435), so only its body checks guard it"
 }

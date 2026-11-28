@@ -148,7 +148,7 @@
  "findings": {
   "jump head": [
    2,
-   0.174
+   0.192
   ],
   "jump at carry_down_117": [
    5,
@@ -156,19 +156,19 @@
   ],
   "jump mandible_r": [
    2,
-   0.193
+   0.213
   ],
   "jump antenna_l_1": [
    2,
-   0.177
+   0.195
   ],
   "jump mandible_l": [
    2,
-   0.193
+   0.213
   ],
   "jump antenna_r_1": [
    2,
-   0.177
+   0.195
   ],
   "jump gaster_front": [
    2,
@@ -190,71 +190,60 @@
    1,
    0.075
   ],
-  "jump leg_r2_lower": [
-   1,
-   0.053
-  ],
-  "jump at carry_down_03": [
-   7,
-   0.057
-  ],
-  "jump leg_r2_foot": [
-   1,
-   0.057
-  ],
-  "jump leg_l2": [
-   1,
-   0.031
-  ],
-  "jump leg_l2_lower": [
-   1,
-   0.052
-  ],
-  "jump leg_l2_foot": [
-   1,
-   0.056
-  ],
   "jump thorax": [
    1,
-   0.124
+   0.134
   ],
-  "jump at carry_down_42": [
-   12,
-   0.193
+  "jump at carry_down_43": [
+   13,
+   0.213
   ],
   "jump antenna_l_2": [
-   2,
-   0.175
+   1,
+   0.192
   ],
   "jump antenna_r_2": [
-   2,
-   0.175
+   1,
+   0.192
+  ],
+  "jump leg_r3_lower": [
+   1,
+   0.117
   ],
   "jump leg_r1": [
    1,
-   0.133
+   0.147
   ],
   "jump leg_l1": [
    1,
-   0.133
+   0.147
   ],
   "jump leg_l1_lower": [
    1,
-   0.167
+   0.183
   ],
   "jump leg_l1_foot": [
    1,
-   0.187
+   0.205
   ],
   "inside gaster_back": [
-   1,
-   0.032
+   3,
+   0.035
   ],
-  "inside at carry_down_41": [
+  "inside at carry_down_39": [
    1,
-   0.032
+   0.014
+  ],
+  "inside at carry_down_42": [
+   1,
+   0.035
+  ],
+  "inside at carry_down_43": [
+   1,
+   0.015
   ]
  },
  "body_findings": {},
+ "camera_checked": true,
  "known_bugs": "a carried nestmate is drawn level on a wall, sticking out from its carrier's head into the shaft (BUGS 176); not inside the wall"
 }

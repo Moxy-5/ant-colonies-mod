@@ -150,6 +150,46 @@
   "onto_ceiling_147.png",
   "onto_ceiling_148.png",
   "onto_ceiling_149.png",
+  "onto_ceiling_150.png",
+  "onto_ceiling_151.png",
+  "onto_ceiling_152.png",
+  "onto_ceiling_153.png",
+  "onto_ceiling_154.png",
+  "onto_ceiling_155.png",
+  "onto_ceiling_156.png",
+  "onto_ceiling_157.png",
+  "onto_ceiling_158.png",
+  "onto_ceiling_159.png",
+  "onto_ceiling_160.png",
+  "onto_ceiling_161.png",
+  "onto_ceiling_162.png",
+  "onto_ceiling_163.png",
+  "onto_ceiling_164.png",
+  "onto_ceiling_165.png",
+  "onto_ceiling_166.png",
+  "onto_ceiling_167.png",
+  "onto_ceiling_168.png",
+  "onto_ceiling_169.png",
+  "onto_ceiling_170.png",
+  "onto_ceiling_171.png",
+  "onto_ceiling_172.png",
+  "onto_ceiling_173.png",
+  "onto_ceiling_174.png",
+  "onto_ceiling_175.png",
+  "onto_ceiling_176.png",
+  "onto_ceiling_177.png",
+  "onto_ceiling_178.png",
+  "onto_ceiling_179.png",
+  "onto_ceiling_180.png",
+  "onto_ceiling_181.png",
+  "onto_ceiling_182.png",
+  "onto_ceiling_183.png",
+  "onto_ceiling_184.png",
+  "onto_ceiling_185.png",
+  "onto_ceiling_186.png",
+  "onto_ceiling_187.png",
+  "onto_ceiling_188.png",
+  "onto_ceiling_189.png",
   "down_again_00.png",
   "down_again_01.png",
   "down_again_02.png",
@@ -236,465 +276,230 @@
   136
  ],
  "findings": {
-  "jump leg_r2": [
+  "inside leg_r2": [
    1,
-   0.124
-  ],
-  "jump at down_again_07": [
-   19,
-   0.336
-  ],
-  "jump leg_l2": [
-   1,
-   0.124
-  ],
-  "inside thorax": [
-   2,
-   0.056
+   0.016
   ],
   "inside at down_again_04": [
-   14,
-   0.142
+   20,
+   0.136
   ],
-  "inside at down_again_05": [
-   14,
-   0.233
-  ],
-  "jump thorax": [
-   3,
-   0.165
-  ],
-  "jump at onto_ceiling_19": [
-   11,
-   0.088
-  ],
-  "jump at onto_ceiling_102": [
+  "jump leg_r2": [
    1,
-   0.087
+   0.042
   ],
-  "inside head": [
-   5,
-   0.154
+  "jump at down_again_10": [
+   21,
+   0.123
   ],
-  "inside at onto_ceiling_101": [
-   6,
-   0.105
+  "inside leg_r2_lower": [
+   1,
+   0.02
   ],
-  "inside at onto_ceiling_102": [
-   7,
-   0.055
+  "jump leg_r2_lower": [
+   1,
+   0.063
+  ],
+  "inside leg_r2_foot": [
+   2,
+   0.027
   ],
   "inside at down_again_03": [
-   7,
-   0.074
+   13,
+   0.066
+  ],
+  "jump leg_r2_foot": [
+   1,
+   0.07
+  ],
+  "inside leg_l2": [
+   1,
+   0.016
+  ],
+  "inside leg_l2_lower": [
+   1,
+   0.02
+  ],
+  "inside leg_l2_foot": [
+   2,
+   0.027
+  ],
+  "inside thorax": [
+   1,
+   0.037
+  ],
+  "jump thorax": [
+   2,
+   0.092
+  ],
+  "jump at onto_ceiling_25": [
+   10,
+   0.126
+  ],
+  "inside head": [
+   3,
+   0.075
+  ],
+  "inside at down_again_05": [
+   11,
+   0.096
   ],
   "jump head": [
    3,
-   0.259
+   0.108
   ],
-  "jump at onto_ceiling_22": [
-   6,
-   0.165
+  "jump at onto_ceiling_26": [
+   7,
+   0.091
   ],
   "inside mandible_r": [
-   5,
-   0.187
+   3,
+   0.093
   ],
   "jump mandible_r": [
-   4,
-   0.29
-  ],
-  "jump at onto_ceiling_21": [
-   4,
-   0.19
+   3,
+   0.112
   ],
   "inside antenna_l_1": [
-   2,
-   0.139
+   3,
+   0.089
   ],
   "jump antenna_l_1": [
    3,
-   0.236
+   0.115
   ],
   "inside antenna_l_2": [
-   6,
-   0.233
+   4,
+   0.136
   ],
-  "inside at onto_ceiling_100": [
-   2,
-   0.04
-  ],
-  "inside at down_again_06": [
-   2,
-   0.059
+  "inside at onto_ceiling_117": [
+   5,
+   0.023
   ],
   "jump antenna_l_2": [
-   2,
-   0.336
+   3,
+   0.123
   ],
   "inside mandible_l": [
-   5,
-   0.187
+   3,
+   0.095
   ],
   "jump mandible_l": [
-   4,
-   0.29
+   3,
+   0.112
   ],
   "inside antenna_r_1": [
-   2,
-   0.139
+   3,
+   0.083
   ],
   "jump antenna_r_1": [
-   4,
-   0.236
+   3,
+   0.112
   ],
   "inside antenna_r_2": [
-   6,
-   0.231
+   4,
+   0.127
   ],
   "jump antenna_r_2": [
-   4,
-   0.327
+   3,
+   0.123
+  ],
+  "inside leg_r3_foot": [
+   1,
+   0.017
+  ],
+  "inside at onto_ceiling_118": [
+   2,
+   0.023
   ],
   "inside leg_r1": [
-   2,
-   0.074
+   1,
+   0.035
   ],
   "jump leg_r1": [
-   1,
-   0.172
+   2,
+   0.126
   ],
   "inside leg_r1_lower": [
-   4,
-   0.111
-  ],
-  "jump leg_r1_lower": [
-   1,
-   0.227
+   3,
+   0.075
   ],
   "inside leg_r1_foot": [
-   5,
-   0.134
+   4,
+   0.101
   ],
   "jump leg_r1_foot": [
    1,
-   0.257
+   0.093
   ],
   "inside leg_l1": [
-   2,
-   0.074
+   1,
+   0.035
   ],
   "jump leg_l1": [
    1,
-   0.172
+   0.061
   ],
   "inside leg_l1_lower": [
    3,
-   0.111
+   0.075
   ],
   "jump leg_l1_lower": [
    1,
-   0.227
+   0.086
   ],
   "inside leg_l1_foot": [
-   4,
-   0.134
-  ],
-  "inside at onto_ceiling_103": [
-   1,
-   0.014
+   3,
+   0.101
   ],
   "jump leg_l1_foot": [
    1,
-   0.257
+   0.101
+  ],
+  "jump leg_l3": [
+   1,
+   0.035
+  ],
+  "jump leg_l3_lower": [
+   1,
+   0.068
+  ],
+  "inside leg_l3_foot": [
+   1,
+   0.021
+  ],
+  "jump leg_l3_foot": [
+   1,
+   0.085
   ],
   "jump petiole": [
-   5,
-   0.072
+   2,
+   0.068
   ],
-  "jump at onto_ceiling_104": [
+  "jump at onto_ceiling_117": [
    1,
-   0.038
+   0.036
   ],
-  "jump at down_again_03": [
-   3,
-   0.06
-  ],
-  "jump at down_again_06": [
-   3,
-   0.144
-  ],
-  "jump postpetiole": [
-   4,
-   0.096
-  ],
-  "inside abdomen": [
-   64,
-   0.091
-  ],
-  "inside at onto_ceiling_104": [
-   1,
-   0.012
-  ],
-  "inside at down_again_17": [
-   1,
-   0.09
-  ],
-  "inside at down_again_18": [
-   1,
-   0.09
-  ],
-  "inside at down_again_19": [
-   1,
-   0.09
-  ],
-  "inside at down_again_20": [
-   1,
-   0.09
-  ],
-  "inside at down_again_21": [
-   1,
-   0.09
-  ],
-  "inside at down_again_22": [
-   1,
-   0.09
-  ],
-  "inside at down_again_23": [
-   1,
-   0.09
-  ],
-  "inside at down_again_24": [
-   1,
-   0.09
-  ],
-  "inside at down_again_25": [
-   1,
-   0.09
-  ],
-  "inside at down_again_26": [
-   1,
-   0.09
-  ],
-  "inside at down_again_27": [
-   1,
-   0.09
-  ],
-  "inside at down_again_28": [
-   1,
-   0.09
-  ],
-  "inside at down_again_29": [
-   1,
-   0.091
-  ],
-  "inside at down_again_30": [
-   1,
-   0.091
-  ],
-  "inside at down_again_31": [
-   1,
-   0.091
-  ],
-  "inside at down_again_32": [
-   1,
-   0.091
-  ],
-  "inside at down_again_33": [
-   1,
-   0.091
-  ],
-  "inside at down_again_34": [
-   1,
-   0.091
-  ],
-  "inside at down_again_35": [
-   1,
-   0.091
-  ],
-  "inside at down_again_36": [
-   1,
-   0.091
-  ],
-  "inside at down_again_37": [
-   1,
-   0.091
-  ],
-  "inside at down_again_38": [
-   1,
-   0.091
-  ],
-  "inside at down_again_39": [
-   1,
-   0.091
-  ],
-  "inside at down_again_40": [
-   1,
-   0.091
-  ],
-  "inside at down_again_41": [
-   1,
-   0.091
-  ],
-  "inside at down_again_42": [
-   1,
-   0.091
-  ],
-  "inside at down_again_43": [
-   1,
-   0.091
-  ],
-  "inside at down_again_44": [
-   1,
-   0.091
-  ],
-  "inside at down_again_45": [
-   1,
-   0.091
-  ],
-  "inside at down_again_46": [
-   1,
-   0.091
-  ],
-  "inside at down_again_47": [
-   1,
-   0.091
-  ],
-  "inside at down_again_48": [
-   1,
-   0.091
-  ],
-  "inside at down_again_49": [
-   1,
-   0.091
-  ],
-  "inside at down_again_50": [
-   1,
-   0.091
-  ],
-  "inside at down_again_51": [
-   1,
-   0.091
-  ],
-  "inside at down_again_52": [
-   1,
-   0.091
-  ],
-  "inside at down_again_53": [
-   1,
-   0.091
-  ],
-  "inside at down_again_54": [
-   1,
-   0.091
-  ],
-  "inside at down_again_55": [
-   1,
-   0.091
-  ],
-  "inside at down_again_56": [
-   1,
-   0.091
-  ],
-  "inside at down_again_57": [
-   1,
-   0.091
-  ],
-  "inside at down_again_58": [
-   1,
-   0.09
-  ],
-  "inside at down_again_59": [
-   1,
-   0.09
-  ],
-  "inside at down_again_60": [
-   1,
-   0.09
-  ],
-  "inside at down_again_61": [
-   1,
-   0.09
-  ],
-  "inside at down_again_62": [
-   1,
-   0.09
-  ],
-  "inside at down_again_63": [
-   1,
-   0.09
-  ],
-  "inside at down_again_64": [
-   1,
-   0.09
-  ],
-  "inside at down_again_65": [
-   1,
-   0.09
-  ],
-  "inside at down_again_66": [
-   1,
-   0.09
-  ],
-  "inside at down_again_67": [
-   1,
-   0.09
-  ],
-  "inside at down_again_68": [
-   1,
-   0.09
-  ],
-  "inside at down_again_69": [
-   1,
-   0.09
-  ],
-  "inside at down_again_70": [
-   1,
-   0.09
-  ],
-  "inside at down_again_71": [
-   1,
-   0.089
-  ],
-  "inside at down_again_72": [
-   1,
-   0.089
-  ],
-  "inside at down_again_73": [
-   1,
-   0.089
-  ],
-  "inside at down_again_74": [
-   1,
-   0.089
-  ],
-  "inside at down_again_75": [
-   1,
-   0.089
-  ],
-  "inside at down_again_76": [
+  "jump gaster_front": [
    1,
-   0.089
+   0.032
   ],
-  "inside at down_again_77": [
-   1,
-   0.089
+  "inside gaster_back": [
+   2,
+   0.023
   ],
-  "inside at down_again_78": [
-   1,
-   0.089
+  "jump gaster_back": [
+   2,
+   0.076
   ],
-  "inside at down_again_79": [
+  "jump at down_again_22": [
    1,
-   0.089
-  ],
-  "jump abdomen": [
-   4,
-   0.218
+   0.068
   ]
  },
  "body_findings": {
-  "tipped": 9
+  "tipped": 10
  },
- "known_bugs": "onto and off the ceiling the body tips 30 degrees a tick (a snap) with the head, antennae and front feet drawn inside the roof; back on the pit floor the gaster stays sunk 0.09 blocks into the floor (found 2026-10-18 by the first guard films)"
+ "camera_checked": true,
+ "known_bugs": "onto and off the ceiling the body tips 30 degrees a tick (a snap) with the head, antennae and front feet drawn inside the roof, the Matabele minor's longer body more so (BUGS 308c); back on the pit floor the gaster stays sunk into the floor (found 2026-10-18 by the first guard films); its pictures differ on every launch (BUGS 435), so only its body checks guard it"
 }
