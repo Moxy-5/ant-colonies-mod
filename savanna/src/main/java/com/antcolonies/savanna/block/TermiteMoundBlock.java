@@ -108,6 +108,9 @@ public class TermiteMoundBlock extends Block implements PlugBlock {
      */
     private static boolean besideSetSoil(LevelReader level, BlockPos pos) {
         for (Direction side : Direction.Plane.HORIZONTAL) {
+            if (!com.antcolonies.colony.LandReady.at(level, pos.relative(side))) {
+                continue; // (never read into land that is not loaded: that loads it on the spot, R5-6)
+            }
             BlockState beside = level.getBlockState(pos.relative(side));
             if (beside.getBlock() instanceof TermiteMoundBlock && isFinished(beside) && beside.getValue(AGE) >= 1
                     || beside.getBlock() instanceof TermiteTunnelBlock) {

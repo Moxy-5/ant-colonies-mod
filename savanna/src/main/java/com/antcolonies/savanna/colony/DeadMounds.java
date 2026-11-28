@@ -94,6 +94,11 @@ public class DeadMounds extends SavedData {
             return List.copyOf(combs);
         }
 
+        /** How far (blocks, flat) the dead mound and its works reach from its middle. */
+        int reach() {
+            return Math.max(MoundPlan.REACH + 1, works == null ? 0 : works.reach + 2);
+        }
+
         /** Whole and part days since the colony died, by the world's clock. */
         public double days(ServerLevel level) {
             return Math.max(0, level.getDayTime() - diedAt) / 24000.0;
@@ -249,7 +254,10 @@ public class DeadMounds extends SavedData {
         DeadMounds book = get(level);
         int budget = BLOCKS_PER_LOOK;
         for (DeadMound mound : book.mounds.values()) {
-            if (mound.isChanging() && LandReady.at(level, mound.center)) {
+            // One check a look for the whole dead mound and its works, and a block more (review R5-6: each write was
+            // guarded by its own cell's chunk only, and a change in the last loaded row makes Minecraft read the
+            // blocks beside it, which loads the chunk beyond on the spot).
+            if (mound.isChanging() && LandReady.round(level, mound.center, mound.reach() + 1)) {
                 budget -= book.update(level, mound, mound.days(level), budget);
                 if (budget <= 0) {
                     break; // the rest next look

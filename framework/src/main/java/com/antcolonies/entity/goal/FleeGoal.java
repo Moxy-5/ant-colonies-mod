@@ -64,7 +64,16 @@ public class FleeGoal extends Goal {
             return false;
         }
         colony = ant.getColony();
-        if (colony == null || colony.nest().isInside(level, ant.blockPosition()) || !feelsDanger(level, flee)) {
+        if (colony == null) {
+            return false;
+        }
+        // Review R5-56: "safe" is the hunters' own judge (AbstractAntEntity.isSheltered: who they may sting). One under
+        // a roof they can still reach (a feeding gallery or runway, a step in from an opening) runs from a hunter it
+        // feels, down the gallery into the nest, as real Macrotermes workers do while the soldiers hold the opening;
+        // before, the nest's "inside" told it it was home already and it was taken where it stood. The alarm alone
+        // (drumming, no hunter felt) still sends in only those outside.
+        boolean inside = colony.nest().isInside(level, ant.blockPosition());
+        if (inside ? ant.isSheltered() || !feelsHunter(level, flee) : !feelsDanger(level, flee)) {
             return false;
         }
         // Startled first: it stands a moment, antennae up, before it bolts (real insects take a beat to react).
@@ -98,8 +107,13 @@ public class FleeGoal extends Goal {
             Colony home = colony;
             BlockPos towards = colony.foragingHoles().waysOut(level).stream().map(ForagingHoles.WayOut::mouth)
                     .min(Comparator.comparingDouble(mouth -> mouth.distSqr(ant.blockPosition()))).orElse(colony.getCenter().below());
-            errand.setOff(at -> home.nest().isInside(level, at.cell()) && !home.foragingHoles().isDoorway(level, at.cell()),
-                    towards, flee == null ? 1.0 : flee.speed());
+            // To where no hunter follows (inside, no doorway, no feeding way); with no way there, under any roof.
+            double speed = flee == null ? 1.0 : flee.speed();
+            if (!errand.setOff(at -> home.nest().isInside(level, at.cell()) && !home.foragingHoles().isDoorway(level, at.cell())
+                    && !home.nest().isFeedingWay(at.cell()), towards, speed)) {
+                errand.setOff(at -> home.nest().isInside(level, at.cell()) && !home.foragingHoles().isDoorway(level, at.cell()),
+                        towards, speed);
+            }
         }
     }
 
@@ -120,9 +134,11 @@ public class FleeGoal extends Goal {
      * were doing; {@link Colony#isAlarmed}).
      */
     private boolean feelsDanger(ServerLevel level, FightNumbers.Flee flee) {
-        if (colony != null && colony.isAlarmed(level, ant.blockPosition())) {
-            return true;
-        }
+        return colony != null && colony.isAlarmed(level, ant.blockPosition()) || feelsHunter(level, flee);
+    }
+
+    /** Whether it feels a hunter close, or a nestmate felled or held by one. */
+    private boolean feelsHunter(ServerLevel level, FightNumbers.Flee flee) {
         AABB near = ant.getBoundingBox().inflate(flee.feelRadius());
         return !level.getEntitiesOfClass(AbstractAntEntity.class, near, other -> other != ant && other.isAlive()
                 && (!other.isDowned() && Fights.hunts(other.profile(), ant)

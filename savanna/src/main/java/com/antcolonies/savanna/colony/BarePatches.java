@@ -131,7 +131,7 @@ public class BarePatches {
         List<Tuft> later = new ArrayList<>();
         for (Iterator<Tuft> it = tufts.iterator(); it.hasNext(); ) {
             Tuft tuft = it.next();
-            if (tuft.growsAt() > now || !LandReady.at(level, tuft.spot()) || !LandReady.at(level, tuft.spot().below())) {
+            if (tuft.growsAt() > now || !LandReady.round(level, tuft.spot(), 1)) { // (and the blocks beside it: a change reads them, R5-6)
                 continue;
             }
             it.remove();

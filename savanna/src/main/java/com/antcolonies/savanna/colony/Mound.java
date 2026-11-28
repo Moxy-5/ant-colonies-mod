@@ -105,6 +105,10 @@ public class Mound {
     private final MoundDrying drying;
     /** Spots a termite found no way to from inside, left alone until the game time given (not saved). */
     private final Map<BlockPos, Long> unreachable = new HashMap<>();
+    /** Tunnel blocks a builder holds a window open in, until the game time given ({@link #plugStrayWindows}; not saved). */
+    private final Map<BlockPos, Long> windowsHeld = new HashMap<>();
+    /** How often (ticks) the mound looks for windows nobody works through. */
+    private static final int WINDOW_LOOK_TICKS = 100;
     /** Termites on their way to dig soil (not saved). */
     private final Claims<UUID> soilClaims = new Claims<>();
     /** How many pellets have been taken from each block being dug (not saved: a half-dug block gives a few too many after a reload). */
@@ -560,6 +564,7 @@ public class Mound {
         if (level instanceof net.minecraft.server.level.ServerLevel server) {
             drying.tick(server, parts);
         }
+        plugStrayWindows(level, parts);
     }
 
     /**
@@ -834,6 +839,57 @@ public class Mound {
     /** A termite found no way to this spot from inside: it is left alone for a while (another may carve the way to it). */
     public void markUnreachable(Level level, BlockPos spot) {
         unreachable.put(spot.immutable(), level.getGameTime() + UNREACHABLE_TICKS);
+    }
+
+    /** A builder bit a window open in this tunnel block and works through it, for at most this long. */
+    public void windowHeld(Level level, BlockPos tunnel, int ticks) {
+        windowsHeld.put(tunnel.immutable(), level.getGameTime() + ticks);
+    }
+
+    /** The builder plugged its window again. */
+    public void windowLetGo(BlockPos tunnel) {
+        windowsHeld.remove(tunnel);
+    }
+
+    /**
+     * The mound owns its windows (review R5-5): every few seconds each tunnel block of the plan with a side open to the
+     * air outside that no builder holds is plugged. Before, only the builder's own goal closed its window, so one whose
+     * builder died, went into the numbers or was unloaded while it worked stayed open for good (a way out by day past
+     * the foraging holes). Windows already left open in a saved world are plugged the same way.
+     */
+    private void plugStrayWindows(Level level, Map<BlockPos, MoundPlan.Part> parts) {
+        long now = level.getGameTime();
+        if (now % WINDOW_LOOK_TICKS >= 20) {
+            return; // (the tick comes once a second: one look in every WINDOW_LOOK_TICKS)
+        }
+        windowsHeld.values().removeIf(until -> until <= now);
+        for (Map.Entry<BlockPos, MoundPlan.Part> entry : parts.entrySet()) {
+            BlockPos pos = entry.getKey();
+            if (entry.getValue() != MoundPlan.Part.TUNNEL || windowsHeld.containsKey(pos) || !LandReady.round(level, pos, 1)) {
+                continue;
+            }
+            BlockState state = level.getBlockState(pos);
+            if (!(state.getBlock() instanceof TermiteTunnelBlock)) {
+                continue;
+            }
+            for (Direction side : Direction.values()) {
+                BlockPos beside = pos.relative(side);
+                if (state.getValue(TermiteTunnelBlock.OPEN.get(side)) && parts.get(beside) != MoundPlan.Part.OPEN
+                        && level.getBlockState(beside).getCollisionShape(level, beside).isEmpty() && !colony.nest().isInside(level, beside)) {
+                    TermiteTunnelBlock.setWindow(level, pos, side, false);
+                    state = level.getBlockState(pos);
+                }
+            }
+        }
+    }
+
+    /**
+     * Whether a termite found no way to this cell from inside a moment ago ({@link #markUnreachable}): the mound's one
+     * memory of "no way there", for soil spots and shaping jobs alike (review R5-4, R5-8).
+     */
+    public boolean isUnreachable(Level level, BlockPos spot) {
+        Long until = unreachable.get(spot);
+        return until != null && until > level.getGameTime();
     }
 
     /**

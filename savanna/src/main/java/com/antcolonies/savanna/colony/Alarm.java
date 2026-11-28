@@ -243,10 +243,31 @@ public class Alarm {
             near.at = at.immutable();
             tasksAt = Long.MIN_VALUE;
             foldInto(near, merge, now);
-        } else if (kind == near.kind && kind != Kind.BREACH && !near.at.equals(at)) {
+        } else if (kind == near.kind && kind != Kind.BREACH && !near.insects && !near.at.equals(at)) {
+            // (Review R5-55: a trouble insects made stays where it began, as a breach does. With 20 raiders round a
+            // feeding place it jumped each second to whichever one was looked at last, and every soldier got a new place.)
             near.at = at.immutable();
             foldInto(near, merge, now);
         }
+    }
+
+    /**
+     * Review R5-55: how long each enemy has been standing by (when first seen, when last). One that only stands there
+     * (a raider stuck in a hole, one with its legs cut off) keeps the alarm up no longer than a seal stays shut
+     * ({@code RaidDefence.SEAL_MOST}); one that hurts a termite raises it again ({@link #memberHurt}). It counts anew once it
+     * has been gone as long as a foe's trouble lasts.
+     */
+    private final Map<UUID, long[]> standingBy = new HashMap<>();
+
+    /** Whether this enemy, seen now, still keeps the alarm up by standing there (see {@link #standingBy}). */
+    private boolean stillFelt(LivingEntity foe, long now, long gone) {
+        long[] seen = standingBy.get(foe.getUUID());
+        if (seen == null || now - seen[1] > gone) {
+            seen = new long[] {now, now};
+            standingBy.put(foe.getUUID(), seen);
+        }
+        seen[1] = now;
+        return now - seen[0] < RaidDefence.SEAL_MOST;
     }
 
     /**
@@ -346,6 +367,7 @@ public class Alarm {
             footsteps(world, player);
         }
         double reach = colony.foragingRadius() + 8.0;
+        long gone = Math.round(numbers().strength(Kind.FOE) / Math.max(0.01, numbers().fadePerSecond()) * 20.0);
         AABB area = new AABB(center).inflate(reach, 24.0, reach);
         List<LivingEntity> enemies = world.getEntitiesOfClass(LivingEntity.class, area, foe -> isEnemy(foe) && ofThisTest(world, foe));
         List<AbstractAntEntity> outside = enemies.isEmpty() ? List.of() : world.getEntitiesOfClass(AbstractAntEntity.class, area,
@@ -362,11 +384,17 @@ public class Alarm {
                         near |= trouble.kind != Kind.FELT && trouble.at.distSqr(at) <= FOE_AT_TROUBLE * FOE_AT_TROUBLE;
                     }
                 }
-                if (near) {
+                if (near && stillFelt(foe, now, gone)) {
                     trouble(world, Kind.FOE, at, foe);
                 }
             }
         }
+        standingBy.values().removeIf(seen -> now - seen[1] > gone);
+    }
+
+    /** The game tests: this enemy has been standing by for {@code ticks} already. */
+    public void standingByForTests(LivingEntity foe, long now, long ticks) {
+        standingBy.put(foe.getUUID(), new long[] {now - ticks, now});
     }
 
     /**

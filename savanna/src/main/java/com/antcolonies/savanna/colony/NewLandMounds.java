@@ -292,6 +292,8 @@ public class NewLandMounds extends SavedData {
             return null;
         }
         long start = System.nanoTime();
+        lapAt = start;
+        laps.setLength(0);
         Colony colony = pick.living() ? putLiving(level, center, pick, colonyId) : putDead(level, center, pick, colonyId);
         if (colony != null) {
             if (treeNow) {
@@ -306,8 +308,8 @@ public class NewLandMounds extends SavedData {
             }
             setDirty();
             lastMillis = (System.nanoTime() - start) / 1.0e6;
-            SavannaMod.LOGGER.info("[new-land] {} at {} in {} ms", describe(pick), center.toShortString(),
-                    String.format(Locale.ROOT, "%.1f", lastMillis));
+            SavannaMod.LOGGER.info("[new-land] {} at {} in {} ms ({})", describe(pick), center.toShortString(),
+                    String.format(Locale.ROOT, "%.1f", lastMillis), laps.toString().trim());
         }
         return colony;
     }
@@ -478,6 +480,16 @@ public class NewLandMounds extends SavedData {
                 Math.max(20, (int) Math.round(700 * Math.pow(share, 1.6) * (0.85 + 0.3 * random.nextDouble()))));
     }
 
+    /** Review R5-7: what each part of putting a mound in took, for the log's line (server thread only). */
+    private static final StringBuilder laps = new StringBuilder();
+    private static long lapAt;
+
+    private static void lap(String part) {
+        long now = System.nanoTime();
+        laps.append(String.format(Locale.ROOT, "%s %.1f ", part, (now - lapAt) / 1.0e6));
+        lapAt = now;
+    }
+
     /** The members a colony of that size has, the nest dug, the mound up, the gardens filled (living or about to die). */
     private static Mound raise(ServerLevel level, Colony colony, Pick pick, RandomSource random, boolean comb) {
         colony.setAge(level, pick.living() ? pick.days() : Math.max(10, pick.days()));
@@ -495,15 +507,20 @@ public class NewLandMounds extends SavedData {
             colony.nest().unlockAllLevels(); // an old colony dug them all long ago
         }
         Mound mound = colony.part(SavannaParts.MOUND).orElse(null);
+        lap("members");
         if (mound != null && mound.numbers() != null) {
             int h = Math.max(2, Math.min(mound.numbers().maxHeight(), (int) Math.round(pick.height() * mound.numbers().maxHeight())));
             mound.setWorkStage(level, h);
             clearForMound(level, mound);
+            lap("cleared");
             mound.buildInstantly(level, h);
+            lap("mound");
         }
         digNest(level, colony);
+        lap("nest");
         if (comb) {
             fillGardens(level, colony, random);
+            lap("comb");
         }
         return mound;
     }
@@ -585,6 +602,7 @@ public class NewLandMounds extends SavedData {
         level.addFreshEntity(king);
         king.becomeKingOf(level, colony);
         manager.markChanged();
+        lap("pair");
         return colony; // (its galleries are grown once its dead tree is in, treeBy)
     }
 
@@ -619,7 +637,9 @@ public class NewLandMounds extends SavedData {
         Colony colony = manager.createColony(SavannaSpecies.MACROTERMES, colonyId, UUID.randomUUID(), center);
         raise(level, colony, pick, random, pick.days() < DeadMounds.GONE_DAYS);
         manager.colonyEnded(level, colony); // its parts write the dead mound down, then it is gone
+        lap("ended");
         DeadMounds.DeadMound mound = DeadMounds.get(level).agedForNewLand(level, colony.getId(), pick.days());
+        lap("worn");
         lastBurrow = null;
         lastTrees.clear();
         if (mound != null && pick.isOldHump()) {
@@ -999,6 +1019,16 @@ public class NewLandMounds extends SavedData {
     /** The Matabele colony the last dead mound got (null if none). */
     public Colony lastAnts() {
         return lastAnts;
+    }
+
+    /** The game tests: how many mounds have been put in, living and dead. */
+    public int putInForTests() {
+        return living + dead;
+    }
+
+    /** The game tests: what each part of the last mound put in took. */
+    public String lastLapsForTests() {
+        return laps.toString().trim();
     }
 
     /** The game tests: how long the last mound took to put in (milliseconds). */

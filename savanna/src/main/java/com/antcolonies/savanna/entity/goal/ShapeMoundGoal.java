@@ -71,9 +71,13 @@ public class ShapeMoundGoal extends Goal {
             return false;
         }
         spot = mound.shaping().pickShapeJob(level, ant);
-        if (spot != null && (errand.isLeftAlone(spot) || !walkThere())) {
+        // A job with no way to it goes into the mound's memory of "no way there" and the next lowest is asked for
+        // (R5-4; one more try a look, so a look costs two route searches at most: the memory lasts 10 seconds and is
+        // every builder's, so look by look they work their way up past the jobs nobody can get to).
+        for (int tries = 0; spot != null && (errand.isLeftAlone(spot) || !walkThere()); tries++) {
+            mound.markUnreachable(level, spot);
             mound.shaping().releaseShapeJob(ant.getUUID());
-            spot = null;
+            spot = tries < 1 ? mound.shaping().pickShapeJob(level, ant) : null;
         }
         return spot != null;
     }

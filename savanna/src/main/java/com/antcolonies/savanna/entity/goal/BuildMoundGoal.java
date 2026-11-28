@@ -66,6 +66,8 @@ public class BuildMoundGoal extends Goal {
     private Reach reach = Reach.INSIDE;
     private int ticks;
     private int failedRoutes;
+    /** Whether it set off to its spot (a walk that then ends where it cannot work from is "no way there", R5-8). */
+    private boolean setOff;
     private int looksWithoutSpot;
     /** The tunnel block whose window it has bitten open, and the side, while it works through it. */
     @Nullable
@@ -150,6 +152,7 @@ public class BuildMoundGoal extends Goal {
     public void start() {
         ticks = 0;
         failedRoutes = 0;
+        setOff = false;
         walkToSpot();
     }
 
@@ -173,6 +176,7 @@ public class BuildMoundGoal extends Goal {
         if (++ticks >= GIVE_UP_TICKS) {
             SavannaMod.LOGGER.info("[mound] termite at {} gave up on spot {} (navigator done: {}, still a spot: {}, reach {})",
                     ant.blockPosition().toShortString(), spot.toShortString(), ant.getNavigator().isDone(), mound.isBuildSpot(level, spot), reach);
+            mound.markUnreachable(level, spot); // (the next look does not pick it again at once)
             closeWindow();
             spot = null;
             return;
@@ -185,48 +189,64 @@ public class BuildMoundGoal extends Goal {
             place(level);
         } else {
             closeWindow();
-            walkToSpot();
+            if (setOff) {
+                noWay(); // the walk is over and it is not there: the legs gave up (another spot, next tick)
+            } else {
+                walkToSpot();
+            }
         }
-    }
-
-    /** Whether the termite can work on its spot from where it is now, with the reach it walked there for. */
-    private boolean canWorkHere(Level level) {
-        Foothold at = ant.getNavigator().getFoothold();
-        return switch (reach) {
-            case INSIDE -> at != null && MoundReach.canBuildFrom(level, colony, at, spot, mound.mayOpenWindows(level));
-            case OUTSIDE -> isWithinReach(ant, spot);
-            case FAR -> MoundReach.isWithin(ant.blockPosition(), spot, 2);
-        };
     }
 
     /**
-     * Plans the walk to the spot: from inside if it can, else from outside at night, else from 2 blocks away; tries other
-     * spots when there is no way at all, and stops trying after a few.
+     * Whether the termite can work on its spot from where it is now, with the reach it walked there for: the very test
+     * the walk was planned with ({@link #workFrom}), so arriving and planning never disagree.
+     */
+    private boolean canWorkHere(Level level) {
+        Foothold at = ant.getNavigator().getFoothold();
+        return at != null && workFrom(ant, colony, mound, spot, reach).test(at);
+    }
+
+    /** How far (blocks, each way) a foothold to work from with this reach lies from the spot at most. */
+    private static int reachOf(Reach way) {
+        return way == Reach.FAR ? 2 : way == Reach.OUTSIDE ? 1 : MoundReach.REACH;
+    }
+
+    /** No way to the spot: it goes into the mound's memory of "no way there" and another is picked, or none after a few. */
+    private void noWay() {
+        setOff = false;
+        mound.markUnreachable(ant.level(), spot);
+        if (++failedRoutes >= MAX_FAILED_ROUTES) {
+            SavannaMod.LOGGER.debug("[mound] termite at {} found no way to mound spots from inside for now (last: {})", ant.blockPosition().toShortString(), spot.toShortString());
+            spot = null;
+            return;
+        }
+        spot = mound.pickBuildSpot(ant.level(), ant);
+    }
+
+    /**
+     * Plans the walk to the spot: from inside if it can, else from outside at night, else from 2 blocks away. One spot
+     * a tick (review R5-8: it tried up to 4 spots, each from up to 3 kinds of place, in one tick, 12 route searches):
+     * with no way at all the spot goes into the mound's memory and another is picked for the next tick, and after a few
+     * it stops trying. Each search knows how near the footholds lie ({@link #reachOf}), so a spot with none round it
+     * fails with no search.
      */
     private void walkToSpot() {
-        while (spot != null) {
-            boolean fallbacks = mound.mayUseFallbacks(ant.level());
-            for (Reach way : Reach.values()) {
-                if (way != Reach.INSIDE && !fallbacks || way == Reach.OUTSIDE && !ant.mayGoOut()) {
-                    continue;
-                }
-                if (ant.getNavigator().moveTo(workFrom(ant, colony, mound, spot, way), spot, 1.0)) {
-                    if (way != Reach.INSIDE) {
-                        SavannaMod.LOGGER.info("[mound] termite at {} builds {} from {} (no way from inside)",
-                                ant.blockPosition().toShortString(), spot.toShortString(), way.name().toLowerCase());
-                    }
-                    reach = way;
-                    return;
-                }
+        boolean fallbacks = mound.mayUseFallbacks(ant.level());
+        for (Reach way : Reach.values()) {
+            if (way != Reach.INSIDE && !fallbacks || way == Reach.OUTSIDE && !ant.mayGoOut()) {
+                continue;
             }
-            mound.markUnreachable(ant.level(), spot);
-            if (++failedRoutes >= MAX_FAILED_ROUTES) {
-                SavannaMod.LOGGER.debug("[mound] termite at {} found no way to mound spots from inside for now (last: {})", ant.blockPosition().toShortString(), spot.toShortString());
-                spot = null;
+            if (ant.getNavigator().moveTo(workFrom(ant, colony, mound, spot, way), spot, reachOf(way), 1.0)) {
+                if (way != Reach.INSIDE) {
+                    SavannaMod.LOGGER.info("[mound] termite at {} builds {} from {} (no way from inside)",
+                            ant.blockPosition().toShortString(), spot.toShortString(), way.name().toLowerCase());
+                }
+                reach = way;
+                setOff = true;
                 return;
             }
-            spot = mound.pickBuildSpot(ant.level(), ant);
         }
+        noWay();
     }
 
     private void place(ServerLevel level) {
@@ -239,6 +259,7 @@ public class BuildMoundGoal extends Goal {
                 windowIn = at.cell();
                 windowSide = side;
                 windowTicks = 0;
+                mound.windowHeld(level, windowIn, GIVE_UP_TICKS + 20);
                 level.playSound(null, windowIn, SoundEvents.MUD_BREAK, SoundSource.BLOCKS, 0.3F, 1.4F);
             }
         }
@@ -260,9 +281,7 @@ public class BuildMoundGoal extends Goal {
             // Someone else finished it, or it can't take soil any more: another spot.
             closeWindow();
             spot = mound.pickBuildSpot(level, ant);
-            if (spot != null) {
-                walkToSpot();
-            }
+            setOff = false; // (the next tick plans the walk to it)
         }
         // Otherwise a creature is standing in it: wait a moment (the spot is ours, nobody else brings soil to it).
     }
@@ -271,6 +290,9 @@ public class BuildMoundGoal extends Goal {
     private void closeWindow() {
         if (windowIn != null && windowSide != null) {
             Level level = ant.level();
+            if (mound != null) {
+                mound.windowLetGo(windowIn);
+            }
             if (level.getBlockState(windowIn).getBlock() instanceof TermiteTunnelBlock
                     && level.getBlockState(windowIn).getValue(TermiteTunnelBlock.OPEN.get(windowSide))) {
                 TermiteTunnelBlock.setWindow(level, windowIn, windowSide, false);

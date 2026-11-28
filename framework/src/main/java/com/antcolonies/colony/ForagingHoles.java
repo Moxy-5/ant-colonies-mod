@@ -74,6 +74,13 @@ public class ForagingHoles {
      * every grown colony planned each route it had given up on again, in the world's first seconds).
      */
     private final java.util.Map<BlockPos, Long> noRouteUntil = new java.util.HashMap<>();
+    /** Foods the workers did not allow a gallery piece to, and until when their route is not planned again (review R5-59). */
+    private final java.util.Map<BlockPos, Long> notAllowed = new java.util.HashMap<>();
+
+    /** The game tests: how many foods wait as not allowed yet without their route being planned again. */
+    public int notAllowedForTests() {
+        return notAllowed.size();
+    }
 
     /**
      * A food's column: a tunnel's route depends only on where the food is sideways, so "no route" is remembered for the
@@ -459,8 +466,17 @@ public class ForagingHoles {
             // Step 3 of termites underground: the way to the food is a piece of the galleries, from the nearest dug one.
             // M8 step 3F: food the workers do not allow yet waits (food leads), and the next nearest is tried meanwhile, a
             // few a check (a piece to a branch costs little, so the far log does not hold back every branch nearer).
+            // Review R5-59: a food the workers did not allow a piece to is remembered, as a food with no route is, for
+            // as long as this check's own clock (10 seconds). Beside a grown colony the builders' time runs this check
+            // every second (GalleryCatchUp.growNow, food first), and each time the same routes were planned through the
+            // ground again.
+            notAllowed.values().removeIf(until -> until <= now || until > now + NEW_HOLE_CHECK_TICKS);
             for (int tried = 0; tried < Math.min(foods.size(), FOODS_TRIED); tried++) {
                 BlockPos food = foods.get(tried);
+                if (notAllowed.containsKey(column(food))) {
+                    foodWaiting = true;
+                    continue;
+                }
                 ColonyHooks.GalleryPiece piece = galleries.pieceTo(level, food);
                 if (piece == null) {
                     noRouteUntil.put(column(food), now + NO_ROUTE_TICKS);
@@ -469,6 +485,7 @@ public class ForagingHoles {
                 }
                 if (!galleries.affords(level, piece, food)) {
                     foodWaiting = true; // food leads: the galleries grow no other way until the workers allow this piece
+                    notAllowed.put(column(food), now + NEW_HOLE_CHECK_TICKS);
                     continue;
                 }
                 List<BlockPos> gallery = planGallery(level, piece.tunnel(), food);

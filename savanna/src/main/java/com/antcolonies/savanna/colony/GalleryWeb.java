@@ -387,6 +387,24 @@ final class GalleryWeb {
         }
     }
 
+    /**
+     * Whether the diggers still have work on the web, by their own question ({@code Nest.firstDiggable}; review R5-54:
+     * asking "is every block dug out" waited for ever on a block no termite digs, a player's cobblestone or torch, water
+     * from a bucket), or some of it lies in land not loaded.
+     */
+    boolean diggingLeft(ServerLevel level) {
+        List<BlockPos> cells = new ArrayList<>();
+        for (NestPlan.ForagingTunnel arm : arms) {
+            for (BlockPos cell : ownCells(arm)) {
+                if (!LandReady.at(level, cell)) {
+                    return true;
+                }
+                cells.add(cell);
+            }
+        }
+        return colony.nest().firstDiggable(level, cells) != null;
+    }
+
     /** Once everything planned is dug and the colony may have more: the shortest tip grows by a piece (or forks). */
     void growTips(ServerLevel level) {
         SavannaNumbers.GalleryNumbers numbers = g.numbers();
@@ -406,14 +424,15 @@ final class GalleryWeb {
         if (tips.isEmpty() || length() >= lengthAllowed()) {
             return;
         }
-        for (NestPlan.ForagingTunnel arm : arms) {
-            for (BlockPos cell : ownCells(arm)) {
-                if (!LandReady.at(level, cell) || !Nest.isDugOut(level, cell)) {
-                    return; // one piece at a time: the last ones are dug first
-                }
-            }
+        if (diggingLeft(level)) {
+            return; // one piece at a time: the last ones are dug first
         }
         Set<BlockPos> stopped = new HashSet<>();
+        for (Tip tip : tips) {
+            if (!ForagingHoles.isDug(level, tip.way())) {
+                stopped.add(tip.way().hole()); // (review R5-54: a way blocked by what no termite digs is not led on)
+            }
+        }
         tipFails.forEach((hole, fails) -> {
             if (fails >= TIP_TRIES) {
                 stopped.add(hole);

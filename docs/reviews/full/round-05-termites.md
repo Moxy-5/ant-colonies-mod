@@ -187,6 +187,8 @@ as "Minecraft spawns nothing near a spectator".
 
 **In play (2026-11-27):** B. Builders stand idle while the mound has tunnels still to carve and spire pieces still to thicken; the stage only moves on after the 5-minute stall, and the same job is still lowest on the next stage.
 
+**Status (2026-11-27, `claude/review-fix-5a`): fixed: a carve or reshape job no builder found a way to is set aside like an unreachable soil spot (`Mound.markUnreachable`, `isUnreachable`; `MoundShaping.pickShapeJob` passes over it) and the builder is handed the next lowest at once (`ShapeMoundGoal.canUse`, two jobs a look), so one job out of reach no longer idles every builder. No test of its own (the mound tests pass).**
+
 **Checked again by the lead.** Read `MoundShaping.pickShapeJob` (`savanna/colony/MoundShaping.java:48-70`: one
 `best`, the lowest, skipping only cells claimed by others) and `ShapeMoundGoal.canUse` and `walkThere`
 (`savanna/entity/goal/ShapeMoundGoal.java:62-100`: a job left alone or with no way there is released and the goal
@@ -209,6 +211,8 @@ answers no, with no second pick). The path holds.
 
 **In play (2026-11-27):** B. A hole in the mound's skin that never closes; termites can walk out through it by day, past the rule that they go out only by the foraging holes.
 
+**Status (2026-11-27, `claude/review-fix-5a`): fixed: the mound keeps the windows its builders hold open (`Mound.windowHeld`, `windowLetGo`, from `BuildMoundGoal`), and every 5 seconds shuts any side of a tunnel block that opens to the outside and is held by nobody (`plugStrayWindows`). A window left by a builder that died, went into the numbers or was unloaded closes within seconds. No test of its own.**
+
 **Checked again by the lead.** Read `BuildMoundGoal.place`, `closeWindow` and `stop`
 (`savanna/entity/goal/BuildMoundGoal.java:156-166`, `:232-283`) and `AbstractAntEntity.remove`
 (`framework/entity/AbstractAntEntity.java:513-527`): the window is closed only by the goal's own `stop`, give-up or
@@ -226,6 +230,8 @@ success, and removing the insect stops no goal. The window is a block state, sav
 ### R5-6 (A, the mechanism proven; how often and how long to measure): dead mounds are worn right at the edge of loaded land with only each block's own chunk checked, and every change makes Minecraft read the blocks beside it, which loads the next chunk on the spot
 
 **In play (2026-11-27):** B. A short hitch now and then while walking or flying through savanna with dead mounds that still have wear to do, most of all on coming back to one left for days. Its length is not measured.
+
+**Status (2026-11-27, `claude/review-fix-5a`): fixed: a dead mound is worn only when all the land its works reach is loaded (`DeadMounds.tick`: `LandReady.round(center, reach + 1)`, `DeadMound.reach`); a bare patch asks for its tuft's neighbours too (`BarePatches.tick`), and mound soil looks only at neighbours in loaded land (`TermiteMoundBlock.besideSetSoil`). No block is read past the edge of loaded land. Not measured in a flight.**
 
 **Checked again by the lead, with Minecraft's own code.** In the mod: `DeadMounds.tick`
 (`savanna/colony/DeadMounds.java:245-259`) works a dead mound whenever its middle's chunk is loaded, no player needed
@@ -252,6 +258,8 @@ each neighbour that way. `docs/BUGS.md` 183 records the same mechanism (8 to 13 
 
 **In play (2026-11-27):** B. A short hitch as each mound of new land appears while exploring, worst for big living mounds and for old dead ones; one can go in every half second while places wait.
 
+**Status (2026-11-27, `claude/review-fix-5a`): half fixed: measured part by part, and the log line now says what each part took (`[new-land] ... in N ms (members, cleared, mound, nest, comb, pair / ended, worn)`). The second mound of a sitting: a full living mound 28 ms (the mound's blocks 21), an old dead hump 61 to 77 ms (mound 17 to 25, ended 4 to 15, worn 10 to 20, its trees and burrow about 22); after many, a dead mound takes about 15 ms. The first mound of a sitting takes 300 to 400 ms, nearly all of it Java loading and warming the code. So the dig's neighbour updates are not the cost (the nest is 1 ms warm) and that change was not made. Tests: `aFullLivingMoundOfNewLandGoesInQuickly`, `anOldDeadHumpOfNewLandGoesInQuickly` (a first mound not timed, the second under 200 ms beside five other servers). Left: an old hump built straight at its worn heights (it would take its 61 to 77 ms to about 40), and the first mound's one-time cost.**
+
 **Checked again by the lead.** Read `NewLandMounds.tick` (`savanna/colony/NewLandMounds.java:184-207`: one whole
 mound a look, `return` after it), `DeadMounds.agedForNewLand` (`savanna/colony/DeadMounds.java:274-288`: the wear
 with no block budget) and `docs/plans/savanna-loading.md:43` ("putting a mound in (6 to 95 ms, once)"). The round's
@@ -271,6 +279,8 @@ which was right for its question; it is still a hitch.
 ### R5-8 (A, to measure; a new side of R2-39 and R2-16): the soil carrier walks by its own rules, with up to 12 route searches in one tick and no cheap "no way there"
 
 **In play (2026-11-27):** B. Short freezes beside a mound whose building has stalled (a player broke the tunnels, odd ground, or a spectator watching, see R5-3), because the fallbacks open exactly then. Not measured.
+
+**Status (2026-11-27, `claude/review-fix-5a`): fixed: the soil carrier walks by the shared legs' own planning, one spot a tick (`BuildMoundGoal.walkToSpot`: one route search a tick, was up to 12), a spot with no way to it is marked unreachable at once and another is picked (`noWay`), and a walk that ends where it cannot work from, or runs past 30 seconds, marks the spot too. Not measured beside a stalled mound.**
 
 **Checked again by the lead.** Read `BuildMoundGoal.tick`, `canWorkHere` and `walkToSpot`
 (`savanna/entity/goal/BuildMoundGoal.java:168-230`): the loop tries up to 4 spots, each from up to 3 kinds of place,
@@ -952,6 +962,8 @@ file's `grows_back` state) and `macrotermes.json:84-85` (only `growth: dry` is f
 
 **In play (2026-11-27):** B. A player digs into a gallery to watch, leaves a torch or a cobblestone in it and fills the hole; from then on that colony's galleries never spread again, however big it grows, and no piece out to food is planned from the pieces behind that block.
 
+**Status (2026-11-27, `claude/review-fix-5a`): fixed: the gate asks the diggers' own question (`GalleryWeb.diggingLeft`: `Nest.firstDiggable` over the web's own blocks), so a block no termite digs no longer stops the web; the tip of a way that is not dug through (blocked) is not led on (`growTips`, `ForagingHoles.isDug`). Test: `TermiteNewLandTests.aGalleryBlockNoTermiteDigsDoesNotStopTheWeb` (cobblestone and glass in one piece; three more pieces grow). Left: the blocked piece itself is never dropped or planned round, and no piece to food starts from behind it.**
+
 **Checked again by the lead.** Read the gate in `GalleryWeb.growTips` (`savanna/colony/GalleryWeb.java:406-415`),
 `Nest.isDugOut` (`framework/colony/Nest.java:781-787`: air, a seed heap or a soil ramp), `Nest.firstDiggable`
 (`:1133-1151`: passes over anything that is not soil, and soil touching water) and `GalleryCatchUp.growNow`
@@ -973,6 +985,8 @@ file's `grows_back` state) and `macrotermes.json:84-85` (only `growth: dry` is f
 ### R5-55 (A, proven as code; its meeting with BUGS 361 likely): a termite alarm never ends while one living enemy insect stays within 4 blocks of it, and it walks along with that enemy
 
 **In play (2026-11-27):** B. After a raid has gone home, the termites round that feeding spot do not go back to work while a stuck or crippled raider is alive there: no worker comes out within 16 blocks, the soldiers stand at their places. A column walking home drags the alarm with it across the termites' land, and before a cover breaks the soldiers keep being sent to new places as the trouble jumps from raider to raider.
+
+**Status (2026-11-27, `claude/review-fix-5a`): fixed: an enemy that only goes on standing by keeps the alarm up no longer than a seal stays shut (`Alarm.stillFelt`, `standingBy`, `RaidDefence.SEAL_MOST`, one game day); it counts anew once it has been gone as long as a foe's trouble lasts, and one that hurts a termite raises the alarm again at once (`memberHurt`). A trouble insects made stays where it began, as a breach does (`Alarm.trouble`), so it no longer jumps from raider to raider. Test: `foragersHurryInThroughAYoungMoundsOpenShaftAtAFoe` goes on with the foe still standing there. Left: a trouble made by another animal or a player still moves with it; R5-70's one record per trouble.**
 
 **Checked again by the lead.** Read `Alarm.tick` (`savanna/colony/Alarm.java:334-370`: an enemy within
 `FOE_AT_TROUBLE`, 4 blocks, of any trouble that is not footsteps feeds it, line 362) and `Alarm.trouble`
@@ -1004,6 +1018,8 @@ file's `grows_back` state) and `macrotermes.json:84-85` (only `growth: dry` is f
 
 **In play (2026-11-27):** B. At a raided feeding spot the termite workers stay in the roofed part of the gallery beside the break, some still feeding, and are stung and carried off one by one; they do not pour back down the gallery while the soldiers hold the opening, as real Macrotermes workers do.
 
+**Status (2026-11-27, `claude/review-fix-5a`): half fixed: a worker under a roof the hunters can still reach (a feeding gallery or runway, a step in from an opening: not `isSheltered`) that feels a hunter within 3 blocks, or a nestmate felled or held, now flees, to a cell inside that is no doorway and no feeding way, down the gallery into the nest (`FleeGoal.canUse`, `start`, `feelsHunter`); with no way there, under any roof as before. The alarm alone still sends in only those outside. Left: `GoInsideGoal` and `RetreatGoal` keep their own judges; no raid soak was run, so how many termites a raid still brings home is not known.**
+
 **Checked again by the lead.** Read `FleeGoal.canUse` and `start` (`framework/entity/goal/FleeGoal.java:57-104`: no
 flight when `Nest.isInside`, line 67; the place to run to is any "inside" cell that is no doorway, line 101),
 `Nest.isInside` (`framework/colony/Nest.java:1038-1088`: every roofed feeding gallery cell is inside) and
@@ -1029,9 +1045,13 @@ It holds.
 
 **Your call (2026-11-27):** should termite workers run down the gallery when ants break into their feeding spot? Today they mostly stay in the roofed part by the break and are taken one by one. Real workers run while the soldiers hold the opening, and the ants catch the slow ones and the soldiers. My pick: yes, they run, built together with the raid work and checked with a soak, because watched raids already catch little (13 of 27 stung nothing in the last soak) and this could make it less.
 
+**Call made (2026-11-27):** yes, they run (the user: "go with the other 11", taken as the yes to my pick). Built without the soak; to be checked with the next raid soak.
+
 ### R5-57 (A, the sums proven; how often it shows to see in play): the minors take every real soldier place first, so at night beside a full colony, and whenever a raid's drumming reaches the nest, every real major is sent into the numbers
 
 **In play (2026-11-27):** B. Near a grown colony at night no major soldier is to be seen: the royal chamber's and the gardens' doorways stand unguarded. When a raid reaches the nest or the player breaks into the mound, the majors walking their beats vanish just as the alarm starts.
+
+**Status (2026-11-27, `claude/review-fix-5a`): fixed: the real soldier places are shared between minors and majors in the colony's own ratio when they ask for more than there are, what one rank does not need going to the other (`Soldiers.shareOut`, `minors_per_major`: of 12 places 9 and 3). Test: `SoldierPlacesTest` (the sums). Not watched in play at night.**
 
 **Checked again by the lead.** Read `Soldiers.wantReal` (`savanna/colony/Soldiers.java:571-589`): the real places are
 `cap / 4` and are handed out in the order of the ranks, minors first, each rank taking `min(posts, count, what is
@@ -1054,6 +1074,8 @@ left)`; while a trouble reaches the nest `posts` is the rank's whole count. `mac
 ### R5-58 (A, proven): a creature in a gallery puts the hidden termites back, and they go under again on the very next tick, so they blink and slip past it unseen
 
 **In play (2026-11-27):** B. Termites in a dug-open or raided gallery blink into view for a tick each second and are gone again, and walk "through" a raider or a player standing in the gallery; the rule "if anything breaks into a gallery, every insect travelling in it shows up as a real one" holds for one tick only.
+
+**Status (2026-11-27, `claude/review-fix-5a`): fixed: a stretch a creature was found standing in is kept as met until a look finds it clear (`HiddenTrips.met`, `creatureIn`), and the legs are told its cells are not hidden (`isHidden`), so a termite put back walks for real past the creature. Test: `hiddenTripsGoUnseenAndShowUpWhereTheyAreWhenTheGalleryIsBrokenInto` sets a chicken into the gallery: nobody travels unseen through its cell.**
 
 **Checked again by the lead.** Read `HiddenTrips.isHidden` (`savanna/colony/HiddenTrips.java:171-175`: blocks and the
 closed-for-danger cells only), `brokenInto` (`:260-285`: the only place that looks for a creature), `comeOut`
@@ -1078,6 +1100,8 @@ closed-for-danger cells only), `brokenInto` (`:260-285`: the only place that loo
 ### R5-59 (A, to measure; a new side of R5-8 and R1-36): beside a grown colony the "new holes to food" check, with up to 6 route searches, runs every second instead of every 10 seconds
 
 **In play (2026-11-27):** B. A server that gets slower beside grown termite mounds whose web has used up its length while known logs or hay lie farther out, the usual state of a grown colony. Not measured.
+
+**Status (2026-11-27, `claude/review-fix-5a`): half fixed: a food the workers do not allow a piece to yet is remembered for the check's own 10 seconds (`ForagingHoles.notAllowed`), as a food with no route is, so the same routes are no longer planned through the ground every second. Left: the check's cheap part (the runways, the food list) still runs with the builders' time every second, because the galleries' growth needs food to come first (`GalleryCatchUp.growNow`); not measured.**
 
 **Checked again by the lead.** Read `BuildLife.tickNear`, `slice` and `growGalleries`
 (`framework/colony/BuildLife.java:124-132`, `:187-205`, `:285-304`), `GalleryCatchUp.growNow`

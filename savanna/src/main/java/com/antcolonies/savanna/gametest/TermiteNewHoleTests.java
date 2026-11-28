@@ -368,6 +368,7 @@ public class TermiteNewHoleTests {
         boolean[] homeward = {false};
         java.util.List<java.util.UUID> loaded = new java.util.ArrayList<>();
         long[] stageAt = {0};
+        BlockPos[] creatureAt = {null};
         int[] brokenBefore = {0};
         helper.onEachTick(() -> {
             Colony colony = TermiteMoundTests.colony(helper);
@@ -482,8 +483,43 @@ public class TermiteNewHoleTests {
                             "a termite still travelling unseen through a gallery broken into " + (helper.getTick() - stageAt[0]) + " ticks ago");
                     if (helper.getTick() - stageAt[0] >= 400) {
                         helper.assertTrue(trips.brokenInto() > brokenBefore[0], "no trip was counted as broken into");
-                        SavannaMod.LOGGER.info("[hidden-test] done: {} arrivals, {} put back by the break-in{}", arrivals[0], putBack.size(),
+                        SavannaMod.LOGGER.info("[hidden-test] the break-in done: {} arrivals, {} put back by the break-in{}", arrivals[0], putBack.size(),
                                 trips.describe());
+                        stage[0] = 4;
+                    }
+                }
+                case 4 -> {
+                    // Review R5-58: a creature set into a gallery ahead of a traveller (a chicken that only stands there).
+                    for (java.util.UUID id : trips.travellers()) {
+                        long[] times = trips.timesOf(id);
+                        double done = (now - times[0]) / (double) (times[1] - times[0]);
+                        java.util.List<BlockPos> run = trips.runOf(id);
+                        if (done < 0.25 || done > 0.5 || run.size() < 16) {
+                            continue;
+                        }
+                        creatureAt[0] = run.get(run.size() * 3 / 4);
+                        net.minecraft.world.entity.animal.Chicken chicken = net.minecraft.world.entity.EntityType.CHICKEN.create(level);
+                        chicken.moveTo(creatureAt[0].getX() + 0.5, creatureAt[0].getY(), creatureAt[0].getZ() + 0.5, 0.0F, 0.0F);
+                        chicken.setNoAi(true);
+                        chicken.setNoGravity(true);
+                        chicken.setInvulnerable(true);
+                        level.addFreshEntity(chicken);
+                        stage[0] = 5;
+                        stageAt[0] = helper.getTick();
+                        break;
+                    }
+                }
+                case 5 -> {
+                    // From the next look on, nobody travels unseen through the cell it stands in: a termite put back
+                    // walks for real past it (before, it went under again on its next step and blinked past).
+                    if (helper.getTick() - stageAt[0] > 25) {
+                        for (java.util.UUID id : trips.travellers()) {
+                            helper.assertTrue(!trips.runOf(id).contains(creatureAt[0]), "a termite travels unseen through the cell a chicken stands in, "
+                                    + (helper.getTick() - stageAt[0]) + " ticks after it was set there");
+                        }
+                    }
+                    if (helper.getTick() - stageAt[0] >= 400) {
+                        helper.assertTrue(trips.metForTests() > 0, "the stretch the chicken stands in is not kept as met");
                         helper.succeed();
                     }
                 }

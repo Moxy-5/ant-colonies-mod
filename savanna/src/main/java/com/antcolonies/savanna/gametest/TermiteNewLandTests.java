@@ -239,6 +239,100 @@ public class TermiteNewLandTests {
     }
 
     /**
+     * Review R5-54: a gallery block no termite digs (a player's cobblestone and glass put into a piece) does not stop
+     * the web: the other tips grow on. Before, every block of every piece had to be dug out first, for ever.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true, batch = "newLandBlockedGallery")
+    public static void aGalleryBlockNoTermiteDigsDoesNotStopTheWeb(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestScenes.deepGround(helper);
+        flatArena(helper);
+        Colony colony = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(32, SURFACE, 32)), NewLandMounds.pickFor("half", 0, 4324L));
+        NewLandMounds.fenceForTests(null);
+        helper.assertTrue(colony != null, "no colony put in");
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        com.antcolonies.savanna.colony.Galleries galleries = com.antcolonies.savanna.colony.Galleries.of(colony);
+        java.util.Set<BlockPos> blocked = new java.util.HashSet<>();
+        int[] armsThen = {-1};
+        helper.onEachTick(() -> {
+            if (armsThen[0] < 0 && galleries.arms().size() >= 3) {
+                NestPlan.ForagingTunnel last = galleries.arms().get(galleries.arms().size() - 1);
+                java.util.List<BlockPos> cells = galleries.digCells(last);
+                if (cells.size() >= 3) {
+                    blocked.add(cells.get(cells.size() / 2));
+                    blocked.add(cells.get(cells.size() / 2 + 1));
+                    level.setBlock(cells.get(cells.size() / 2), Blocks.COBBLESTONE.defaultBlockState(), 3);
+                    level.setBlock(cells.get(cells.size() / 2 + 1), Blocks.GLASS.defaultBlockState(), 3);
+                    armsThen[0] = galleries.arms().size();
+                }
+            }
+            for (NestPlan.ForagingTunnel tunnel : colony.foragingHoles().tunnels(level)) {
+                for (BlockPos cell : galleries.digCells(tunnel)) {
+                    if (!blocked.contains(cell) && !com.antcolonies.colony.Nest.isDugOut(level, cell)) {
+                        level.setBlock(cell, Blocks.AIR.defaultBlockState(), 3);
+                    }
+                }
+            }
+            if (helper.getTick() % 20 == 0) {
+                galleries.growNow(level);
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(armsThen[0] >= 0, "no piece blocked yet (" + galleries.arms().size() + " pieces)");
+            helper.assertTrue(galleries.arms().size() >= armsThen[0] + 3, "the web stopped at " + galleries.arms().size()
+                    + " pieces (" + armsThen[0] + " when one was blocked):" + galleries.describe(level));
+        });
+    }
+
+    /**
+     * Review R5-7: the biggest mounds new land has, a full living one and an old dead hump, go in the way world
+     * generation hands them over without a hitch (the test above times a half mound).
+     */
+    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true, batch = "newLandFull")
+    public static void aFullLivingMoundOfNewLandGoesInQuickly(GameTestHelper helper) {
+        putInQuickly(helper, NewLandMounds.pickFor("full", 0, 4322L), NewLandMounds.pickFor("full", 0, 4332L));
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true, batch = "newLandHump")
+    public static void anOldDeadHumpOfNewLandGoesInQuickly(GameTestHelper helper) {
+        putInQuickly(helper, NewLandMounds.pickFor("dead", 120, 4323L), NewLandMounds.pickFor("dead", 120, 4333L));
+    }
+
+    /**
+     * A first mound of the same kind goes in at the arena's side and is not timed: the first of a sitting takes 300 to
+     * 400 ms, nearly all of it Java loading and warming the code (measured 2026-11-27), which no mound after it pays.
+     */
+    private static void putInQuickly(GameTestHelper helper, com.antcolonies.savanna.worldgen.TermiteMoundStructure.Pick first,
+            com.antcolonies.savanna.worldgen.TermiteMoundStructure.Pick timed) {
+        ServerLevel level = helper.getLevel();
+        TestScenes.deepGround(helper);
+        TestScenes.shapeGround(helper, 65, (x, z) -> 0);
+        NewLandMounds book = NewLandMounds.get(level);
+        int before = book.putInForTests();
+        boolean[] second = new boolean[1];
+        NewLandMounds.queue(level, helper.absolutePos(new BlockPos(11, SURFACE, 32)), first);
+        helper.succeedWhen(() -> {
+            int put = book.putInForTests() - before;
+            if (put >= 1 && !second[0]) {
+                second[0] = true;
+                NewLandMounds.queue(level, helper.absolutePos(new BlockPos(53, SURFACE, 32)), timed);
+            }
+            if (put < 2) {
+                MoundPlan.awaitGrowingForTests(10_000);
+            }
+            helper.assertTrue(put >= 2, "only " + put + " of the two put in yet");
+            double millis = book.lastMillisForTests();
+            helper.assertTrue(millis < QUICK_MILLIS, "putting it in took " + millis + " ms (" + book.lastLapsForTests() + ")");
+        });
+    }
+
+    /**
+     * What one mound may take to put in: a game tick is 50 ms; the test servers run six at once on one PC, so the
+     * check allows four ticks (my pick; measured alone, warm: a half mound 31 ms, an old hump 77 ms).
+     */
+    private static final double QUICK_MILLIS = 200;
+
+    /**
      * Review R8-11: a place world generation hands over just before the world closes (no tick left to look at it) still
      * reaches the world's book, and nothing of this world is left behind for the next world opened in the same sitting.
      */

@@ -60,8 +60,9 @@ public class TermiteAlarmTests {
      * soon after (within 20 seconds), while the alarm is still up, or roofed over: the builders sometimes put the plan's
      * tunnel block back over it first (it failed 1 run in 3 that way, 2026-10-14), and then it is closed to the sky.
      */
-    @GameTest(template = "arena", timeoutTicks = 6000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 9000, skyAccess = true)
     public static void foragersHurryInThroughAYoungMoundsOpenShaftAtAFoe(GameTestHelper helper) {
+        long[] stoodLong = {-1}; // (review R5-55) when the foe, still standing there, had stood as long as a seal stays shut
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         List<TermiteSoldierEntity> minors = new ArrayList<>();
@@ -130,6 +131,11 @@ public class TermiteAlarmTests {
                                     && colony.isAlarmed(level, worker.blockPosition())).isEmpty()) {
                 at[2] = tick; // every worker where the foe is felt is in (those searching farther off carry on: the alarm is local)
             }
+            if (at[2] >= 0 && stoodLong[0] < 0) {
+                // Review R5-55: a foe that only goes on standing there keeps the alarm up no longer than a seal stays shut.
+                colony.part(SavannaParts.ALARM).orElseThrow().standingByForTests(foe[0], level.getGameTime(), 24000);
+                stoodLong[0] = tick;
+            }
             if (tick % 500 == 0) {
                 StringBuilder all = new StringBuilder();
                 for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
@@ -163,6 +169,9 @@ public class TermiteAlarmTests {
                     + colony.part(SavannaParts.ALARM).orElseThrow().describe(level));
             helper.assertTrue(at[2] - at[0] <= 1200, "the workers took " + (at[2] - at[0]) + " ticks to get in after the foe came");
             helper.assertTrue(at[2] - at[0] <= 600, "the workers where the foe was felt took " + (at[2] - at[0]) + " ticks to get in, more than 30 seconds");
+            helper.assertTrue(!foe[0].isAlive() || colony.part(SavannaParts.ALARM).orElseThrow().isCalm(level),
+                    "the foe has stood by as long as a seal stays shut, and " + (helper.getTick() - stoodLong[0])
+                            + " ticks later the alarm is still up:" + colony.part(SavannaParts.ALARM).orElseThrow().describe(level));
         });
     }
 

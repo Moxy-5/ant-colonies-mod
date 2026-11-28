@@ -171,7 +171,7 @@ public class HiddenTrips implements HiddenWays {
     public boolean isHidden(BlockPos cell) {
         ServerLevel level = cellsLevel;
         // (not where the gallery runs near an attack, brain step 4g: the termites walk it for real, and can be seen and met there)
-        return level != null && cells.contains(cell) && isClosed(level, cell) && !colony.part(SavannaParts.CLOSED_HOLES).map(closed -> closed.closesCell(cell)).orElse(false);
+        return level != null && cells.contains(cell) && !metCells.contains(cell) && isClosed(level, cell) && !colony.part(SavannaParts.CLOSED_HOLES).map(closed -> closed.closesCell(cell)).orElse(false);
     }
 
     @Override
@@ -201,16 +201,21 @@ public class HiddenTrips implements HiddenWays {
 
     /** Once a second while the nest is loaded (from {@link Colony#tick}): break-ins, arrivals. */
     void tick(ServerLevel level) {
-        if (trips.isEmpty()) {
+        if (trips.isEmpty() && met.isEmpty()) {
             return;
         }
         refreshCells(level);
         long now = level.getGameTime();
         boolean changed = false;
+        boolean metChanged = met.removeIf(stretch -> creatureIn(level, stretch) == null);
         for (Iterator<Trip> it = trips.iterator(); it.hasNext(); ) {
             Trip trip = it.next();
             String broken = brokenInto(level, trip);
             if (broken != null) {
+                if (creatureIn(level, trip.cells) != null && !met.contains(trip.cells)) {
+                    met.add(trip.cells);
+                    metChanged = true;
+                }
                 int index = trip.reached(now);
                 if (level.isPositionEntityTicking(trip.run.get(index).cell()) && comeOut(level, trip, index)) {
                     brokenInto++;
@@ -238,9 +243,44 @@ public class HiddenTrips implements HiddenWays {
                 }
             }
         }
+        if (metChanged) {
+            Set<BlockPos> all = new HashSet<>();
+            met.forEach(all::addAll);
+            metCells = all;
+        }
         if (changed) {
             ColonyManager.get(level).markChanged();
         }
+    }
+
+    /**
+     * Review R5-58: the stretches a creature that is not the colony's own was found standing in, kept until a look finds
+     * them clear; the legs are told these cells are not hidden ({@link #isHidden}), as for the cells closed for danger.
+     * Before, only the once-a-second look knew of the creature: a termite put back went under again on its next step
+     * and was put back a second later, blinking past the raider or the player without ever meeting it.
+     */
+    private final List<Set<BlockPos>> met = new ArrayList<>();
+    private Set<BlockPos> metCells = Set.of();
+
+    /** A living creature, not the colony's own (nor a spectator), standing in one of these cells, or null. */
+    @Nullable
+    private Entity creatureIn(ServerLevel level, Set<BlockPos> stretch) {
+        AABB box = null;
+        for (BlockPos cell : stretch) {
+            AABB one = new AABB(cell);
+            box = box == null ? one : box.minmax(one);
+        }
+        if (box == null) {
+            return null;
+        }
+        List<Entity> found = level.getEntities((Entity) null, box, e -> e instanceof LivingEntity && e.isAlive() && !isNestmate(e)
+                && !(e instanceof Player player && player.isSpectator()) && stretch.contains(e.blockPosition()));
+        return found.isEmpty() ? null : found.get(0);
+    }
+
+    /** The game tests: how many stretches are kept as met by a creature. */
+    public int metForTests() {
+        return met.size();
     }
 
     /** Once a second while the colony is out of range ({@link AwayLife#tickAway}): the travellers walk home as numbers. */
@@ -270,18 +310,9 @@ public class HiddenTrips implements HiddenWays {
                 return "opened at " + opened.toShortString();
             }
         }
-        AABB box = null;
-        for (BlockPos cell : trip.cells) {
-            AABB one = new AABB(cell);
-            box = box == null ? one : box.minmax(one);
-        }
-        if (box != null) {
-            for (Entity entity : level.getEntities((Entity) null, box, e -> e instanceof LivingEntity && e.isAlive() && !isNestmate(e)
-                    && !(e instanceof Player player && player.isSpectator()) && trip.cells.contains(e.blockPosition()))) {
-                return "a " + entity.getType().getDescription().getString() + " in it at " + entity.blockPosition().toShortString();
-            }
-        }
-        return null;
+        Entity entity = creatureIn(level, trip.cells);
+        return entity == null ? null
+                : "a " + entity.getType().getDescription().getString() + " in it at " + entity.blockPosition().toShortString();
     }
 
     private boolean isNestmate(Entity entity) {

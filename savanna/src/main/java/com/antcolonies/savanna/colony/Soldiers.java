@@ -577,15 +577,34 @@ public class Soldiers {
         boolean trouble = alarm != null && alarm.anyKeptIn(level);
         boolean called = alarm != null && alarm.reachesNest(level);
         int soldierCap = cap / 4;
-        for (Rank rank : Rank.values()) {
-            int count = colony.getCount(rank.caste());
-            int posts = called ? count : posts(level, rank).size();
+        Rank[] ranks = Rank.values();
+        int[] asked = new int[ranks.length];
+        for (int i = 0; i < ranks.length; i++) {
+            int count = colony.getCount(ranks[i].caste());
+            int posts = called ? count : posts(level, ranks[i]).size();
             // (no more than the colony has, so the workers get the rest of the cap)
-            int want = watched || trouble ? Math.min(Math.min(posts, count), soldierCap - soldiers) : 0;
-            wanted.put(rank.caste(), Math.max(0, want));
-            soldiers += Math.max(0, want);
+            asked[i] = watched || trouble ? Math.min(posts, count) : 0;
+        }
+        int[] given = shareOut(asked, soldierCap, numbers().minorsPerMajor());
+        for (int i = 0; i < ranks.length; i++) {
+            wanted.put(ranks[i].caste(), given[i]);
+            soldiers += given[i];
         }
         return soldiers;
+    }
+
+    /**
+     * Review R5-57: the real places shared between the minors (first) and the majors (second) in the colony's own ratio
+     * ({@code minors_per_major}, 3 to 1: of 12 places 9 and 3) when they ask for more than there are; what one rank
+     * does not need of its share goes to the other. Before, the minors were served first and took all 12 at night and
+     * at every alarm, so every real major was sent into the numbers just as it was needed.
+     */
+    static int[] shareOut(int[] asked, int places, int minorsPerMajor) {
+        int minorShare = Math.round(places * minorsPerMajor / (minorsPerMajor + 1.0F));
+        int minors = Math.min(asked[0], minorShare);
+        int majors = Math.min(asked[1], places - minors);
+        minors = Math.min(asked[0], places - majors);
+        return new int[] {Math.max(0, minors), Math.max(0, majors)};
     }
 
     /** For the colony list: the soldiers that are numbers in the nest. */

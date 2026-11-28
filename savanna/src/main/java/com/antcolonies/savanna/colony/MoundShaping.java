@@ -55,7 +55,10 @@ public class MoundShaping {
         BlockPos best = null;
         for (Map.Entry<BlockPos, MoundPlan.Part> entry : mound.getParts(level).entrySet()) {
             BlockPos pos = entry.getKey();
-            if ((best != null && pos.getY() >= best.getY()) || !LandReady.at(level, pos) || Mound.isClaimedByOther(carveClaims, pos, ant.getUUID())) {
+            // (A job a builder just found no way to is passed over, R5-4: every builder was handed the one lowest job,
+            // and when nobody could get beside it nothing was carved or reshaped at all.)
+            if ((best != null && pos.getY() >= best.getY()) || !LandReady.at(level, pos) || Mound.isClaimedByOther(carveClaims, pos, ant.getUUID())
+                    || mound.isUnreachable(level, pos)) {
                 continue;
             }
             MoundGrowth.Job job = shapeJobAt(level, pos);
