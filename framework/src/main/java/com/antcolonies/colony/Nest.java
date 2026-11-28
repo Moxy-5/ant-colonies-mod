@@ -414,7 +414,7 @@ public class Nest {
     /** True once everything needed to live in this level is dug out: the way in and the whole room (bread may lie on its floor). */
     private static boolean isFinished(Level level, NestPlan.Chamber chamber) {
         for (BlockPos pos : chamber.wayIn()) {
-            if (!isDugOut(level, pos)) {
+            if (!isWayOpen(level, pos)) {
                 return false;
             }
         }
@@ -431,14 +431,32 @@ public class Nest {
         return isShaftOpen(level, layout.shaftDepth());
     }
 
-    /** True when the entrance shaft is dug out down to {@code depth} blocks. */
+    /** True when the entrance shaft is dug out down to {@code depth} blocks (something the insects walk through may stand in it). */
     private boolean isShaftOpen(Level level, int depth) {
         for (int i = 1; i <= depth; i++) {
-            if (!LandReady.at(level, center.below(i)) || !level.getBlockState(center.below(i)).isAir()) {
+            BlockPos pos = center.below(i);
+            if (!LandReady.at(level, pos) || !level.getBlockState(pos).isAir() && !isWayOpen(level, pos)) {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * Whether a cell of a way in (the shaft, the stairs, a tunnel to a room) lets the insects through: dug out, or
+     * holding something they walk through (review R6-20: a torch a player put down a Matabele nest's chimney to look in
+     * hid every room of the nest, so the queen was "not home" and nobody fed her). Only the ways in ask this; what is
+     * dug or filled ({@link #isDugOut}) is not changed by it. A solid block still shuts the way, as a stone would.
+     */
+    private static boolean isWayOpen(Level level, BlockPos pos) {
+        if (isDugOut(level, pos)) {
+            return true;
+        }
+        if (!LandReady.at(level, pos)) {
+            return false;
+        }
+        BlockState state = level.getBlockState(pos);
+        return state.getCollisionShape(level, pos).isEmpty() && state.getFluidState().isEmpty();
     }
 
     /**
@@ -806,7 +824,7 @@ public class Nest {
             return List.of();
         }
         for (BlockPos pos : chamber.wayIn()) {
-            if (!isDugOut(level, pos)) {
+            if (!isWayOpen(level, pos)) {
                 return List.of();
             }
         }
@@ -1211,9 +1229,10 @@ public class Nest {
      * Ants never open a block that touches water or lava (it would flood the nest). The one judge of it, for the nest,
      * the ground reader and the foraging holes. Land not loaded, the block's own or a neighbour's across a chunk's
      * edge, counts as water, the careful answer: reading it would load or make that land on the spot, a freeze (review
-     * R1-8, R1-18: the cell was guarded, its neighbours were not).
+     * R1-8, R1-18: the cell was guarded, its neighbours were not). Public for a species that digs a nest at once (the
+     * termites' mounds of new land, review R5-21).
      */
-    static boolean touchesFluid(Level level, BlockPos pos) {
+    public static boolean touchesFluid(Level level, BlockPos pos) {
         if (!LandReady.at(level, pos)) {
             return true;
         }

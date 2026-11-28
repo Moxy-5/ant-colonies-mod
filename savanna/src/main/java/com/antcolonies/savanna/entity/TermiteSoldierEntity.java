@@ -442,8 +442,15 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
         }
         long now = level().getGameTime();
         Colony colony = getColony();
-        if (lastFed == Colony.NOT_SET || colony == null || !colony.isHungerOn()) {
+        if (lastFed == Colony.NOT_SET || colony == null || !colony.isHungerOn() || !colony.workerFood().hungerRuns()) {
             lastFed = now;
+        }
+        // Review R5-69: a soldier cannot feed itself; gone the workers' starve time with nobody bringing it food, it dies
+        // (as a number does, Meals). Before, it only got slow, and a colony of soldiers alone lived on for ever.
+        int starve = colony == null || !colony.profile().worker().eats() ? 0 : colony.profile().worker().starveAfterTicks();
+        if (starve > 0 && now - lastFed >= starve) {
+            hurt(damageSources().starve(), 1000.0F);
+            return;
         }
         updateHungry(now - lastFed >= numbers().slowAfterTicks());
     }

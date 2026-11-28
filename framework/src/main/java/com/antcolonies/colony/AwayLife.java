@@ -494,7 +494,12 @@ public class AwayLife {
         if (colonyId == null) {
             return false;
         }
-        Colony colony = ColonyManager.get(level).getColony(colonyId);
+        ColonyManager manager = ColonyManager.get(level);
+        Colony colony = manager.getColony(colonyId);
+        if (colony == null && manager.endedAway(colonyId)) {
+            entity.discard(); // review R5-24: its colony died out while it lay frozen here (it was one of the numbers)
+            return true;
+        }
         return colony != null && colony.away().cameBack(level, entity);
     }
 

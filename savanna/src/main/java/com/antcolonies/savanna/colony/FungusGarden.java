@@ -151,6 +151,20 @@ public class FungusGarden implements NurseFood {
         return combs;
     }
 
+    /**
+     * The garden's comb as the colony ends, perhaps away (review R5-24, R5-50): in land not loaded nothing is read (it
+     * would load that land on the spot); every garden cell there is handed on, to be read when it loads.
+     */
+    public List<BlockPos> combsAtEnd(Level level) {
+        List<BlockPos> combs = new ArrayList<>();
+        for (BlockPos pos : colony.nest().getGardenCells(level)) {
+            if (!com.antcolonies.colony.LandReady.at(level, pos) || level.getBlockState(pos).is(SavannaBlocks.FUNGUS_COMB.get())) {
+                combs.add(pos);
+            }
+        }
+        return combs;
+    }
+
     /** How many layers of comb there are in all the gardens. */
     public int countCombLayers(Level level) {
         int layers = 0;

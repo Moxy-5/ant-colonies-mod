@@ -2427,7 +2427,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     @Override
     public void tick() {
-        if (level() instanceof ServerLevel serverLevel && nestCaste() != null && backFromFrozen(serverLevel)) {
+        if (level() instanceof ServerLevel serverLevel && backFromFrozen(serverLevel)) {
             return; // it was frozen in unloaded land and is one of its colony's numbers now: it has left the world
         }
         if (level() instanceof ServerLevel serverLevel) {
@@ -2459,7 +2459,20 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         long now = level.getGameTime();
         boolean gap = now != lastServerTick + 1;
         lastServerTick = now;
-        return (gap || tickCount % 20 == 0) && com.antcolonies.colony.AwayLife.backFromFrozen(level, this, getColonyId());
+        if (!gap && tickCount % 20 != 0) {
+            return false;
+        }
+        if (nestCaste() == null) {
+            // A queen or king is always real: only a colony that died out while away takes one (review R5-24: she
+            // starved in her room, frozen; woken with no colony she founded a new one). Dead, she leaves her body.
+            if (getColonyId() != null && !isDeadOrDying() && ColonyManager.get(level).endedAway(getColonyId())
+                    && ColonyManager.get(level).getColony(getColonyId()) == null) {
+                hurt(damageSources().starve(), 1000.0F);
+                return true;
+            }
+            return false;
+        }
+        return com.antcolonies.colony.AwayLife.backFromFrozen(level, this, getColonyId());
     }
 
     private void tickBody() {

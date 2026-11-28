@@ -100,8 +100,8 @@ public class MatabeleQueenEntity extends AbstractAntEntity {
     @Override
     public void tick() {
         super.tick();
-        if (!(level() instanceof ServerLevel serverLevel)) {
-            return;
+        if (!(level() instanceof ServerLevel serverLevel) || isRemoved() || isDeadOrDying()) {
+            return; // (dying: no new colony for her, review R5-24)
         }
         ColonyManager manager = ColonyManager.get(serverLevel);
         // On the first tick, then every LOOK_AGAIN ticks until she has one: a colony for this queen, settled in the

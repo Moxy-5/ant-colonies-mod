@@ -59,6 +59,14 @@ final class DeadWorks {
     final List<BlockPos> walls = new ArrayList<>();
     /** The gallery cells, to fill in with washed-in soil ({@link MoundWear#galleryDay}). */
     final List<BlockPos> galleries = new ArrayList<>();
+    /**
+     * Review R5-20: the ground left bare round the holes (where the colony cut the grass to the roots), to green over
+     * with the holes ({@link MoundWear#holeDay}); handed over by the colony's bare patches when it ended. Before, nobody
+     * kept them and Minecraft's grass does not spread onto coarse dirt: the patches stayed bare for good.
+     */
+    final List<BlockPos> bare = new ArrayList<>();
+    /** The block the bare ground is made of (the species file's {@code bare_ground}): only that block greens over. */
+    Block bareBlock;
     /** How far out (blocks) the galleries reached from the nest: the far ends fill in first. */
     int reach;
 
@@ -69,7 +77,7 @@ final class DeadWorks {
     }
 
     boolean isEmpty() {
-        return holes.isEmpty() && sheets.isEmpty() && spots.isEmpty() && walls.isEmpty() && galleries.isEmpty();
+        return holes.isEmpty() && sheets.isEmpty() && spots.isEmpty() && walls.isEmpty() && galleries.isEmpty() && bare.isEmpty();
     }
 
     /**
@@ -146,6 +154,8 @@ final class DeadWorks {
                 (lvl, pos) -> crumbleAround(lvl, pos, true));
         used += pass(level, holes, pos -> MoundWear.holeDay(MoundWear.jitter(pos.asLong())), days, budget - used, dirty,
                 DeadWorks::closeHole);
+        used += pass(level, bare, pos -> MoundWear.holeDay(MoundWear.jitter(pos.asLong())), days, budget - used, dirty,
+                this::greenOver);
         used += pass(level, galleries, pos -> MoundWear.galleryDay(flat(pos, center), reach, MoundWear.jitter(pos.asLong() * 7 + 1)),
                 days, budget - used, dirty, DeadWorks::fillIn);
         return used;
@@ -260,6 +270,17 @@ final class DeadWorks {
         return 1;
     }
 
+    /** Review R5-20: bare ground round an old hole greens over, unless something covers it or it is not bare any more. */
+    private int greenOver(ServerLevel level, BlockPos ground) {
+        BlockPos up = ground.above();
+        if (bareBlock == null || !level.getBlockState(ground).is(bareBlock) || level.getBlockState(up).isCollisionShapeFullBlock(level, up)
+                || !level.getFluidState(up).isEmpty()) {
+            return 0;
+        }
+        level.setBlock(ground, Blocks.GRASS_BLOCK.defaultBlockState(), Block.UPDATE_ALL);
+        return 1;
+    }
+
     /** A gallery cell fills in with washed-in soil (the ground's own, as the living colony packs a gallery it gives up). */
     private static int fillIn(ServerLevel level, BlockPos cell) {
         if (!Nest.isDugOut(level, cell)) {
@@ -284,7 +305,8 @@ final class DeadWorks {
 
     /** For the command: what is left. */
     String describe() {
-        return "holes " + holes.size() + ", mud " + (sheets.size() + spots.size() + walls.size()) + ", galleries " + galleries.size();
+        return "holes " + holes.size() + ", mud " + (sheets.size() + spots.size() + walls.size()) + ", galleries " + galleries.size()
+                + ", bare ground " + bare.size();
     }
 
     // --- saving ---------------------------------------------------------------------------------------------------
@@ -297,6 +319,10 @@ final class DeadWorks {
         tag.putLongArray("walls", longs(walls));
         tag.putLongArray("galleries", longs(galleries));
         tag.putInt("reach", reach);
+        if (!bare.isEmpty() && bareBlock != null) {
+            tag.putLongArray("bare", longs(bare));
+            tag.putString("bareBlock", net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(bareBlock).toString());
+        }
         return tag;
     }
 
@@ -308,6 +334,13 @@ final class DeadWorks {
         read(tag.getLongArray("walls"), works.walls);
         read(tag.getLongArray("galleries"), works.galleries);
         works.reach = tag.getInt("reach");
+        if (tag.contains("bareBlock", net.minecraft.nbt.Tag.TAG_STRING)) {
+            net.minecraft.resources.ResourceLocation id = net.minecraft.resources.ResourceLocation.tryParse(tag.getString("bareBlock"));
+            works.bareBlock = id == null ? null : net.minecraft.core.registries.BuiltInRegistries.BLOCK.getOptional(id).orElse(null);
+            if (works.bareBlock != null) {
+                read(tag.getLongArray("bare"), works.bare);
+            }
+        }
         return works;
     }
 

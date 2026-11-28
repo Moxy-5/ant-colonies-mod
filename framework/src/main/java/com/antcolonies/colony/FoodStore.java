@@ -313,7 +313,8 @@ public class FoodStore {
             // (a plant the numbers have used up out of sight still stands until it is out of every player's sight: skipped)
             if (plant == null || plant.pieces() - getPiecesCut(pos) <= 0 || claimed.getOrDefault(pos, 0) >= Math.max(1, plant.foragers())
                     || fromInside && !isFeedableFromInside(level, pos)
-                    || (fromInside ? colony.keepsOff(level, pos) : !colony.mayForageAt(level, pos))) { // (only where the patrollers came back from, never where the colony keeps away for danger)
+                    || (fromInside ? colony.keepsOff(level, pos) : !colony.mayForageAt(level, pos)) // (only where the patrollers came back from, never where the colony keeps away for danger)
+                    || colony.isAlarmed(level, pos)) { // (nor into a trouble felt now, review R5-65: asked here, no longer through "keep off")
                 continue;
             }
             if (exits == null) {
@@ -734,12 +735,45 @@ public class FoodStore {
     /**
      * Once a second while the whole nest is loaded: the brain notes how many more layers the food store's heaps can
      * take (the empty floor and the heaps not full, not where a young one lies), for when it cannot look ({@link #roomKnown}).
+     * And the blocks are the truth of what is stored (review R5-14): the count is set to the layers on the store's heaps
+     * plus what the ledger still owes them. Only the colony's own doings changed the count, so a player breaking comb, a
+     * comb losing its floor or a comb a player put in drifted it from the world for good: the colony list showed comb that
+     * was gone, levels unlocked from food the colony no longer had, and away the workers starved beside comb.
      */
     void watchRoom(Level level) {
         int room = freeLayers(level);
         if (room >= 0) { // (else: keep what was seen last)
             seenRoom = room;
         }
+        int stored = storedLayers(level);
+        if (stored >= 0) {
+            food = Math.max(0, stored + colony.ledger().store());
+            richSeeds = Math.min(richSeeds, food);
+            hadFood |= food > 0;
+        }
+    }
+
+    /**
+     * The layers on the food store's heaps, or -1 when it cannot be told: a cell's land not loaded, or no store cell
+     * counted at all (the shaft or the way in shut for now: the count stays as it was rather than read as nothing).
+     */
+    private int storedLayers(Level level) {
+        List<BlockPos> cells = colony.nest().getFoodStoreCells(level);
+        if (cells.isEmpty()) {
+            return -1;
+        }
+        SeedPileBlock pile = food().pileBlock();
+        int layers = 0;
+        for (BlockPos pos : new java.util.LinkedHashSet<>(cells)) {
+            if (!LandReady.at(level, pos)) {
+                return -1;
+            }
+            BlockState state = level.getBlockState(pos);
+            if (state.is(pile)) {
+                layers += state.getValue(SeedPileBlock.LAYERS);
+            }
+        }
+        return layers;
     }
 
     /**

@@ -24,8 +24,9 @@ import net.minecraft.util.RandomSource;
  * workers by their diet ({@link WorkerFood}: a seed from the store, eaten raw like the real ants; for termites the young
  * share a fungus nodule, the older ones old comb), soldiers a piece of the nurses' food (a fungus nodule). Which worker
  * numbers are young is not kept per meal: their share of the meals is the young share of the worker numbers. A worker
- * number gone the profile's starve time without a meal dies and leaves its body; a soldier only gets slow without food,
- * so as a number nothing happens to it.
+ * number gone the profile's starve time without a meal dies and leaves its body; so does a soldier (review R5-69: a
+ * soldier cannot feed itself, the workers bring its food, so it starves by the workers' starve time when nobody brings
+ * it; before, it only got slow, and a colony of soldiers alone lived on for ever).
  *
  * <p>Species-neutral: any caste with a meal in its profile (the workers when {@code worker.eats}, the soldiers).
  */
@@ -53,7 +54,8 @@ class Meals {
         }
         ColonyHooks.Castes castes = colony.isOwnCaste(caste) ? colony.hooks().first(ColonyHooks.CASTES) : null;
         int interval = castes == null ? 0 : castes.mealIntervalTicks(caste);
-        return interval > 0 ? new Diet(interval, 0, false) : null;
+        var worker = colony.profile().worker();
+        return interval > 0 ? new Diet(interval, worker.eats() ? worker.starveAfterTicks() : 0, false) : null; // (R5-69: the workers' starve time)
     }
 
     private static long minute(long time) {
@@ -191,7 +193,7 @@ class Meals {
                 times.merge(minute(now), fed, Integer::sum);
                 colony.away().note(level, AwayReport.What.MEALS, fed);
             }
-            if (diet.starveAfter() > 0) {
+            if (diet.starveAfter() > 0 && colony.workerFood().hungerRuns()) { // (fed by the workers: starves only once theirs runs)
                 int starved = 0;
                 for (long minute : new ArrayList<>(times.keySet())) {
                     if (now - minute < diet.starveAfter()) {

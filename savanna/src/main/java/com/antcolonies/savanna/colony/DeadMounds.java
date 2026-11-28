@@ -42,7 +42,9 @@ import net.minecraft.world.level.saveddata.SavedData;
  * <p>The garden: nothing weeds it any more, so Xylaria takes the comb ({@link DeadCombBlock}): furred the first day,
  * black with stalks from day 1 to 4, rotting from day 4, losing its layers, gone after {@link #GONE_DAYS} days (my
  * picks from the real "within days, gone in about a week"). The days count by the world's clock ({@code /time add}
- * moves them on); the comb only ever moves forward, so land away for a while catches up when it loads.
+ * moves them on) or by game time, whichever has gone further (review R5-19: {@code /time set day} puts the world's clock
+ * back, and by it alone every mound that died later read 0 days for good); the comb only ever moves forward, so land
+ * away for a while catches up when it loads.
  *
  * <p>The mound (part 2): nobody patches it any more, so rain wears it down in the real order, sped up ({@link MoundWear}):
  * the pieces on top first, the spires down to the body in a few days, then the body slumping into a low hump over about a
@@ -67,10 +69,25 @@ public class DeadMounds extends SavedData {
     public static final double GONE_DAYS = 6.5;
     /** The most blocks the wear changes in one look, in all the dead mounds together (my pick). */
     static final int BLOCKS_PER_LOOK = 256;
+    /**
+     * Review R5-23: a dead mound more than this many days behind its day (its land away for a while, or {@code /time
+     * add}) is catching up: worn the quiet way (no breaking sounds or crumbs, as new land's dead mounds are) and every
+     * tick until it has caught up, not a slice every {@link #LOOK_TICKS} with a burst of sounds in front of the player.
+     * Only the wear of the last day is seen as it happens. (One day: a mound watched every look is never this far behind.)
+     */
+    static final double CATCH_UP_DAYS = 1.0;
+    /** A dead mound written before its game time of death was kept (review R5-19): worked out at its first look. */
+    private static final long UNKNOWN = Long.MIN_VALUE;
 
-    /** One comb of the dead garden: where, and how many layers it had when the colony died. */
+    /**
+     * One comb of the dead garden: where, and how many layers it had when the colony died ({@link #UNREAD}: its land was
+     * not loaded then, read when it loads; review R5-24).
+     */
     public record Comb(BlockPos pos, int layers) {
     }
+
+    /** A comb written while its land was not loaded: whether it is comb at all, and its layers, are read when it loads. */
+    static final int UNREAD = -1;
 
     /** One dead mound: its colony (by id), the nest's entrance, when the colony died (world clock ticks), its comb left. */
     public static final class DeadMound {
@@ -78,16 +95,23 @@ public class DeadMounds extends SavedData {
         public final BlockPos center;
         /** (Set back once for a dead mound of new land, M8 step 1b, which died before the world was made.) */
         public long diedAt;
+        /** When the colony died by game time (review R5-19: the world's clock can be set back; game time cannot). */
+        long diedAtGame;
+        /** Review R5-23: the day the mound was last brought fully up to (not saved: after a load it catches up quietly). */
+        private double caughtUpTo = -1;
+        /** Review R5-23: it is catching up, worn every tick until it has (not saved). */
+        private boolean catchingUp;
         final List<Comb> combs = new ArrayList<>();
         /** The mound's wear (none if the colony had no mound standing). */
         Wear wear;
         /** Part 3: the colony's works out round the mound (none if it had built none). */
         DeadWorks works;
 
-        DeadMound(UUID colony, BlockPos center, long diedAt) {
+        DeadMound(UUID colony, BlockPos center, long diedAt, long diedAtGame) {
             this.colony = colony;
             this.center = center;
             this.diedAt = diedAt;
+            this.diedAtGame = diedAtGame;
         }
 
         public List<Comb> combs() {
@@ -99,9 +123,16 @@ public class DeadMounds extends SavedData {
             return Math.max(MoundPlan.REACH + 1, works == null ? 0 : works.reach + 2);
         }
 
-        /** Whole and part days since the colony died, by the world's clock. */
+        /**
+         * Whole and part days since the colony died: by the world's clock or by game time, whichever has gone further
+         * (review R5-19: {@code /time add} moves the wear on, {@code /time set} back no longer stops it).
+         */
         public double days(ServerLevel level) {
-            return Math.max(0, level.getDayTime() - diedAt) / 24000.0;
+            long byClock = level.getDayTime() - diedAt;
+            if (diedAtGame == UNKNOWN) {
+                diedAtGame = level.getGameTime() - Math.max(0, byClock); // (a mound saved before R5-19: its age so far)
+            }
+            return Math.max(0, Math.max(byClock, level.getGameTime() - diedAtGame)) / 24000.0;
         }
 
         /** Whether the mound's wear was written down when the colony died (it had a mound standing). */
@@ -186,7 +217,7 @@ public class DeadMounds extends SavedData {
 
     /** The colony with this id has died out at {@code center}: its dead mound (a new one, or the one already written). */
     public DeadMound died(ServerLevel level, UUID colony, BlockPos center) {
-        DeadMound mound = mounds.computeIfAbsent(colony, id -> new DeadMound(id, center, level.getDayTime()));
+        DeadMound mound = mounds.computeIfAbsent(colony, id -> new DeadMound(id, center, level.getDayTime(), level.getGameTime()));
         setDirty();
         return mound;
     }
@@ -234,37 +265,85 @@ public class DeadMounds extends SavedData {
         }
     }
 
+    /**
+     * Review R5-20: the ground the dead colony left bare round its holes ({@code grounds}, of {@code block}), to green
+     * over with the holes; a dead mound with no other works gets works for it.
+     */
+    void addBare(ServerLevel level, UUID colony, BlockPos center, List<BlockPos> grounds, Block block) {
+        if (grounds.isEmpty()) {
+            return;
+        }
+        DeadMound mound = died(level, colony, center);
+        if (mound.works == null) {
+            mound.works = new DeadWorks();
+        }
+        mound.works.bareBlock = block;
+        mound.works.bare.addAll(grounds);
+        setDirty();
+    }
+
     /** The dead colony's comb, as it was when it died: each turns furred at once (its nodules gone). */
     public void addCombs(ServerLevel level, UUID colony, BlockPos center, List<BlockPos> combs) {
         DeadMound mound = died(level, colony, center);
         for (BlockPos pos : combs) {
+            if (!LandReady.at(level, pos)) {
+                mound.combs.add(new Comb(pos.immutable(), UNREAD)); // (the colony died away: read when its land loads)
+                continue;
+            }
             BlockState state = level.getBlockState(pos);
             if (state.getBlock() instanceof FungusCombBlock) {
                 mound.combs.add(new Comb(pos.immutable(), FungusCombBlock.layers(state)));
             }
         }
+        setDirty();
         updateCombs(level, mound, mound.days(level));
     }
 
-    /** Every few seconds: the dead gardens and mounds in loaded land move on. */
+    /**
+     * Every few seconds: the dead gardens and mounds in loaded land move on. A mound catching up (more than
+     * {@link #CATCH_UP_DAYS} behind) goes on every tick, quietly, until it has (review R5-23).
+     */
     public static void tick(ServerLevel level) {
-        if (level.getGameTime() % LOOK_TICKS != 0) {
+        boolean look = level.getGameTime() % LOOK_TICKS == 0;
+        DeadMounds book = get(level);
+        if (!look && !book.anyCatchingUp) {
             return;
         }
-        DeadMounds book = get(level);
         int budget = BLOCKS_PER_LOOK;
         for (DeadMound mound : book.mounds.values()) {
+            if (!look && !mound.catchingUp || !mound.isChanging()) {
+                continue;
+            }
             // One check a look for the whole dead mound and its works, and a block more (review R5-6: each write was
             // guarded by its own cell's chunk only, and a change in the last loaded row makes Minecraft read the
             // blocks beside it, which loads the chunk beyond on the spot).
-            if (mound.isChanging() && LandReady.round(level, mound.center, mound.reach() + 1)) {
-                budget -= book.update(level, mound, mound.days(level), budget);
-                if (budget <= 0) {
-                    break; // the rest next look
-                }
+            if (!LandReady.round(level, mound.center, mound.reach() + 1)) {
+                mound.catchingUp = false;
+                continue;
+            }
+            double days = mound.days(level);
+            boolean behind = days - mound.caughtUpTo > CATCH_UP_DAYS;
+            int used;
+            quiet = behind;
+            try {
+                used = book.update(level, mound, days, budget);
+            } finally {
+                quiet = false;
+            }
+            mound.catchingUp = behind && used >= budget;
+            if (used < budget) {
+                mound.caughtUpTo = days; // (all done that was due)
+            }
+            budget -= used;
+            if (budget <= 0) {
+                break; // the rest next look (or next tick, catching up)
             }
         }
+        book.anyCatchingUp = book.mounds.values().stream().anyMatch(mound -> mound.catchingUp);
     }
+
+    /** Whether any dead mound is catching up (review R5-23; not saved). */
+    private boolean anyCatchingUp;
 
     /**
      * The game tests: the mound's comb and the mound itself as they would be {@code days} after the colony died (the
@@ -285,6 +364,7 @@ public class DeadMounds extends SavedData {
             return null;
         }
         mound.diedAt = level.getDayTime() - Math.round(days * 24000.0);
+        mound.diedAtGame = level.getGameTime() - Math.round(days * 24000.0);
         quiet = true; // (no breaking sounds or crumbs: thousands at once flooded the sound player, docs/plans/savanna-loading.md)
         try {
             update(level, mound, mound.days(level), Integer.MAX_VALUE);
@@ -367,13 +447,23 @@ public class DeadMounds extends SavedData {
 
     /** The mound's comb brought up to its day: furred, black, rotting, gone; a comb broken or replaced is forgotten. */
     private void updateCombs(ServerLevel level, DeadMound mound, double days) {
-        for (Iterator<Comb> it = mound.combs.iterator(); it.hasNext(); ) {
+        for (java.util.ListIterator<Comb> it = mound.combs.listIterator(); it.hasNext(); ) {
             Comb comb = it.next();
             if (!LandReady.at(level, comb.pos())) {
                 continue;
             }
             BlockState now = level.getBlockState(comb.pos());
             boolean living = now.getBlock() instanceof FungusCombBlock;
+            if (comb.layers() == UNREAD) { // (written while its land was not loaded, R5-24: read now)
+                if (!living) {
+                    it.remove();
+                    setDirty();
+                    continue;
+                }
+                comb = new Comb(comb.pos(), FungusCombBlock.layers(now));
+                it.set(comb);
+                setDirty();
+            }
             if (!living && !now.is(SavannaBlocks.DEAD_COMB.get())) {
                 it.remove(); // broken or built over: nothing left to rot
                 setDirty();
@@ -661,6 +751,7 @@ public class DeadMounds extends SavedData {
             m.putUUID("colony", mound.colony);
             m.put("center", NbtUtils.writeBlockPos(mound.center));
             m.putLong("diedAt", mound.diedAt);
+            m.putLong("diedAtGame", mound.diedAtGame);
             ListTag combs = new ListTag();
             for (Comb comb : mound.combs) {
                 CompoundTag c = new CompoundTag();
@@ -686,7 +777,8 @@ public class DeadMounds extends SavedData {
         for (Tag t : tag.getList("mounds", Tag.TAG_COMPOUND)) {
             CompoundTag m = (CompoundTag) t;
             BlockPos center = NbtUtils.readBlockPos(m, "center").orElse(BlockPos.ZERO);
-            DeadMound mound = new DeadMound(m.getUUID("colony"), center, m.getLong("diedAt"));
+            DeadMound mound = new DeadMound(m.getUUID("colony"), center, m.getLong("diedAt"),
+                    m.contains("diedAtGame", Tag.TAG_LONG) ? m.getLong("diedAtGame") : UNKNOWN);
             for (Tag ct : m.getList("combs", Tag.TAG_COMPOUND)) {
                 CompoundTag c = (CompoundTag) ct;
                 mound.combs.add(new Comb(BlockPos.of(c.getLong("pos")), c.getInt("layers")));

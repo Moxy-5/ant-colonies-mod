@@ -99,9 +99,33 @@ public class BarePatches {
             bare = true;
         }
         if (tufts.size() >= MAX_TUFTS) {
-            tufts.remove(0);
+            Tuft oldest = tufts.remove(0);
+            if (LandReady.at(level, oldest.spot().below())) {
+                unbare(level, oldest); // (review R5-20: dropped bare, its ground stayed bare for good)
+            }
         }
         tufts.add(new Tuft(spot.immutable(), eatenAt + numbers.ticks(), bare));
+    }
+
+    /**
+     * Review R5-20: the colony has died out ({@code ColonyNews.COLONY_ENDED}): the ground it left bare is handed to its
+     * dead mound's works, to green over as its holes grass over (nobody else would: grass does not spread onto coarse
+     * dirt).
+     */
+    void colonyEnded(ServerLevel level, BlockPos center) {
+        SavannaNumbers.Regrowth numbers = colony.profile().section(SavannaNumbers.REGROWTH).orElse(null);
+        BlockState bareGround = numbers == null ? null : numbers.bareGroundState();
+        if (bareGround == null) {
+            return;
+        }
+        List<BlockPos> grounds = new ArrayList<>();
+        for (Tuft tuft : tufts) {
+            if (tuft.madeBare()) {
+                grounds.add(tuft.spot().below());
+            }
+        }
+        DeadMounds.get(level).addBare(level, colony.getId(), center, grounds, bareGround.getBlock());
+        tufts.clear();
     }
 
     /** Whether the spot is within {@code radius} blocks (sideways, a few up or down) of one of the colony's holes. */

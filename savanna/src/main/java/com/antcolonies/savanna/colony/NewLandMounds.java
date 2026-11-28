@@ -1,6 +1,7 @@
 package com.antcolonies.savanna.colony;
 
 import com.antcolonies.colony.LandReady;
+import com.antcolonies.colony.Nest;
 import com.antcolonies.colony.GroundTop;
 import java.util.ArrayList;
 import java.util.List;
@@ -490,8 +491,12 @@ public class NewLandMounds extends SavedData {
         lapAt = now;
     }
 
-    /** The members a colony of that size has, the nest dug, the mound up, the gardens filled (living or about to die). */
-    private static Mound raise(ServerLevel level, Colony colony, Pick pick, RandomSource random, boolean comb) {
+    /**
+     * The members a colony of that size has, the nest dug, the mound up, the gardens filled (living or about to die).
+     * False, nothing built, if the nest would be dug into water or lava (review R5-21: the termites never open a block
+     * that touches either, and a nest dug through a buried pool or a cave's lava flooded): the place does not suit.
+     */
+    private static boolean raise(ServerLevel level, Colony colony, Pick pick, RandomSource random, boolean comb) {
         colony.setAge(level, pick.living() ? pick.days() : Math.max(10, pick.days()));
         // Workers of every age from just grown up to old, never older than the colony; and its soldiers.
         int workers = workersFor(pick, random);
@@ -505,6 +510,11 @@ public class NewLandMounds extends SavedData {
         }
         if (pick.stage() >= 10) {
             colony.nest().unlockAllLevels(); // an old colony dug them all long ago
+        }
+        for (BlockPos cell : nestCells(level, colony)) {
+            if (!level.getFluidState(cell).isEmpty() || Nest.touchesFluid(level, cell)) {
+                return false;
+            }
         }
         Mound mound = colony.part(SavannaParts.MOUND).orElse(null);
         lap("members");
@@ -522,7 +532,7 @@ public class NewLandMounds extends SavedData {
             fillGardens(level, colony, random);
             lap("comb");
         }
-        return mound;
+        return true;
     }
 
     /** Whatever new land put where the mound goes and is not soil (a fallen branch, a bush) is cleared first. */
@@ -541,9 +551,17 @@ public class NewLandMounds extends SavedData {
      * bedrock: real savanna soil is metres deep, Minecraft's stone a few blocks down is the game's shortcut (my pick).
      */
     private static void digNest(ServerLevel level, Colony colony) {
+        for (BlockPos cell : nestCells(level, colony)) {
+            dig(level, cell);
+        }
+    }
+
+    /** Every cell of the shaft and of every room the plan has now, the shaft first, top down. */
+    private static List<BlockPos> nestCells(ServerLevel level, Colony colony) {
+        List<BlockPos> cells = new ArrayList<>();
         BlockPos bottom = colony.nest().getShaftBottom(level);
         for (BlockPos cell = colony.getCenter().below(); bottom != null && cell.getY() >= bottom.getY(); cell = cell.below()) {
-            dig(level, cell);
+            cells.add(cell);
         }
         List<NestPlan.Chamber> rooms = new ArrayList<>(colony.nest().getPlannedChambers(level));
         rooms.addAll(colony.nest().getSideRooms(level));
@@ -552,10 +570,9 @@ public class NewLandMounds extends SavedData {
             rooms.add(colony.nest().getFoundingChamber(level));
         }
         for (NestPlan.Chamber room : rooms) {
-            for (BlockPos cell : room.cells()) {
-                dig(level, cell);
-            }
+            cells.addAll(room.cells());
         }
+        return cells;
     }
 
     private static void dig(ServerLevel level, BlockPos cell) {
@@ -590,7 +607,9 @@ public class NewLandMounds extends SavedData {
         ColonyManager manager = ColonyManager.get(level);
         Colony colony = manager.createColony(SavannaSpecies.MACROTERMES, colonyId, queen.getUUID(), center);
         queen.becomeQueenOf(colony);
-        raise(level, colony, pick, random, true);
+        if (!raise(level, colony, pick, random, true)) {
+            return wet(level, manager, colony);
+        }
         // The royal pair in their chamber, the queen swollen by the colony's size (as she grows in play).
         NestPlan.Chamber home = colony.nest().getHomeChamber(level);
         Vec3 spot = Vec3.atBottomCenterOf(home != null ? home.center() : center);
@@ -635,7 +654,9 @@ public class NewLandMounds extends SavedData {
         RandomSource random = RandomSource.create(pick.seed());
         ColonyManager manager = ColonyManager.get(level);
         Colony colony = manager.createColony(SavannaSpecies.MACROTERMES, colonyId, UUID.randomUUID(), center);
-        raise(level, colony, pick, random, pick.days() < DeadMounds.GONE_DAYS);
+        if (!raise(level, colony, pick, random, pick.days() < DeadMounds.GONE_DAYS)) {
+            return wet(level, manager, colony);
+        }
         manager.colonyEnded(level, colony); // its parts write the dead mound down, then it is gone
         lap("ended");
         DeadMounds.DeadMound mound = DeadMounds.get(level).agedForNewLand(level, colony.getId(), pick.days());
@@ -652,6 +673,15 @@ public class NewLandMounds extends SavedData {
             lastTrees.addAll(woods(level, center, pick, random));
         }
         return colony;
+    }
+
+    /** Review R5-21: the place does not suit after all, its nest would meet water or lava: the colony made for it goes. */
+    private Colony wet(ServerLevel level, ColonyManager manager, Colony colony) {
+        manager.removeColony(colony.getId());
+        skipped++;
+        setDirty();
+        SavannaMod.LOGGER.info("[new-land] no termite mound at {}: its nest would meet water or lava", colony.getCenter().toShortString());
+        return null;
     }
 
     /** The top of the ground (or hump) at x, z: the first free cell over it. */

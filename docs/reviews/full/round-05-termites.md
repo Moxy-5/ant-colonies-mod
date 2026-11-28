@@ -372,6 +372,8 @@ skips searches that carry a test) was not read again by the lead; R2-16 measured
 
 **In play (2026-11-27):** B. After a player digs into a garden the colony list keeps showing comb that is gone, and the nest unlocks levels from food it no longer has; away, workers can starve beside old comb.
 
+**Status (2026-11-27, `claude/review-fix-b8`): fixed: while the whole nest is loaded the blocks are the truth: once a second (`FoodStore.watchRoom`) the count is set to the layers on the store's heaps plus what the ledger still owes them (`storedLayers`); a store with no cell counted (its shaft or way in shut for now) keeps its count. A player breaking or putting comb, a comb losing its floor, now reach the count within a second. No test of its own. Left: away the numbers still eat only while both the count and the seen comb say yes.**
+
 - **What is wrong:** the food store's count changes only by the colony's own doings. A player breaking comb, a comb
   losing its floor, or a player placing a fungus comb item (an uncounted ripe layer that grows nodules) never reaches
   it. Away, the numbers eat only while both the count and the seen comb say yes.
@@ -432,6 +434,8 @@ skips searches that carry a test) was not read again by the lead; R2-16 measured
 
 **In play (2026-11-27):** B. After one `/time set day` in a world 60 days old, no dead mound wears and no dead comb rots for 60 days of play; with the daylight cycle off they never do.
 
+**Status (2026-11-27, `claude/review-fix-b8`): fixed: a dead mound keeps its game time of death beside the day clock (`DeadMound.diedAtGame`, saved; a mound saved before works its own out at its first look) and its age is the larger of the two, so `/time add` still moves the wear on and `/time set day` no longer stops it. No test of its own. Left: the trees count their days the same way (`tree/Forest.java`), not changed here.**
+
 - **Checked by the lead with Minecraft's code:** `TimeCommand.setTime` (`:64-71`) sets every level's day time to the
   number given, so `/time set day` puts the clock back to 1000. `DeadMounds.days` (`savanna/colony/DeadMounds.java:98-100`)
   then reads 0 for every mound that died later (`:184`, `:279`).
@@ -443,6 +447,8 @@ skips searches that carry a test) was not read again by the lead; R2-16 measured
 ### R5-20 (B, proven): when a termite colony dies, the bare earth round its holes stays bare for good
 
 **In play (2026-11-27):** B. Round every mound that died in play, little patches of coarse dirt round the old foraging holes never green over, while the holes themselves and the mound beside them grass over.
+
+**Status (2026-11-27, `claude/review-fix-b8`): fixed: the bare patches hear the colony's end (after the galleries) and hand the ground they made bare to the dead mound's works (`BarePatches.colonyEnded`, `DeadMounds.addBare`, `DeadWorks.bare`, saved with the bare block's name), which turn it back to grass on the day its holes grass over (`DeadWorks.greenOver`); at the cap of 4,096 tufts the oldest is un-bared before it is dropped. No test of its own.**
 
 - **What is wrong:** the bare patches are a part of the living colony with no "colony ended" handler, and the dead
   mound's works do not take them over; Minecraft grass does not spread onto coarse dirt. A rarer way to the same end:
@@ -456,6 +462,8 @@ skips searches that carry a test) was not read again by the lead; R2-16 measured
 ### R5-21 (B, likely): the nest of a mound of new land is dug through water and lava, which the termites themselves never do
 
 **In play (2026-11-27):** B. Now and then a mound of new land whose rooms are flooded (a river bank, a buried pool, a cave), or lava running into a nest.
+
+**Status (2026-11-27, `claude/review-fix-b8`): fixed: before anything is built, a mound of new land checks every cell of its nest's shaft and rooms with the framework's one judge (`Nest.touchesFluid`, now public); a nest that would touch water or lava (or land not loaded) skips the place like a place on water, and the colony made for it is taken away (`NewLandMounds.raise` returns false, `wet`). No test of its own.**
 
 - **What is wrong:** `digNest` cuts every cell "through anything but bedrock" with full updates, so water or lava
   beside a cell flows in; the framework's one judge (`Nest.touchesFluid`) is not asked, and the place check looks only
@@ -482,6 +490,8 @@ skips searches that carry a test) was not read again by the lead; R2-16 measured
 
 **In play (2026-11-27):** B. Coming back to a mound that died long ago: it stands as it was left, then drops a slice every 5 seconds, top first, with a burst of breaking sounds, until weeks of wear are done in a minute or two.
 
+**Status (2026-11-27, `claude/review-fix-b8`): fixed: a dead mound more than a day behind its day (`DeadMounds.CATCH_UP_DAYS`) is catching up: it is worn the quiet way (no breaking sounds or crumbs, as new land's dead mounds are) and every tick until it has caught up, so weeks of wear go in a second or two without a burst of sounds; only the wear of the last day is seen as it happens. Not looked at in play.**
+
 - **What is wrong:** the catch-up has no rule about being seen and breaks each block the loud way. The living
   colony's catch-up works only out of sight, and new land's dead mounds already have the quiet way (written because
   "thousands at once flooded the sound player"). All dead mounds share the one budget, in the book's order.
@@ -494,6 +504,8 @@ skips searches that carry a test) was not read again by the lead; R2-16 measured
 ### R5-24 (B, proven for the manager's path; the termite side of R1-27): a colony that dies out while away leaves no dead mound until a player comes near, and counts as living until then
 
 **In play (2026-11-27):** B. A mound whose colony has been dead for 100 days stands fresh and only begins to wear on arrival; until then Matabele scouts walk out to a mound with nobody in it.
+
+**Status (2026-11-27, `claude/review-fix-b8`): fixed (also R1-27's away half and R5-50): the manager ends a colony away whose queen is dead or starved and whose numbers hold nobody (`Colony.diedOutAway`, `ColonyManager.tickColonies`), and keeps its id (`endedAway`, saved); an insect of such a colony frozen in land not loaded leaves the world when it loads (`AwayLife.backFromFrozen`), and a queen or king dies there (`AbstractAntEntity.backFromFrozen`; a dying queen founds no new colony). The garden's comb in land not loaded is written down unread and read when it loads (`FungusGarden.combsAtEnd`, `DeadMounds.UNREAD`). No test of its own.**
 
 - **What is wrong:** a colony is ended (its dead mound written down) only from the near tick or by its queen's body
   dying; away, the manager only runs the numbers (`framework/colony/ColonyManager.java:95-128`). With R5-2, far
@@ -733,6 +745,8 @@ skips searches that carry a test) was not read again by the lead; R2-16 measured
 - **From:** X-8.
 
 ### R5-50 (C, proven): two block reads with no loaded-land check, reachable today only by the kill command
+
+**Status (2026-11-27, `claude/review-fix-b8`): fixed with R5-24: at a colony's end the garden passes its cells in land not loaded unread (`FungusGarden.combsAtEnd`) and `DeadMounds.addCombs` reads only loaded ones; the rest are read when their land loads.**
 
 - `FungusGarden.getCombs` (`:144-152`) and `DeadMounds.addCombs` (`savanna/colony/DeadMounds.java:233-242`) read
   blocks when a colony ends. Every real ending happens near, where the garden is loaded; `/antcolonies kill` on a far
@@ -1130,6 +1144,8 @@ closed-for-danger cells only), `brokenInto` (`:260-285`: the only place that loo
 
 **In play (2026-11-27):** B. On a grey day with no rain falling in the savanna the foraging holes open and termites walk out at noon, where the Matabele's day raids and the player find them; and there is never a rainy night with more holes open.
 
+**Status (2026-11-27, `claude/review-fix-b8`): fixed: one judge, `Colony.rainsNow` (the world's weather is rain), for the foraging time, the night's holes and the raids (my pick, as the finding proposed). So in rain the savanna termites forage by day as before, the night's holes are half as many again, and a raid turns home and none sets out (M8 step 3e, which never ran in a savanna before). No test of its own (the rain tests pretend rain).**
+
 - **What is wrong:** "is it foraging time" asks whether the **world's weather** is rain (`level.isRaining()`). "How
   many holes tonight" asks whether rain **falls on the nest** (`Colony.rainsNow`: the weather is rain and the nest's
   biome has rain). No savanna has rain: Minecraft's own (read in `OverworldBiomes.java:327`) and the mod's floodplain
@@ -1214,6 +1230,8 @@ closed-for-danger cells only), `brokenInto` (`:260-285`: the only place that loo
 
 **In play (2026-11-27):** B. A raid at a log where the termites had stopped feeding still finds termites; at a spot with one open cell most of the termites brought out stand shut in under the wood, counted as there, with raiders pacing above them (the picture of BUGS 452).
 
+**Status (2026-11-27, `claude/review-fix-b8`): fixed (its first half): the raid's feeders stand only in the cells of the by-day places that a raider can get into (`Raid.feedersOut`, `MatabeleEntity.wayInto`), the nearest the spot first; none are shut in under whole wood. Test `theTermitesFeedingUnderTheMudStandInTheirGalleryWhenRaidersBreakIn` now asks 3 and gets the 2 under the mud. Left: one judge of "termites feed here now" owned by the termite colony, and Q-9's tenth taken twice.**
+
 - **What is wrong:** by day three questions have three answers. Who really feeds: nobody, when the store is full (the
   usual state of a well-fed colony), the food cannot be eaten from inside or no pieces are left. What the record says
   (`FeedingSpots.byDayPlaces`): every feeding gallery and closed runway that is built right, a question about blocks.
@@ -1235,6 +1253,8 @@ closed-for-danger cells only), `brokenInto` (`:260-285`: the only place that loo
 ### R5-65 (B, proven as code; how often it bites to measure): the raid reads the termites' alarm as "they have given this spot up"
 
 **In play (2026-11-27):** B. A raid whose arrival alarms the termites before the attack starts (a hole still open at dawn, a forager still out) is told nobody feeds there: the column looks round and goes home and the find is forgotten, or it attacks and the termites under the mud are not brought out for it.
+
+**Status (2026-11-27, `claude/review-fix-b8`): fixed: the alarm no longer answers `KEEP_OFF` (it answers `ALARMED`), so "keep off" means only the lasting reasons again; the foragers' plant pick asks `isAlarmed` itself (`FoodStore`). Left: Q-3, the termites plugging `OUT_THERE` for their far feeding places.**
 
 **Checked by the lead.** `SavannaParts.java:257` answers the question `KEEP_OFF` with `Alarm::keepsIn` (line 121 is
 the lasting answer, the closed holes); `Raid.java:378` (the judge) and `:1801` (`bringOutFeeders`, which returns
@@ -1323,6 +1343,8 @@ with no diary line) ask `keepsOff`.
 ### R5-69 (B, proven; a new side of R5-18 and R6-2): termite soldiers never starve and never die of age, so a colony whose workers are all gone lives on for ever as a handful of soldiers
 
 **In play (2026-11-27):** B. A mound that should be dead (no workers, no queen, no building, no foraging) stays listed as a living colony with slow soldiers walking its beats for good, and never becomes a dead mound for the Matabele to move into.
+
+**Status (2026-11-27, `claude/review-fix-b8`): fixed: a soldier starves by the workers' starve time, as a number (`Meals.dietOf`, once the workers' hunger runs) and as a body (`TermiteSoldierEntity`), so a colony of soldiers alone dies out by the rule that exists (my pick: they eat only what the workers bring). No test of its own.**
 
 - **What is wrong:** a soldier cannot feed itself; the workers bring it fungus. Without them it only slows
   (`slow_after_ticks`), as a mob and as a number: every caste but the workers has "never" as its starve time
@@ -1431,6 +1453,8 @@ with no diary line) ask `keepsOff`.
 ### R5-75 (B, proven; a new side of R5-11): the feeding-spot and gallery numbers were set for colonies of 600 to 700 workers and not looked at again when the cap became 200
 
 **In play (2026-11-27):** B. A full mound keeps about 6 feeding spots at branches where 10 to 15 were chosen for a big colony, so there are fewer by-day places for the Matabele scouts to find; and its galleries stop at about 35 blocks out, not the 50 in the species file.
+
+**Status (2026-11-27, `claude/review-fix-b8`): fixed: `nest.new_holes.per_workers` 30 to 14 (14 by-day feeding spots at the cap of 200 workers, 7 at 100, at least 3); the three reach numbers read only with the galleries off are out of the file (their defaults are the same); the galleries' note says `max_length` never binds at 200 workers and the tips' 35 blocks are kept. `tools/raid_balance.py` now caps workers at 200 as the game does: big colonies 8 to 14 spots, median 11 (6 before); a Matabele nest's nearest spot median 37 blocks (46), within 50 for 84 percent (63).**
 
 - **What is wrong:** `nest.new_holes` says "a full colony of 600 to 700 workers keeps 15, a half-grown one of 200
   keeps 6". Since the honest sizes (2026-11-11) a full colony is 200 workers: `mostFor(200)` = 6. `reach_min`,

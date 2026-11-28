@@ -432,11 +432,11 @@ public class Colony {
      */
     public boolean isForagingTime(net.minecraft.world.level.Level level) {
         Optional<SpeciesProfile.DayClock> clock = profile().food().dayClock();
+        boolean wet = rainsNow(level); // (review R5-60: the one judge, as the night's holes and the raids ask it)
         if (clock.isPresent()) {
-            return clock.get().outAt(timeOfDay(level), heat(level), rainForTests != null ? rainForTests : rainsOnNest(level));
+            return clock.get().outAt(timeOfDay(level), heat(level), wet);
         }
-        boolean day = isDay(level);
-        return profile().food().foragesNow(day, rainForTests != null ? rainForTests : level.isRaining());
+        return profile().food().foragesNow(isDay(level), wet);
     }
 
     /**
@@ -542,14 +542,17 @@ public class Colony {
         return heat;
     }
 
-    /** Whether rain falls on the nest now (never in a dry biome such as the badlands or the desert). */
-    private boolean rainsOnNest(net.minecraft.world.level.Level level) {
-        return level.isRaining() && level.getBiome(center).value().hasPrecipitation();
-    }
-
-    /** Whether it rains on the nest now (as the colony sees it: a game test may pretend, see {@link #setRainForTests}). */
+    /**
+     * Whether the weather is wet at the nest now (as the colony sees it: a game test may pretend, see
+     * {@link #setRainForTests}): the world's weather is rain. The one judge for the foraging time, the night's holes and
+     * the raids (review R5-60: the foraging time asked the world's weather and the holes and the raids asked whether rain
+     * falls on the nest's biome, and no savanna has rain to fall in Minecraft, so the two never agreed: termites came out
+     * by day under a "dry" sky while the rain's extra holes and the raids' turning home never ran). The world's weather
+     * still turns wet over a savanna (the sky darkens), and real Macrotermes forage on wet, overcast days; the dry-sky
+     * look is for the seasons work to make right.
+     */
     public boolean rainsNow(net.minecraft.world.level.Level level) {
-        return rainForTests != null ? rainForTests : rainsOnNest(level);
+        return rainForTests != null ? rainForTests : level.isRaining();
     }
 
     /**
@@ -730,6 +733,14 @@ public class Colony {
     public boolean queenDied(ServerLevel level) {
         queenDiedAt = level.getGameTime();
         return !isEmpty(level);
+    }
+
+    /**
+     * Review R5-24: away, the colony has died out: its queen dead or starved (as far as the brain knows) and nobody left
+     * in the numbers. (Near, the queen's body ends it when she dies, and {@link #tick} when nobody is left.)
+     */
+    public boolean diedOutAway(ServerLevel level) {
+        return !queenCare().isAlive() && isEmpty(level);
     }
 
     /** Nobody left: no workers or soldiers, no eggs or young. */

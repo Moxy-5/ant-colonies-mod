@@ -1815,8 +1815,12 @@ public final class Raid implements FightDiary {
 
     /**
      * {@link #bringOutFeeders}'s work: up to {@code wanted} workers of this termite colony come out of its numbers into
-     * the free cells of its by-day feeding places within {@code reach} of the spot, one a cell, the cells with a way in
-     * first, then the nearest the spot, and stay bodies until {@code until}. Returns how many came out.
+     * the free cells of its by-day feeding places within {@code reach} of the spot that a raider can get into
+     * ({@link MatabeleEntity#wayInto}), one a cell, the nearest the spot first, and stay bodies until {@code until}.
+     * Returns how many came out. (Review R5-64: the cells with no way in came after the others, so at a spot with one
+     * open cell most of the termites brought out stood shut in under the wood, counted as there, with the raiders pacing
+     * above them: a termite no raider can reach is no prey. Real Macrotermes do keep workers under their sheeting by
+     * day; here they are the ones the raid can reach.)
      */
     public static int feedersOut(ServerLevel level, Colony termites, BlockPos at, double reach, int wanted, long until) {
         if (wanted <= 0) {
@@ -1835,9 +1839,8 @@ public final class Raid implements FightDiary {
                 }
             }
         }
-        Map<BlockPos, Boolean> wayIn = new HashMap<>();
-        cells.sort(Comparator.comparing((BlockPos cell) -> !wayIn.computeIfAbsent(cell, in -> MatabeleEntity.wayInto(level, in)))
-                .thenComparingDouble(cell -> cell.distSqr(at)));
+        cells.removeIf(cell -> !MatabeleEntity.wayInto(level, cell));
+        cells.sort(Comparator.comparingDouble(cell -> cell.distSqr(at)));
         int out = 0;
         for (BlockPos cell : cells) {
             if (out >= wanted) {

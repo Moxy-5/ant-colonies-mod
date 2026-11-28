@@ -49,6 +49,36 @@ public class MatabeleNestTests {
     }
 
     /**
+     * Review R6-20: a torch a player puts down the old chimney to look in (a block the ants walk through) leaves the
+     * nest's rooms where they were: the queen's room is still open and every room still counts. A solid block in the same
+     * cell shuts the way (as a stone would shut real ants in), and taken out again the rooms are back.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
+    public static void aTorchDownTheChimneyLeavesTheMatabeleRoomsOpen(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestScenes.deepGround(helper);
+        BlockPos middle = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
+        Colony termites = NewLandMounds.get(level).put(level, middle, NewLandMounds.pickFor("dead", 30, 5L));
+        helper.assertTrue(termites != null, "no dead mound put in");
+        Colony colony = settled(helper, helper.absolutePos(new BlockPos(MIDDLE + 9, SURFACE, MIDDLE)));
+        com.antcolonies.colony.NestPlan.Chamber home = colony.nest().getHomeChamber(level);
+        helper.assertTrue(home != null && !home.wayIn().isEmpty(), "the nest has no royal chamber with a way in" + colony.nest().describeSite(level));
+        int rooms = colony.nest().getAllRoomCells(level).size();
+        helper.assertTrue(rooms > 0 && colony.nest().getFinishedRoomCenter(level) != null, "the rooms are not open before the torch");
+        BlockPos way = home.wayIn().get(home.wayIn().size() / 2);
+        helper.assertTrue(level.getBlockState(way).isAir(), "the chimney cell " + way.toShortString() + " is not open to put a torch in");
+        level.setBlock(way, net.minecraft.world.level.block.Blocks.TORCH.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+        helper.assertTrue(colony.nest().getAllRoomCells(level).size() == rooms, "a torch in the chimney at " + way.toShortString() + " hid the rooms: "
+                + colony.nest().getAllRoomCells(level).size() + " room cells of " + rooms);
+        helper.assertTrue(colony.nest().getFinishedRoomCenter(level) != null, "a torch in the chimney shut the queen out of her room");
+        level.setBlock(way, net.minecraft.world.level.block.Blocks.COBBLESTONE.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+        helper.assertTrue(colony.nest().getAllRoomCells(level).size() < rooms, "a stone in the chimney does not shut the way in");
+        level.setBlock(way, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+        helper.assertTrue(colony.nest().getAllRoomCells(level).size() == rooms, "the rooms are not back once the stone is gone");
+        helper.succeed();
+    }
+
+    /**
      * No dead mound near: a queen put down has no colony and the command makes none (dead mounds are the only home for
      * now, the user, 2026-10-24); once a dead mound is put in near her she finds it on her next look and settles in it.
      */

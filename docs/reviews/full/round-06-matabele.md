@@ -651,6 +651,8 @@ Honest about what is known: neither reader had a checked Megaponera development 
 
 **In play (2026-11-27):** B. Likely, not proven: one block you put in a Matabele nest's chimney (a torch) makes the colony lose all its rooms.
 
+**Status (2026-11-27, `claude/review-fix-b8`): fixed for any block the ants walk through: a way in (the shaft, the stairs, a tunnel to a room, a Matabele nest's old chimney) is open while every cell is dug out or holds something with no collision and no fluid (`Nest.isWayOpen`), so a torch down the chimney leaves every room as it was; what is dug or filled (`isDugOut`) is unchanged. A solid block still shuts the way, as a stone would shut real ants in (digging round it is not built). Test `aTorchDownTheChimneyLeavesTheMatabeleRoomsOpen`.**
+
 The lead read `Nest.getRoomCells` (`Nest.java:798-806`) and `isDugOut` (`:775-781`): every way-in cell must be air, a heap or a ramp, or the room has no cells. The rule holds; that a torch in a dead mound's chimney is on the way in of every room, and what the ants then do, were not walked, so it stays "likely" and grade B. If it holds in play it is a grade A (a player can meet it with one torch).
 
 - **What is wrong:** a room counts only while every cell of its way in is open (`Nest.getRoomCells`,

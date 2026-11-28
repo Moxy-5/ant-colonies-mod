@@ -33,6 +33,12 @@ public class ColonyManager extends SavedData {
      * never costs the others (review R1-30, R1-42: before, one throw emptied the whole list).
      */
     private final java.util.List<CompoundTag> unread = new java.util.ArrayList<>();
+    /**
+     * Review R5-24: the colonies that died out while away (saved). Their insects frozen in land not loaded (a starved
+     * queen in her room, a worker folded into the numbers that died as one) leave the world when that land loads, rather
+     * than waking up with no colony (a queen with none founds a new one).
+     */
+    private final java.util.Set<UUID> endedAway = new java.util.HashSet<>();
 
     public static ColonyManager get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
@@ -100,6 +106,14 @@ public class ColonyManager extends SavedData {
                 } finally {
                     com.antcolonies.debug.Perf.colonyWhere(null);
                     com.antcolonies.debug.Perf.colony(place, System.nanoTime() - started);
+                }
+                if (colony.diedOutAway(level)) {
+                    // Review R5-24 (and R1-27): ended now, not when a player next comes near: its dead nest is written
+                    // down from the day it died, and nothing counts it as living meanwhile.
+                    com.antcolonies.ColonyFrameworkMod.LOGGER.info("[colony] colony {} at {} has died out while away ({}); its nest is abandoned",
+                            colony.getId(), colony.getCenter().toShortString(), place);
+                    endedAway.add(colony.getId());
+                    colonyEnded(level, colony);
                 }
                 continue;
             }
@@ -193,6 +207,11 @@ public class ColonyManager extends SavedData {
         setDirty();
     }
 
+    /** Review R5-24: whether the colony with this id died out while away (its insects frozen out there leave when they load). */
+    public boolean endedAway(@Nullable UUID id) {
+        return id != null && endedAway.contains(id);
+    }
+
     public void removeColony(UUID id) {
         if (colonies.remove(id) != null) {
             setDirty();
@@ -241,6 +260,11 @@ public class ColonyManager extends SavedData {
             list.add(kept.copy());
         }
         tag.put("colonies", list);
+        ListTag ended = new ListTag();
+        for (UUID id : endedAway) {
+            ended.add(net.minecraft.nbt.NbtUtils.createUUID(id));
+        }
+        tag.put("endedAway", ended);
         return tag;
     }
 
@@ -257,6 +281,9 @@ public class ColonyManager extends SavedData {
                 com.antcolonies.ColonyFrameworkMod.LOGGER.error("[colony] a saved colony could not be read and is kept as it was (species {}, id {})",
                         saved.getString("species"), saved.hasUUID("id") ? saved.getUUID("id") : "?", e);
             }
+        }
+        for (Tag t : tag.getList("endedAway", Tag.TAG_INT_ARRAY)) {
+            manager.endedAway.add(net.minecraft.nbt.NbtUtils.loadUUID(t));
         }
         return manager;
     }

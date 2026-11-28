@@ -660,8 +660,9 @@ public class TermiteRaidDefenceTests {
      * colony by day with a feeding gallery under dead wood on its record, sixty workers in its numbers and no body at
      * the place. Under whole wood, with no mud, the raiders have no way in ({@code MatabeleEntity.wayIn}); two blocks
      * eaten through and plastered with mud, they have. Then three feeders are called out ({@code Raid.feedersOut}, what
-     * a raid of real ants does as its attack begins): three workers stand in the gallery's cells, the numbers hold three
-     * fewer, and five seconds later they are still bodies (the colony's crew count took such ones back at once).
+     * a raid of real ants does as its attack begins): two workers stand in the gallery's two cells under the mud (review
+     * R5-64: none in the cells under whole wood, where no raider can reach them), the numbers hold two fewer, and five
+     * seconds later they are still bodies (the colony's crew count took such ones back at once).
      */
     @GameTest(template = "arena", timeoutTicks = 2000, skyAccess = true, batch = "termite_feeders_come_out")
     public static void theTermitesFeedingUnderTheMudStandInTheirGalleryWhenRaidersBreakIn(GameTestHelper helper) {
@@ -698,22 +699,22 @@ public class TermiteRaidDefenceTests {
                     "a gallery under mud a major may bite open counts as having no way in");
             int inside = colony.population().inside(com.antcolonies.colony.Caste.WORKER);
             int out = com.antcolonies.savanna.colony.Raid.feedersOut(level, colony, food, 10.0, 3, level.getGameTime() + 2400);
-            helper.assertTrue(out == 3, out + " feeder(s) came out of 3 asked for, with " + inside + " workers in the numbers and 4 free gallery cells");
-            helper.assertTrue(colony.population().inside(com.antcolonies.colony.Caste.WORKER) == inside - 3,
-                    "the numbers hold " + colony.population().inside(com.antcolonies.colony.Caste.WORKER) + " workers after 3 came out of " + inside);
+            // (review R5-64: only the two cells under the mud, where a major can break in; none shut in under whole wood)
+            helper.assertTrue(out == 2, out + " feeder(s) came out of 3 asked for, with " + inside + " workers in the numbers and 2 free gallery cells a raider can get into");
+            helper.assertTrue(colony.population().inside(com.antcolonies.colony.Caste.WORKER) == inside - 2,
+                    "the numbers hold " + colony.population().inside(com.antcolonies.colony.Caste.WORKER) + " workers after 2 came out of " + inside);
             came.addAll(TestIsolation.insectsOf(helper, TermiteWorkerEntity.class));
-            helper.assertTrue(came.size() == 3 && came.stream().allMatch(termite -> gallery.contains(termite.blockPosition())),
-                    "the feeders do not stand in the gallery's cells: " + came.stream().map(termite -> termite.blockPosition().toShortString()).toList());
-            // (under the mud first: where a major can break in to them)
-            helper.assertTrue(came.stream().anyMatch(termite -> termite.blockPosition().equals(gallery.get(1)) || termite.blockPosition().equals(gallery.get(2))),
-                    "no feeder stands under the mud, where the raiders have their way in");
+            helper.assertTrue(came.size() == 2 && came.stream().allMatch(termite -> termite.blockPosition().equals(gallery.get(1))
+                            || termite.blockPosition().equals(gallery.get(2))),
+                    "the feeders do not all stand under the mud, where the raiders have their way in: "
+                            + came.stream().map(termite -> termite.blockPosition().toShortString()).toList());
             calledAt[0] = level.getGameTime();
         });
         helper.succeedWhen(() -> {
             helper.assertTrue(calledAt[0] >= 0 && level.getGameTime() - calledAt[0] >= 100, "waiting 5 s after the feeders came out");
             helper.assertTrue(came.stream().allMatch(termite -> termite.isAlive() && !termite.isRemoved()),
                     "a feeder brought out for the raid went back into the numbers within 5 s: "
-                            + came.stream().filter(termite -> termite.isRemoved()).count() + " of 3 gone");
+                            + came.stream().filter(termite -> termite.isRemoved()).count() + " of 2 gone");
         });
     }
 

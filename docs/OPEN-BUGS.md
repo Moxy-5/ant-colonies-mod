@@ -10,10 +10,10 @@ for the number there).
 | Part | Left |
 |---|---|
 | In the game: A, it breaks play | 1 |
-| In the game: B, it looks or plays wrong | 34 |
+| In the game: B, it looks or plays wrong | 22 |
 | In the game: C, small or rare | 54 |
 | Waiting for your call | 27 |
-| Behind the scenes (code review) | 206 |
+| Behind the scenes (code review) | 204 |
 | Tool faults | 6 |
 | *Test flakes, in `docs/TEST-FLAKES.md`* | *59* |
 
@@ -23,7 +23,7 @@ Something a player meets goes wrong in a way that matters: a crash, a freeze, a 
 
 - **306** The raids were rewritten from scratch (2026-11-24) and three long unattended runs are done: every raid ends, none hangs or crashes, and since the fix of the tail left behind (BUGS 450) the raiding colonies bring home enough to hold their size (151 termites in the last run, 23 and 57 before). Still to do: you watch raids in-game; the smaller raid bugs left are on this list.
 
-## B: it looks or plays wrong (34)
+## B: it looks or plays wrong (22)
 
 A player will likely see it, and the game goes on.
 
@@ -41,25 +41,13 @@ A player will likely see it, and the game goes on.
 - **R4-18** A busy river costs frames: about 6.5 ms a frame for 103 river animals in view (it was 13.3). *(half fixed)*
 - **R4-26** A bullfrog (or a land animal later) caught by a crocodile hangs upright and still while the crocodile rolls it.
 - **R5-7** A short hitch as each mound of new land appears while exploring, worst for big living mounds and for old dead ones; one can go in every half second while places wait. *(half fixed)*
-- **R5-14** After a player digs into a garden the colony list keeps showing comb that is gone, and the nest unlocks levels from food it no longer has; away, workers can starve beside old comb.
-- **R5-19** After one `/time set day` in a world 60 days old, no dead mound wears and no dead comb rots for 60 days of play; with the daylight cycle off they never do.
-- **R5-20** Round every mound that died in play, little patches of coarse dirt round the old foraging holes never green over, while the holes themselves and the mound beside them grass over.
-- **R5-21** Now and then a mound of new land whose rooms are flooded (a river bank, a buried pool, a cave), or lava running into a nest.
-- **R5-23** Coming back to a mound that died long ago: it stands as it was left, then drops a slice every 5 seconds, top first, with a burst of breaking sounds, until weeks of wear are done in a minute or two.
-- **R5-24** A mound whose colony has been dead for 100 days stands fresh and only begins to wear on arrival; until then Matabele scouts walk out to a mound with nobody in it.
 - **R5-56** At a raided feeding spot the termite workers stay in the roofed part of the gallery beside the break, some still feeding, and are stung and carried off one by one; they do not pour back down the gallery while the soldiers hold the opening, as real Macrotermes workers do. *(half fixed)*
 - **R5-59** A server that gets slower beside grown termite mounds whose web has used up its length while known logs or hay lie farther out, the usual state of a grown colony. Not measured. *(half fixed)*
-- **R5-60** On a grey day with no rain falling in the savanna the foraging holes open and termites walk out at noon, where the Matabele's day raids and the player find them; and there is never a rainy night with more holes open.
 - **R5-61** At night beside a grown mound termites trail far across open ground away from any open hole, and lone scouts wander tens of blocks out, where the design means a tight ring of grazers round each open hole; these far walkers are the ones caught out at dawn.
 - **R5-63** At dusk by a growing colony few or no holes open for minutes while the builders dig; by a grown one the holes open one after another across the land instead of together; and a hole no builder can reach leaves the holes after it shut all night, with builders standing idle.
-- **R5-64** A raid at a log where the termites had stopped feeding still finds termites; at a spot with one open cell most of the termites brought out stand shut in under the wood, counted as there, with raiders pacing above them (the picture of BUGS 452).
-- **R5-65** A raid whose arrival alarms the termites before the attack starts (a hole still open at dawn, a forager still out) is told nobody feeds there: the column looks round and goes home and the find is forgotten, or it attacks and the termites under the mud are not brought out for it.
 - **R5-68** The same raid on the same colony is a hard fight unwatched (60% of the soldiers answer, up to 12, a quarter of them taken) and a light one watched (the one to three soldiers at the spot); and a watched raid shuts the spot for about three and a half days where an unwatched one shuts it for two.
-- **R5-69** A mound that should be dead (no workers, no queen, no building, no foraging) stays listed as a living colony with slow soldiers walking its beats for good, and never becomes a dead mound for the Matabele to move into.
 - **R5-73** Colonies far from the player fill up and reach the cap of 200 however bare their land, while the colony the player watches is held by its real grass and wood; after a long absence the far colonies are the big ones.
-- **R5-75** A full mound keeps about 6 feeding spots at branches where 10 to 15 were chosen for a big colony, so there are fewer by-day places for the Matabele scouts to find; and its galleries stop at about 35 blocks out, not the 50 in the species file.
 - **R5-80** Watching in spectator, an eaten fallen tree leaves its log-shaped mud cast standing for good, leftover plates of a filled gallery stay, every crust stays fresh (lightest colour, softest to break), pulp heaps do not sink and remains do not weather.
-- **R6-20** Likely, not proven: one block you put in a Matabele nest's chimney (a torch) makes the colony lose all its rooms.
 - **R8-3** Likely, not proven: with a biome mod that is a data pack (Terralith, say) its biomes may not appear at all.
 
 ## C: small or rare (54)
@@ -182,18 +170,16 @@ number and what you want.
 - **R11-22** (the new raid code) Numbers
   - *Your call:* Real ants in one raid. `most_real` is 75, while the project's aim is about 50 to 60 real mobs for a whole colony. Lower it to about 50 (the rest of a big raid goes along as numbers, as now), or keep 75 for the look of a long column? My pick: keep 75 unless you see lag in a big raid; it is your eye that decides.
 
-## Behind the scenes (206)
+## Behind the scenes (204)
 
 Code review findings no player sees: code that will cost us when building on it (speed not yet measured,
 rules in two places, gaps in the checks) and tidy-ups. *Open* means looked at and left for the reason
 given; *half fixed* says what is left; no word means nobody has started it.
 
-### Will cost us when building on it (48)
+### Will cost us when building on it (47)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
-- **R1-27** A colony that dies out while away is not ended until a player comes near
-  - *Open:* left on purpose. Ending a colony writes down its dead mound, combs and works by reading their blocks (`DeadMounds.addMound`, `addCombs`, `DeadWorks.record`), so it cannot be done as numbers in land that is not loaded; ending it ...
 - **R1-31** Every colony ever made ticks once a second for ever and marks the file changed
   - *Open:* to measure, in a big explored world (not done; no such world at hand). Checked now: marking the file only on a change saves nothing, since a colony's clocks (ages, meals, the garden) change every second it lives as numbers; the ...
 
@@ -303,7 +289,7 @@ given; *half fixed* says what is left; no word means nobody has started it.
 - **R12-65** `MoveRider`, the planned one home for block moves, lacks two lessons of the monitor's copy, and the drawing half is copied three times
   - *Half fixed:* `MoveRider` has the two lessons: its room checks for up, down and out ask for the middle line too (no change for the otter: its feet stand 0.22 blocks out, so the middle is always one of the feet's columns), and a move cut on its ...
 
-### Tidy-ups (158)
+### Tidy-ups (157)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -404,7 +390,6 @@ given; *half fixed* says what is left; no word means nobody has started it.
 - **R5-46** The dead works' list of "the nest, never filled" leaves out the side rooms
 - **R5-48** The mound's allowance for a whole absence is paid at the head count on the day of return
 - **R5-49** The bare patches catch up all in one tick on return
-- **R5-50** Two block reads with no loaded-land check, reachable today only by the kill command
 - **R5-51** Three places where the mound meets the player's own digging and building
 - **R5-85** Small leftovers in the web's and the holes' books
 - **R5-86** A closed hole stays shut by game time, the foraging hours run on the day clock
@@ -514,16 +499,16 @@ Faults in the test and film tools, not in the game.
 
 ## The code review so far
 
-519 findings: 294 left (above), 225 done (below). The plan: `docs/plans/code-review.md`.
+519 findings: 280 left (above), 239 done (below). The plan: `docs/plans/code-review.md`.
 
 | Round | System | Found | Left | Done |
 |---|---|---|---|---|
-| 1 | the colony brain | 50 | 16 | 34 |
+| 1 | the colony brain | 50 | 15 | 35 |
 | 2 | the legs | 43 | 18 | 25 |
 | 3 | the insect body | 45 | 32 | 13 |
 | 4 | how bodies are drawn | 37 | 32 | 5 |
-| 5 | the termites | 97 | 84 | 13 |
-| 6 | the Matabele ants (not raids) | 33 | 30 | 3 |
+| 5 | the termites | 97 | 72 | 25 |
+| 6 | the Matabele ants (not raids) | 33 | 29 | 4 |
 | 7 | the giant trees | 36 | 15 | 21 |
 | 8 | the world | 20 | 14 | 6 |
 | 9 | the river hunters | 44 | 19 | 25 |
@@ -556,6 +541,7 @@ Faults in the test and film tools, not in the game.
 - **R1-22** (B) The catch-up digs the founders' chamber by weaker rules than the real diggers
 - **R1-24** (C) `Nest.isEntranceOpen` reads the block before asking whether the land is ready (BUGS 390)
 - **R1-26** (B) The far rule removes loaded insects without asking whether a player can see them
+- **R1-27** (B) A colony that dies out while away is not ended until a player comes near
 - **R1-28** (B) Folding an insect into the numbers loses a species load it carries
 - **R1-29** (B) An insect frozen while its colony is here waits in limbo
 - **R1-30** (B) One colony that fails to load wipes every colony of the dimension (BUGS 387)
@@ -631,18 +617,31 @@ Faults in the test and film tools, not in the game.
 - **R5-5** (A) A window a builder bites in a tunnel stays open for ever if the builder dies, is folded into the numbers, or its land unloads while it works through it
 - **R5-6** (A) Dead mounds are worn right at the edge of loaded land with only each block's own chunk checked, and every change makes Minecraft read the blocks beside it, which loads the next chunk on the spot
 - **R5-8** (A) The soil carrier walks by its own rules, with up to 12 route searches in one tick and no cheap "no way there"
+- **R5-14** (B) The colony's food count and the comb in the world are two truths that drift apart, and nothing brings them back together
+- **R5-19** (B) Dead mounds count their days on the day clock, everything else on game time, so `/time set day` stops every dead mound from rotting and wearing
+- **R5-20** (B) When a termite colony dies, the bare earth round its holes stays bare for good
+- **R5-21** (B) The nest of a mound of new land is dug through water and lava, which the termites themselves never do
+- **R5-23** (B) The wear a dead mound owes from a long absence is paid in front of the returning player, 256 blocks at a stroke, each with its breaking sound
+- **R5-24** (B) A colony that dies out while away leaves no dead mound until a player comes near, and counts as living until then
+- **R5-50** (C) Two block reads with no loaded-land check, reachable today only by the kill command
 - **R5-52** (A) A night skipped with `/time set day`, or a day clock that stands still, takes the termites' foraging, and the fix for the slept night does not see it
 - **R5-53** (A) Eaten dry grass grows back green and only dries on Minecraft's random ticks, so near a spectator, and far from every player, a colony's grass never becomes food again
 - **R5-54** (A) One gallery block the termites cannot dig stops the whole web from growing, for good
 - **R5-55** (A) A termite alarm never ends while one living enemy insect stays within 4 blocks of it, and it walks along with that enemy
 - **R5-57** (A) The minors take every real soldier place first, so at night beside a full colony, and whenever a raid's drumming reaches the nest, every real major is sent into the numbers
 - **R5-58** (A) A creature in a gallery puts the hidden termites back, and they go under again on the very next tick, so they blink and slip past it unseen
+- **R5-60** (B) "it rains" is judged two ways along the same night, and in a savanna the two never agree
+- **R5-64** (B) By day the colony's record names where termites could feed, not where any termite is, and the raid stands termites also in cells no raider can get at
+- **R5-65** (B) The raid reads the termites' alarm as "they have given this spot up"
+- **R5-69** (B) Termite soldiers never starve and never die of age, so a colony whose workers are all gone lives on for ever as a handful of soldiers
+- **R5-75** (B) The feeding-spot and gallery numbers were set for colonies of 600 to 700 workers and not looked at again when the cap became 200
 
 *Round 6, the Matabele ants (not raids)*
 
 - **R6-1** (A) A second player joining over LAN, or anyone on a server, is thrown out (or crashes) when a Matabele worker comes into view
 - **R6-2** (A) A Matabele colony whose workers all die keeps its queen for ever, and its dead mound stays taken
 - **R6-3** (A) A major with a fresh wound, or badly wounded, is sent out scouting alone
+- **R6-20** (B) One block a player puts anywhere in the chimney hides every room of the nest
 
 *Round 7, the giant trees*
 

@@ -442,6 +442,8 @@ servers, not in the user's usual game. They stay A: a freeze is a freeze, and th
 
 **Status (2026-11-26, `claude/review-fix-1b`): open: left on purpose. Ending a colony writes down its dead mound, combs and works by reading their blocks (`DeadMounds.addMound`, `addCombs`, `DeadWorks.record`), so it cannot be done as numbers in land that is not loaded; ending it away needs those three made to work from the brain's own lists first. What is lost today is small: an empty, queenless colony has no members to raid or count, and its mound starts to wear when a player comes, not when it died. Now grade C by my judgment.**
 
+**Status (2026-11-27, `claude/review-fix-b8`): fixed by R5-24's fix: a colony away whose queen is dead or starved and whose numbers hold nobody is ended there (`Colony.diedOutAway`); the three readers of blocks at a colony's end now cope with land not loaded (the mound's already did; the garden's comb is read when it loads, `DeadMounds.UNREAD`; the works read only the plan); its insects frozen out there leave when their land loads (`ColonyManager.endedAway`).**
+
 - **Where:** `ColonyManager.java:89-98` (the away branch calls only `tickAway`); `Colony.java:675-678` (the one
   `isQueenless() && isEmpty` check, in the near tick); `QueenCare.java:401-403` (a queen starved away is only a flag).
 - **What is wrong:** the empty record ticks as numbers every second and sends no `COLONY_ENDED` news until a player is

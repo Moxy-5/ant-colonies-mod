@@ -141,8 +141,8 @@ public class TermiteQueenEntity extends AbstractAntEntity implements SwellingQue
     @Override
     public void tick() {
         super.tick();
-        if (!(level() instanceof ServerLevel serverLevel)) {
-            return;
+        if (!(level() instanceof ServerLevel serverLevel) || isRemoved() || isDeadOrDying()) {
+            return; // (dying: no new colony for her, review R5-24)
         }
         ColonyManager manager = ColonyManager.get(serverLevel);
         // Once, on the first tick: make sure the brain has a colony for this queen.

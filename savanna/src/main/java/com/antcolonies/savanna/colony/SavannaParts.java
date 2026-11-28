@@ -151,7 +151,7 @@ public final class SavannaParts {
             .ticks(20, FungusGarden::grow)
             .hears(ColonyNews.HEAP_GONE, 10, (garden, level, news) -> garden.loseNodules(news.nodules())) // a comb eaten right down: its nodules go with it
             .hears(ColonyNews.COLONY_ENDED, 20, (garden, level, news) -> // M8 1a: Xylaria takes the dead garden
-                    DeadMounds.get(level).addCombs(level, news.colony(), news.center(), garden.getCombs(level)))
+                    DeadMounds.get(level).addCombs(level, news.colony(), news.center(), garden.combsAtEnd(level)))
             .plugs(ColonyHooks.AWAY_AFTER_NURSES, 10, garden -> new GardenAway(garden)::grow) // nodules grow and the comb ages while away
             .plugs(ColonyHooks.LOOK_ON_LEAVING, 10, garden -> garden::look) // the comb counted as the colony goes away far (BUGS 146)
             .answers(ColonyQuestions.NOTHING_TO_EAT_IN_STORE, 10, (garden, level, nothing) -> garden.oldKnown() <= 0) // no old layer as far as the brain knows
@@ -254,7 +254,9 @@ public final class SavannaParts {
             // or nap and no food is fetched; nowhere else. (It plugs no hole itself: an attacked hole is plugged by the
             // danger memory, the closed holes, which hear the same news.)
             .answers(ColonyQuestions.ALARMED, 10, Alarm::keepsIn)
-            .answers(ColonyQuestions.KEEP_OFF, 50, Alarm::keepsIn)
+            // (Review R5-65: it no longer answers "keep off" as well. That question means the lasting reasons, an attack
+            // remembered, a spot shut; a raid asked it and read a trouble of a few seconds as "they have given this spot
+            // up": no termite there, the feeders not brought out. The foragers' pick asks "alarmed" itself.)
             .hears(ColonyNews.PLAYER_STAMPED, 10, (alarm, level, news) -> alarm.footsteps(level, news.player())) // something felt
             .hears(ColonyNews.BLOCK_BROKEN, 10, (alarm, level, news) -> alarm.blockBroken(level, news.where(), news.breaker())) // a breach
             .notSaved("a trouble lasts a minute or two: after a load the colony is calm"));
@@ -275,6 +277,7 @@ public final class SavannaParts {
     public static final Type<BarePatches> BARE_PATCHES = listed("bare_patches", BarePatches::new, part -> part
             .ticks(110, BarePatches::tick)
             .hears(ColonyNews.PLANT_EATEN, 10, (patches, level, news) -> patches.eatenAway(level, news.where(), news.eaten(), news.eatenAt()))
+            .hears(ColonyNews.COLONY_ENDED, 40, (patches, level, news) -> patches.colonyEnded(level, news.center())) // R5-20 (after the galleries' 30)
             .plugs(ColonyHooks.LIST_HOLES, 30, patches -> level -> patches.colony().profile().section(SavannaNumbers.REGROWTH).isPresent() ? ", " + patches.describe() : "")
             .saves(BarePatches::save, BarePatches::load)
             .sample(BarePatches::fillForTests));
