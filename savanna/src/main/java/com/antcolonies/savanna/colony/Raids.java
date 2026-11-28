@@ -20,7 +20,6 @@ import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.SavannaSpecies;
 import com.antcolonies.savanna.entity.MatabeleEntity;
 import com.antcolonies.savanna.entity.goal.MatabeleRaidGoal;
-import com.antcolonies.savanna.registry.SavannaEntities;
 import com.antcolonies.savanna.species.SavannaNumbers;
 import com.antcolonies.watch.Watch;
 
@@ -573,8 +572,8 @@ public class Raids {
 
     /**
      * M8 step 3d: what the raiders going as numbers took under the mud comes home with the column: onto the prey pile (out
-     * of sight: they are numbers), and the termite colony remembers the attack (its danger map: it keeps off the spot a
-     * few days and plugs the holes there, brain step 4g), as the real raiders' stings already tell it.
+     * of sight: they are numbers). The termite colony remembered the attack when they took it (its danger map: it keeps
+     * off the spot a few days and plugs the holes there, brain step 4g; {@code Raid.remembered}, review R5-68).
      */
     private void bringHiddenHome(ServerLevel level, Raid raid) {
         int hidden = raid.hiddenCatch();
@@ -588,10 +587,6 @@ public class Raids {
             pile.bringInCounted(level.getGameTime(), hidden); // (out of sight: counted, no block touched; its layers are laid later)
         }
         colony.away().note(level, com.antcolonies.colony.AwayReport.What.PREY_BROUGHT, hidden);
-        Colony termites = raid.hiddenFrom() == null ? null : ColonyManager.get(level).getColony(raid.hiddenFrom());
-        if (termites != null) {
-            termites.danger().hurt(level, raid.find().at(), SavannaEntities.MATABELE_MAJOR.get().toShortString(), true);
-        }
         say(level, "the raiders going as numbers bring " + hidden + " termite(s) home" + (pile == null ? "" : pile.describe(level)));
     }
 

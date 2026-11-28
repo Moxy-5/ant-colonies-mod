@@ -24,7 +24,8 @@ import net.minecraft.world.entity.ai.goal.Goal;
  * <p><b>Scouting and telling</b> (termites): a forager with no food plant it knows of walks out to a random spot in the
  * colony's food area and looks round there; the colony knows what it found once it is back inside. Even when there is
  * known food, about one trip in {@link #SCOUT_ANYWAY} is a scouting trip, so a richer find farther out is still made.
- * The spot lies between a third of the food radius and all of it from the entrance, so the scouts range out.
+ * The spot lies between a third of the food radius and all of it from the entrance, so the scouts range out; with
+ * galleries (termites underground) it lies within the graze of one of the holes open tonight (review R5-61).
  *
  * <p>(Until 2026-11-23 this goal also held the red harvester ant's two other ways: searching alone and being called
  * out to a rich patch along a scent line. They left with it; the git tag {@code harvester-last} has them.)
@@ -73,9 +74,34 @@ public class ScoutGoal extends Goal {
         return spot != null;
     }
 
-    /** A random open spot on the ground in the colony's food area, outside the nest and the mound; null if none was hit. */
+    /**
+     * A random open spot on the ground in the colony's food area, outside the nest and the mound; null if none was hit.
+     * A colony with galleries scouts only round the holes open to the foragers tonight, within the graze of one picked
+     * at random (review R5-61: the one rule of where it grazes, {@code FieldLife#grazedFrom}; the night's explore holes,
+     * picked on the web's far side, give the new ground). Before, a scout walked to a random spot anywhere in the whole
+     * range, up to 56 blocks out over open ground.
+     */
     @Nullable
     private BlockPos pickSpot(ServerLevel level, Colony colony) {
+        com.antcolonies.colony.ColonyHooks.Underground web = colony.underground();
+        if (web != null) {
+            java.util.List<BlockPos> holes = web.holesInTurn(level);
+            if (holes.isEmpty()) {
+                return null;
+            }
+            int graze = web.grazeRadius();
+            for (int tries = 0; tries < 8; tries++) {
+                BlockPos hole = holes.get(ant.getRandom().nextInt(holes.size()));
+                float angle = ant.getRandom().nextFloat() * Mth.TWO_PI;
+                double distance = 1.0 + ant.getRandom().nextDouble() * Math.max(0, graze - 1);
+                BlockPos cell = openGround(level, colony, hole.getX() + Mth.floor(Math.cos(angle) * distance),
+                        hole.getZ() + Mth.floor(Math.sin(angle) * distance));
+                if (cell != null) {
+                    return cell;
+                }
+            }
+            return null;
+        }
         int radius = colony.foragingRadius();
         for (int tries = 0; tries < 8; tries++) {
             float angle = ant.getRandom().nextFloat() * Mth.TWO_PI;

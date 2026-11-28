@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "antcolonies:mud_crust",
+    "antcolonies:mud_cast",
+    "antcolonies:pulp_heap",
+    "antcolonies:termite_remains"
+  ]
+}

@@ -557,6 +557,13 @@ public class MatabeleAwayTests {
                     int lost = termitesBefore[0] - termites[0].population().inside(Caste.WORKER);
                     helper.assertTrue(lost <= hidden / many + 1, hidden + " termites taken, but the termites' count lost " + lost
                             + " (one counted stands for " + many + ")");
+                    // Review R5-68: what the numbers took is remembered by the termites as they take it, a sting a termite,
+                    // as a watched raid's stings are (it was one death written when the raid got home).
+                    com.antcolonies.species.SpeciesProfile.DangerNumbers danger = termites[0].danger().numbers();
+                    double remembered = termites[0].danger().places().stream().filter(place -> place.pos().closerThan(spot, 6))
+                            .mapToDouble(com.antcolonies.colony.DangerMap.Place::peak).max().orElse(0);
+                    helper.assertTrue(hidden == 0 || remembered >= Math.min(danger.most(), hidden * danger.hurt()) - 0.01, "the termites lost "
+                            + hidden + " to the raid but remember only " + remembered + " there: " + termites[0].danger().describe(level));
                 })
                 .thenWaitUntil(() -> helper.assertTrue(raids.column() != column[0], "the raid is not home yet; " + column[0].describe()))
                 .thenExecute(() -> {

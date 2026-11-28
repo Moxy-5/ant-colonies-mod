@@ -5,15 +5,14 @@ import java.util.List;
 import java.util.Map;
 
 import com.antcolonies.colony.Colony;
+import com.antcolonies.block.WithheldTicks;
 import com.antcolonies.colony.LandReady;
 import com.antcolonies.savanna.block.MoundSoil;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -37,8 +36,6 @@ final class MoundDrying {
     private static final int PAUSE_TICKS = 100;
     /** At most this many cells a second on the walk after a pause. */
     private static final int WALK_PER_SECOND = 400;
-    /** Minecraft's own reach for random ticks: a player nearer than this (blocks, flat, to the chunk's middle). */
-    private static final int GAME_REACH = 128;
 
     private final Mound mound;
     /** The drying's own dice (not the colony's: the colony's rolls stay what they were). */
@@ -133,26 +130,9 @@ final class MoundDrying {
         return Mound.isMoundBlock(state) && state.hasProperty(MoundSoil.AGE) && state.isRandomlyTicking() ? state : null;
     }
 
-    /**
-     * Whether Minecraft itself gives the mound's chunk random ticks now ({@code ServerChunkCache.tickChunks} and
-     * {@code ChunkMap.playerIsCloseEnoughForSpawning}, 1.21.1): the game rule is above 0 and a player who is not a
-     * spectator is within 128 blocks of the chunk's middle.
-     */
+    /** Whether Minecraft itself gives the mound's chunk random ticks now (the one judge, {@link WithheldTicks#givenByTheGame}). */
     private boolean givenByTheGame(ServerLevel level) {
-        if (level.getGameRules().getInt(GameRules.RULE_RANDOMTICKING) <= 0) {
-            return false;
-        }
-        ChunkPos chunk = new ChunkPos(mound.center());
-        double x = chunk.getMiddleBlockX();
-        double z = chunk.getMiddleBlockZ();
-        for (ServerPlayer player : level.players()) {
-            double dx = player.getX() - x;
-            double dz = player.getZ() - z;
-            if (!player.isSpectator() && dx * dx + dz * dz < GAME_REACH * GAME_REACH) {
-                return true;
-            }
-        }
-        return false;
+        return WithheldTicks.givenByTheGame(level, new ChunkPos(mound.center()));
     }
 
     /** Tests only: the mound's cells get the random ticks of this many game ticks now, whoever is near. */

@@ -547,11 +547,15 @@ public class FieldLife {
 
     /**
      * Termites underground step 4: the open hole (the night's turns, a runway's hole, a hole by rich food) nearest the
-     * plant within the graze ({@code food_radius}) that the numbers go out of, or null: no hole open near it, so the
+     * plant within the graze ({@code food_radius}) that the colony goes out of, or null: no hole open near it, so the
      * plant waits for a night its hole has its turn (as the real foragers graze only round the holes they opened).
+     * <b>The one rule of where a colony with galleries grazes</b> (review R5-61): the numbers ask it here, the real
+     * foragers' pick ({@link FoodStore#findGrass}) and the scouts' spot ({@code ScoutGoal}) ask it too; before, only the
+     * numbers kept to it, and the real ones were sent 20 or 40 blocks over open ground once the tufts by the open holes
+     * were taken. Null with no web (a species without galleries grazes anywhere in its reach).
      */
     @Nullable
-    private BlockPos grazedFrom(BlockPos plant, List<BlockPos> holes) {
+    public BlockPos grazedFrom(BlockPos plant, List<BlockPos> holes) {
         ColonyHooks.Underground web = colony.underground();
         int radius = web == null ? 0 : web.grazeRadius();
         BlockPos best = null;

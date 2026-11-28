@@ -69,6 +69,10 @@ public class ModEvents {
                     Perf.end();
                 }
             }
+            // The random ticks Minecraft holds back beside a spectator, for the blocks that age by them (review R5-80).
+            long withheld = System.nanoTime();
+            com.antcolonies.block.WithheldTicks.tick(level);
+            Perf.other("withheld ticks", System.nanoTime() - withheld);
             // The raid test bench (docs/plans/raid-test-bench.md): the rules checked after the brain, the labels.
             long started = System.nanoTime();
             com.antcolonies.watch.Watch.tick(level);

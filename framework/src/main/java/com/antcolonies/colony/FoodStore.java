@@ -303,6 +303,10 @@ public class FoodStore {
             claimed.merge(claim.plant(), 1, Integer::sum);
         }
         List<BlockPos> exits = null;
+        // With galleries, outside only round the holes open to the foragers tonight (review R5-61, the numbers' own rule,
+        // FieldLife#grazedFrom); food eaten from inside is the colony's at any hour.
+        ColonyHooks.Underground web = fromInside ? null : colony.underground();
+        List<BlockPos> tonight = web != null ? web.holesInTurn(level) : null;
         BlockPos best = null;
         double bestWorth = -1;
         for (BlockPos pos : plants(level)) {
@@ -316,6 +320,9 @@ public class FoodStore {
                     || (fromInside ? colony.keepsOff(level, pos) : !colony.mayForageAt(level, pos)) // (only where the patrollers came back from, never where the colony keeps away for danger)
                     || colony.isAlarmed(level, pos)) { // (nor into a trouble felt now, review R5-65: asked here, no longer through "keep off")
                 continue;
+            }
+            if (tonight != null && colony.field().grazedFrom(pos, tonight) == null && !isFeedableFromInside(level, pos)) {
+                continue; // no hole open near it tonight: it waits for a night its hole has its turn
             }
             if (exits == null) {
                 exits = colony.foragingHoles().waysOut(level).stream().map(ForagingHoles.WayOut::mouth).toList();

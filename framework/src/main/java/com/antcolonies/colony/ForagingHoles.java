@@ -56,6 +56,9 @@ public class ForagingHoles {
     private final Claims<UUID> plugClaims = new Claims<>();
     /** Which hole each worker that plugs one is on (one worker to a hole). */
     private final java.util.Map<UUID, BlockPos> plugging = new java.util.HashMap<>();
+    /** The same for the workers opening the night's holes ({@link #pickHoleToOpen}). */
+    private final Claims<UUID> openClaims = new Claims<>();
+    private final java.util.Map<UUID, BlockPos> opening = new java.util.HashMap<>();
     /** Game time the foraging time was first seen to be over (not saved: after a reload the grace starts again). */
     private long closedSince = Colony.NOT_SET;
     private long outsideCheckedAt = Long.MIN_VALUE;
@@ -253,15 +256,65 @@ public class ForagingHoles {
         return (state.is(ModTags.DIGGABLE) || colony.profile().nest().isPlug(state)) && !touchesFluid(level, hole);
     }
 
-    /** A closed hole to open now (its tunnel is dug and it is foraging time), or null. */
+    /**
+     * <b>Opening the night's holes, its own small job</b> (review R5-63): the closed hole nearest this worker that may
+     * be opened now (its tunnel dug, foraging time, its turn, see {@link #mayOpen}), that no other worker has taken and
+     * that this one has not found unreachable ({@code leftAlone}); taken for it until {@link #releaseOpen}. Null if none.
+     * It used to be the last-but-one entry of the builders' one work list ({@code Nest.findDigTarget}), behind every
+     * gallery block still to dig, and every builder was handed the same first hole in list order: by a growing colony
+     * few holes opened for minutes at dusk, by a grown one they opened one after another across the land, and a hole no
+     * builder could reach left the rest shut all night. Now every worker that digs takes one of the night's holes first,
+     * the nearest free one, as the workers plugging them at dawn do ({@link #pickHoleToPlug}): real Macrotermes workers
+     * open the night's holes all over the web at once at dusk.
+     */
     @Nullable
-    BlockPos holeToOpen(Level level) {
+    public BlockPos pickHoleToOpen(Level level, AbstractAntEntity ant, java.util.function.Predicate<BlockPos> leftAlone) {
+        return pickHoleToOpen(level, ant.getUUID(), ant.blockPosition(), leftAlone);
+    }
+
+    /** {@link #pickHoleToOpen(Level, AbstractAntEntity, java.util.function.Predicate)} for the worker {@code ant} standing at {@code at}. */
+    @Nullable
+    public BlockPos pickHoleToOpen(Level level, UUID ant, BlockPos at, java.util.function.Predicate<BlockPos> leftAlone) {
+        if (!colony.isForagingTime(level) && colony.nest().foodWays().getRunways().isEmpty()) {
+            return null; // (a hole under a finished runway may be opened at any hour: asked below, of each)
+        }
+        long now = level.getGameTime();
+        openClaims.prune(now);
+        opening.keySet().removeIf(id -> !openClaims.contains(id));
+        BlockPos best = null;
+        double bestDistance = Double.MAX_VALUE;
+        ColonyHooks.Underground web = colony.underground();
         for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
-            if (isDug(level, tunnel) && !isOpen(level, tunnel.hole()) && !colony.nest().foodWays().isSpent(tunnel.hole()) && mayOpen(level, tunnel.hole())) {
-                return tunnel.hole();
+            BlockPos hole = tunnel.hole();
+            double away = hole.distSqr(at);
+            // (the cheap checks first: a grown web has a hundred holes, a dozen of them in turn; the tunnel's walk last)
+            if (away >= bestDistance || web != null && !web.isInTurn(hole) || leftAlone.test(hole) || isTakenByAnother(opening, hole, ant)
+                    || isOpen(level, hole) || !mayOpen(level, hole) || colony.nest().foodWays().isSpent(hole) || !isDug(level, tunnel)) {
+                continue;
+            }
+            best = hole;
+            bestDistance = away;
+        }
+        if (best != null) {
+            openClaims.put(ant, now + CLAIM_TICKS);
+            opening.put(ant, best.immutable());
+        }
+        return best;
+    }
+
+    /** The worker no longer opens the hole it took ({@link #pickHoleToOpen}). */
+    public void releaseOpen(UUID ant) {
+        openClaims.remove(ant);
+        opening.remove(ant);
+    }
+
+    private static boolean isTakenByAnother(java.util.Map<UUID, BlockPos> taken, BlockPos hole, UUID ant) {
+        for (java.util.Map.Entry<UUID, BlockPos> entry : taken.entrySet()) {
+            if (!entry.getKey().equals(ant) && entry.getValue().equals(hole)) {
+                return true;
             }
         }
-        return null;
+        return false;
     }
 
     /** How many holes are open now (for the colony list). */

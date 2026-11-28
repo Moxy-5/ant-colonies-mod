@@ -516,6 +516,51 @@ public class TermiteFoodTests {
     }
 
     /**
+     * Review R5-80: the leftovers age beside a spectator too. Minecraft gives random ticks only near a player who is not
+     * a spectator, so watching in spectator an eaten log's cast stood for good, every crust stayed fresh, pulp heaps did
+     * not sink and remains did not weather. The framework now gives the blocks of its tag the random ticks held back
+     * ({@code WithheldTicks}); given by hand here, the scene's cells only. Mound soil is not in the tag (the mound dries
+     * its own, {@code MoundDrying}) and is left as it is.
+     */
+    @GameTest(template = "arena", skyAccess = true)
+    public static void theLeftoversAgeBesideASpectator(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestScenes.deepGround(helper);
+        BlockPos crust = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
+        BlockPos cast = crust.east(2);
+        BlockPos heap = crust.west(2);
+        BlockPos remains = crust.north(2);
+        BlockPos soil = crust.south(2);
+        level.setBlock(crust, SavannaBlocks.MUD_CRUST.get().withFace(Blocks.AIR.defaultBlockState(), net.minecraft.core.Direction.NORTH), 3);
+        level.setBlock(cast, SavannaBlocks.MUD_CAST.get().defaultBlockState(), 3);
+        level.setBlock(heap, com.antcolonies.savanna.registry.TreeBlocks.PULP_HEAP.get().withLayers(8), 3);
+        BlockState pile = SavannaBlocks.TERMITE_REMAINS.get().defaultBlockState()
+                .setValue(com.antcolonies.block.SeedPileBlock.LAYERS, com.antcolonies.block.SeedPileBlock.MAX_LAYERS);
+        level.setBlock(remains, pile, 3);
+        level.setBlock(soil, SavannaBlocks.TERMITE_MOUND.get().defaultBlockState().setValue(com.antcolonies.savanna.block.TermiteMoundBlock.AGE, 0), 3);
+        for (BlockPos pos : List.of(crust, cast, heap, remains)) {
+            helper.assertTrue(level.getBlockState(pos).is(com.antcolonies.block.WithheldTicks.TAG), "not given the held-back ticks: " + level.getBlockState(pos));
+        }
+        helper.assertTrue(!level.getBlockState(soil).is(com.antcolonies.block.WithheldTicks.TAG), "mound soil would be dried twice");
+        java.util.Set<BlockPos> scene = java.util.Set.of(crust, cast, heap, remains, soil);
+        // About 200 random ticks a cell: some ten days of a block's random ticks.
+        // (each chunk the scene's cells lie in: the arena's middle can straddle a chunk's edge)
+        scene.stream().map(net.minecraft.world.level.ChunkPos::new).distinct().forEach(chunk ->
+                com.antcolonies.block.WithheldTicks.give(level, level.getChunk(chunk.x, chunk.z), 4096 * 200, scene::contains));
+        helper.assertTrue(level.getBlockState(crust).getValue(com.antcolonies.savanna.block.MudCrustBlock.AGE) > 0, "the crust is still fresh: " + level.getBlockState(crust));
+        helper.assertTrue(level.getBlockState(cast).isAir(), "the cast nobody needs still stands");
+        BlockState sunk = level.getBlockState(heap);
+        helper.assertTrue(!sunk.is(com.antcolonies.savanna.registry.TreeBlocks.PULP_HEAP.get())
+                || sunk.getValue(com.antcolonies.savanna.block.PulpHeapBlock.LAYERS) < 8, "the pulp heap did not sink: " + sunk);
+        BlockState weathered = level.getBlockState(remains);
+        helper.assertTrue(!weathered.is(SavannaBlocks.TERMITE_REMAINS.get())
+                || weathered.getValue(com.antcolonies.block.SeedPileBlock.LAYERS) < com.antcolonies.block.SeedPileBlock.MAX_LAYERS,
+                "the remains did not weather: " + weathered);
+        helper.assertTrue(level.getBlockState(soil).getValue(com.antcolonies.savanna.block.TermiteMoundBlock.AGE) == 0, "the mound soil was ticked: " + level.getBlockState(soil));
+        helper.succeed();
+    }
+
+    /**
      * The user's bug (2026-10-14): termites eating a branch from outside at night were cased in with it (a plate of mud
      * put down in the spot they stood in), could plan no route from inside the plate's block and were shut out by day.
      * Now a plate put down where a nestmate stands nudges it out first, to an open spot away from the plate; and a
