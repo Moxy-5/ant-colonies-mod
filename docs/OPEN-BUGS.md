@@ -10,7 +10,7 @@ for the number there).
 | Part | Left |
 |---|---|
 | In the game: A, it breaks play | 1 |
-| In the game: B, it looks or plays wrong | 24 |
+| In the game: B, it looks or plays wrong | 25 |
 | In the game: C, small or rare | 54 |
 | Waiting for your call | 27 |
 | Behind the scenes (code review) | 204 |
@@ -23,7 +23,7 @@ Something a player meets goes wrong in a way that matters: a crash, a freeze, a 
 
 - **306** The raids were rewritten from scratch (2026-11-24) and three long unattended runs are done: every raid ends, none hangs or crashes, and since the fix of the tail left behind (BUGS 450) the raiding colonies bring home enough to hold their size (151 termites in the last run, 23 and 57 before). Still to do: you watch raids in-game; the smaller raid bugs left are on this list.
 
-## B: it looks or plays wrong (24)
+## B: it looks or plays wrong (25)
 
 A player will likely see it, and the game goes on.
 
@@ -38,6 +38,7 @@ A player will likely see it, and the game goes on.
 - **427** The bullfrog's feet and hands whip the long way round when it climbs out of the water or starts to swim.
 - **452** Some raids still reach termites they can smell but not get at (shut in under ground or wood beside an open gallery): the ants search 15 seconds and go home empty.
 - **478** A Matabele colony can keep raiding one termite spot where it never catches anything, because the scouts keep finding it again as new, and starve.
+- **483** At a raid nearly every raider chases the same single termite, which runs off down its tunnel, so the raid catches little and the termite soldiers win.
 - **R3-38** A Matabele that lost a leg has all six again after it goes into the nest out of sight and comes out. *(half fixed)*
 - **R4-18** A busy river costs frames: about 6.5 ms a frame for 103 river animals in view (it was 13.3). *(half fixed)*
 - **R4-26** A bullfrog (or a land animal later) caught by a crocodile hangs upright and still while the crocodile rolls it.
