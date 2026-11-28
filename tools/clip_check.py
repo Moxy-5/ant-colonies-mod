@@ -32,6 +32,21 @@ the game draws it, then in the game frame by frame.
                (its "postures": the ways between lying, sitting and standing), GeckoLib's blend between
                them played as the game plays it (the blend length read from the animal's Java code), and draws each
                blend as a strip (sw_<from>_<to>.png) with --times.
+  --video [--cams side,front,above] [--slow 4] [--plays 2] [--fixed] [--no-paths]  (the Motion Studio, phase 3 part B
+               step 2, 2026-11-28; tools/clip_video.py) each clip named (with --switches each clip change checked) as
+               an mp4, no game: posed as this checker poses it, written as a game recording and drawn by
+               tools/replay_video.py, the drawing of every game film's video (cameras side by side, the game's speed
+               then --slow times slower, a bar with the clip and each foot by the one feet rule). A walk walks over
+               still ground at its own speed with the cameras following, so the ground moves under it like a
+               treadmill and a sliding planted foot shows red; a move crosses its scene's real blocks. About half a
+               minute a video: references/anim_lab/<animal>/video/vid_<model>_<clip>.mp4, vid_sw_<a>_<b>.mp4 (the
+               recording in run-film/clip_video/, which tools/replay.py opens as a page). With --pair (2026-11-28)
+               a video of each prey clip with every spot checked held at once (--spots to show fewer), the holder
+               and its prey placed as the pair check places them, red where parts are in each other (a holder's
+               head on the hide is its bite): <holder>/video/vid_pair_<hold>_<prey><size>_<clip>.mp4; with --scene
+               everyone round the prey, one form a spot (the forms in turn) and round a carcass the full lions lying
+               by it: <prey>/video/vid_scene_<pose>[_size<s>].mp4. The cameras round the holder (a scene: the prey)
+               take in everyone. Not yet with --hold or --gait-changes.
   --gait-changes [--write]  (the Motion Studio, phase 2, step 3, 2026-11-25) for each change between two of the plan's
                gaits (its "gaits.order"), the moment of the old clip whose pose is nearest the new clip's first frame (the
                farthest any box corner is from its place in the other, model px), against the worst moment; --write
@@ -558,6 +573,16 @@ WALK_PLANTED, WALK_HANG, WALK_DOWN = 0.25, 1.0, 0.5
 POP_MIN, POP_TIMES, SEAM_MIN = 3.0, 3.0, 1.0
 
 
+def ground_speed(animal, name, clip):
+    """How fast clip `name` (its lab.Clip) carries the animal over the ground at play speed 1 (model px a second): the
+    plan's checks.walks for it, else its stride note over its length for the plan's walk_clips; None for a clip that
+    does not walk. One rule for the walk check and the video's moving ground (tools/clip_video.py)."""
+    speed = animal.checks.get('walks', {}).get(name)
+    if speed is None and clip.stride and animal.matches(name, 'walk_clips'):
+        speed = clip.stride / clip.length
+    return speed
+
+
 def check_clip(animal, name, flagged):
     """Prints the clip's findings; returns its flagged moments (for the strips) and the lines."""
     pl = Played(animal, name)
@@ -736,9 +761,7 @@ def check_clip(animal, name, flagged):
         out(f'  planted feet hanging over the ground (more than {tol:g} px; a foot place out of its leg reach; px at time): '
             + (', '.join(hung) + '  FLAGGED' if hung else 'none')
             + (f'  ({", ".join(excused)} up on purpose: the plan\'s feet_up_ok)' if excused else ''))
-    walk_speed = ck.get('walks', {}).get(name)
-    if walk_speed is None and pl.clip.stride and animal.matches(name, 'walk_clips'):
-        walk_speed = pl.clip.stride / pl.length
+    walk_speed = ground_speed(animal, name, pl.clip)
     if walk_speed is not None and animal.feet:
         out(f'  planted feet: should slide back at {walk_speed:.2f} px/s (the walking speed, '
             f'{walk_speed * animal.px:.3f} blocks/s), none sideways')
@@ -1063,41 +1086,60 @@ def hidden_at_rest(animal):
 RESET_TICKS = 5      # GeckoLib's getBoneResetTime(): a bone no clip moves goes back to rest over this (no animal changes it)
 
 
-def switch_poses(animal, a, b, ticks, phase=None):
-    """The poses a tick apart from the end of clip a, through GeckoLib's blend (each bone's turn, place and size eased
-    straight from where clip a left it to clip b's first frame over the blend's ticks), into clip b's first ticks.
-    A looping clip a is left at `phase` (seconds); a played one at its end. The move's path is the entity's, not a
-    bone's, so it is left out."""
-    plan = animal.model.plan
-    ca = lab.Clip(a, plan.clip_to_roles(animal.data[a]) if plan else animal.data[a])
-    cb = lab.Clip(b, plan.clip_to_roles(animal.data[b]) if plan else animal.data[b])
-    ca.path = cb.path = None
-    ta = (phase if phase is not None else 0.0) if ca.loop else ca.length
-    before = [ca.pose(max(0.0, ta - (3 - i) * 0.05)) for i in range(4)]
-    start, goal = before[-1], cb.pose(0.0)
-    names = set(start) | set(goal)
-    rest = ((0, 0, 0), (0, 0, 0), (1, 1, 1))
-    keyed = {n: tuple(ch in cb.bones.get(n, {}) for ch in ('rotation', 'position', 'scale')) for n in names}
+class Blend:
+    """GeckoLib's change from clip a to clip b, the one rule for the check below and the video (tools/clip_video.py):
+    each bone's turn, place and size eased straight from where clip a left it to clip b's first frame over the blend's
+    ticks (a channel clip b does not key going home over GeckoLib's own reset, RESET_TICKS, whatever the blend's
+    length; R12-9), then clip b playing. A looping clip a is left at `phase` (seconds), a played one at its end; lead:
+    seconds of clip a wanted before it is left (a loop's moment moved on by whole rounds so that many fit). The move's
+    path is the entity's, not a bone's, so it is left out."""
 
-    def eased(n, k, to):
-        """Bone n, k ticks into the change: a channel clip b keys is eased to `to` over the blend; one it does not key
-        goes home over GeckoLib's own reset (RESET_TICKS, whatever the blend's length; R12-9)."""
+    def __init__(self, animal, a, b, ticks, phase=None, lead=0.0):
+        plan = animal.model.plan
+        self.ca = lab.Clip(a, plan.clip_to_roles(animal.data[a]) if plan else animal.data[a])
+        self.cb = lab.Clip(b, plan.clip_to_roles(animal.data[b]) if plan else animal.data[b])
+        self.ca.path = self.cb.path = None
+        self.ticks = ticks
+        self.ta = (phase if phase is not None else 0.0) if self.ca.loop else self.ca.length
+        if self.ca.loop and lead > self.ta and self.ca.length > 0:
+            self.ta += math.ceil((lead - self.ta) / self.ca.length) * self.ca.length
+        self.start, self.goal = self.ca.pose(max(0.0, self.ta)), self.cb.pose(0.0)
+        self.names = set(self.start) | set(self.goal)
+        self.keyed = {n: tuple(ch in self.cb.bones.get(n, {}) for ch in ('rotation', 'position', 'scale'))
+                      for n in self.names}
+
+    REST = ((0, 0, 0), (0, 0, 0), (1, 1, 1))
+
+    def eased(self, n, k):
+        """Bone n, k ticks (any fraction) into the change: its channels clip b keys eased to its first frame over the
+        blend, the others going home over RESET_TICKS."""
         out = []
         for c in range(3):
-            if keyed[n][c]:
-                f, goal_c = min(1.0, k / ticks), to.get(n, rest)[c]
+            if self.keyed[n][c]:
+                f, goal_c = min(1.0, k / self.ticks), self.goal.get(n, self.REST)[c]
             else:
-                f, goal_c = min(1.0, k / RESET_TICKS), rest[c]
-            out.append(tuple(x + (y - x) * f for x, y in zip(start.get(n, rest)[c], goal_c)))
+                f, goal_c = min(1.0, k / RESET_TICKS), self.REST[c]
+            out.append(tuple(x + (y - x) * f for x, y in zip(self.start.get(n, self.REST)[c], goal_c)))
         return tuple(out)
 
-    blend = [{n: eased(n, k, goal) for n in names} for k in range(1, ticks + 1)]
-    after = []
-    for i in range(1, 4):
-        pose = cb.pose(i * 0.05)
-        after.append({n: tuple(pose.get(n, rest)[c] if keyed[n][c] else eased(n, ticks + i, goal)[c] for c in range(3))
-                      for n in names})
-    return before, blend, after, ca, cb
+    def at(self, k):
+        """The pose k ticks (any fraction) after clip a is left: clip a before (k <= 0), the blend, then clip b."""
+        if k <= 0:
+            return self.ca.pose(max(0.0, self.ta + k * 0.05))
+        if k <= self.ticks:
+            return {n: self.eased(n, k) for n in self.names}
+        pose = self.cb.pose((k - self.ticks) * 0.05)
+        return {n: tuple(pose.get(n, self.REST)[c] if self.keyed[n][c] else self.eased(n, k)[c] for c in range(3))
+                for n in self.names}
+
+
+def switch_poses(animal, a, b, ticks, phase=None):
+    """The poses a tick apart from the end of clip a, through GeckoLib's blend, into clip b's first ticks (Blend)."""
+    bl = Blend(animal, a, b, ticks, phase)
+    before = [bl.at(-(3 - i)) for i in range(4)]
+    blend = [bl.at(k) for k in range(1, ticks + 1)]
+    after = [bl.at(ticks + i) for i in range(1, 4)]
+    return before, blend, after, bl.ca, bl.cb
 
 
 WORST_PHASE = {}             # (animal, a, b) -> the moment of clip a check_switch judged the change at (None: its end)
@@ -1435,6 +1477,42 @@ def with_edges_all(posed):
     return [(bn, q) for bn, cs, _ in posed for q in with_edges(cs)]
 
 
+def place_point(feet, d, left, size, da, p):
+    """A model point (its own pixels) set on the ground in the prey's frame (a sixteenth of a block): its feet at
+    feet (x, z), facing d, its left `left`, drawn da model px ahead, at this size. The one placing of a holder
+    (Pair.holder_point), a lion lying by the kill (place_points) and the pair videos (tools/clip_video.py)."""
+    a, side = (-p[2] + da) * size, p[0] * size
+    return (feet[0] + d[0] * a + left[0] * side, p[1] * size, feet[1] + d[1] * a + left[1] * side)
+
+
+def in_each_other(bodies):
+    """The red marks of a pair or a scene (its strips and its videos, tools/clip_video.py): each body's points deeper
+    than BODIES_IN inside another body. bodies [(posed, head)], all in one frame: head None for the prey, else the
+    body's head bones (a lion lying by the kill: none); a holder's head and the prey in each other is its bite, shown
+    by the jaw's own mark, not red. Returns each body's points, in the order given."""
+    boxes = [Boxes(posed) for posed, _ in bodies]
+    out = []
+    for i, (posed, head) in enumerate(bodies):
+        pts, got = with_edges_all(posed), {}
+        for j, (_, head_j) in enumerate(bodies):
+            if i == j or not boxes[i].overlaps(boxes[j]):
+                continue
+            into = boxes[j].near(boxes[i])
+            mine = pts
+            if head is not None and head_j is None:          # a holder's head in the prey: its bite
+                mine = [(bn, q) for bn, q in pts if bn not in head]
+            elif head is None and head_j is not None:        # the prey in a holder's head: its bite
+                into = Boxes(None, [b for b in into.boxes if b[0] not in head_j])
+            if not into.boxes:
+                continue
+            (x0, y0, z0), (x1, y1, z1) = into.lo, into.hi
+            for bn, q in mine:
+                if id(q) not in got and x0 <= q[0] <= x1 and y0 <= q[1] <= y1 and z0 <= q[2] <= z1                         and into.depth(q) > BODIES_IN:
+                    got[id(q)] = q
+        out.append(list(got.values()))
+    return out
+
+
 _PREY_POSED = {}     # a prey's posed boxes and their points by (prey, size, clip, kind, tick): several pairs share them
 
 
@@ -1522,9 +1600,7 @@ class Pair:
         return feet, d, left, sp
 
     def holder_point(self, frame, p):
-        (fx, fz), d, left, _ = frame
-        a, side = (-p[2] + self.da_h) * self.hs, p[0] * self.hs
-        return (fx + d[0] * a + left[0] * side, p[1] * self.hs, fz + d[1] * a + left[1] * side)
+        return place_point(frame[0], frame[1], frame[2], self.hs, self.da_h, p)
 
     def holder_posed(self, frame, k):
         pose = self.h_play.pose(self.holder_tick(k) / 20)
@@ -1645,17 +1721,16 @@ def pair_strip(pair, clip, kind, spot, ticks, views, path, others=()):
         out, marks = [], []
         prey = pair.prey_posed(clip, kind, k)[0]
         out += prey
-        pb = Boxes(prey)
+        bodies = [(prey, None)]
         for s in (spot,) + tuple(others):
             frame = pair.holder_frame(s, pair.prey_place(clip, kind, k))
             hposed, pose = pair.holder_posed(frame, k)
             out += hposed
+            bodies.append((hposed, pair.head))
             jaw = pair.jaw(frame, pose)
             marks.append((frame[3], GREEN, 4))
             marks.append((jaw, BLUE, 3))
-            for bn, q in with_edges_all(hposed):
-                if bn not in pair.head and pb.depth(q) > 1.0:
-                    marks.append((q, RED, 2))
+        marks += [(q, RED, 2) for pts in in_each_other(bodies) for q in pts]
         return out, marks
 
     pts = [p for k in ticks for _, cs, _ in scene(k)[0] for p in cs]
@@ -1712,6 +1787,21 @@ def scene_boxes(sc, ext_z):
         boxes.append(('ground', [(x0 if not q >> 2 & 1 else x1, y0 if not q >> 1 & 1 else y1, z0 if not q & 1 else z1)
                                  for q in range(8)], {f: lab.STEP_GREY for f in lab.FACE_CORNERS}))
     return boxes
+
+
+def inside_points(animal, pl, posed):
+    """The box corners of a pose inside a block of the clip's scene, as the strips mark them red (and the video,
+    tools/clip_video.py): deeper than a foot may graze (1.05 px, the plan's feet_parts) or 0.6 px for any other part;
+    none judged in open water, in the air or while digging."""
+    sc = pl.scene
+    if sc.kind in ('open_water', 'air') or pl.kind == 'dig':
+        return []
+    feet_parts = animal.checks.get('feet_parts', [])
+    out = []
+    for bone, cs, _ in posed:
+        allowed = 1.05 if any(f in bone for f in feet_parts) else 0.6
+        out += [p for p in cs if sc.solid(p[1], p[2]) > allowed]
+    return out
 
 
 def strip(animal, pl, planted, times, views, flagged, path, title, held=None, angle=90.0):
@@ -1775,14 +1865,9 @@ def strip(animal, pl, planted, times, views, flagged, path, title, held=None, an
                     for xx in ext_x:
                         fr.canvas.line(fr.px((xx, yy, wz[0])), fr.px((xx, yy, wz[1])), col, fr.cell, depth=False)
             # parts inside a block: red dots
-            if sc.kind not in ('open_water', 'air') and pl.kind != 'dig':
-                feet_parts = animal.checks.get('feet_parts', [])
-                for bone, cs, _ in posed:
-                    allowed = 1.05 if any(f in bone for f in feet_parts) else 0.6
-                    for p in cs:
-                        if sc.solid(p[1], p[2]) > allowed:
-                            x, y, _ = fr.px(p)
-                            fr.canvas.dot(x, y, 3, RED, fr.cell)
+            for p in inside_points(animal, pl, posed):
+                x, y, _ = fr.px(p)
+                fr.canvas.dot(x, y, 3, RED, fr.cell)
             # planted feet's trails over the last 0.4 s: green, red where a planted foot slides
             for key, track in planted.items():
                 seg = [(e[0], e[1], e[2]) for e in track if t - 0.4 <= e[0] <= t]
@@ -1838,8 +1923,9 @@ def switch_strip(animal, a, b, ticks, views, path, phase=None):
     return path
 
 
-def run_pairs(holder, prey_name, holds, spots_wanted, times, views, out_dir):
-    """--pair: every pair its prey's plan lists for this holder (spots.pairs), or those of the hold clips named."""
+def run_pairs(holder, prey_name, holds, spots_wanted, times, views, out_dir, filmed=None):
+    """--pair: every pair its prey's plan lists for this holder (spots.pairs), or those of the hold clips named. With
+    --video (filmed: its settings) a video of each prey clip with every spot checked held at once (tools/clip_video.py)."""
     prey = Animal(prey_name)
     specs = [p for p in prey.plan_data.get('spots', {}).get('pairs', [])
              if p['holder'] == holder.name and (not holds or any(fnmatch.fnmatch(p['hold'], h) for h in holds))]
@@ -1862,6 +1948,11 @@ def run_pairs(holder, prey_name, holds, spots_wanted, times, views, out_dir):
                 png = pair_strip(pair, clip, kind, names[0], ticks, views, os.path.join(
                     out_dir, f'pair_{holder.name}_{spec["hold"]}_{prey_name}_{clip}_all.png'), others=names[1:])
                 print('  wrote', png)
+        if filmed:
+            import clip_video
+            names = [s for s in pair.table['names'] if (not spots_wanted or s in spots_wanted) and s in pair.spots]
+            for clip, kind in spec['clips'].items():
+                print('    drew', clip_video.pair_video(pair, clip, kind, names, **filmed))
     print(f'  {flags} flagged')
     return 2 if flags else 0
 
@@ -1895,10 +1986,7 @@ def bystanders():
 def place_points(posed, size, da, feet, d, left):
     """A model's posed boxes set on the ground in the prey's frame (px = a sixteenth of a block): its feet there,
     facing d, its left `left` (as Pair.holder_point)."""
-    def at(p):
-        a, side = (-p[2] + da) * size, p[0] * size
-        return (feet[0] + d[0] * a + left[0] * side, p[1] * size, feet[1] + d[1] * a + left[1] * side)
-    return [(bn, [at(p) for p in cs], col) for bn, cs, col in posed]
+    return [(bn, [place_point(feet, d, left, size, da, p) for p in cs], col) for bn, cs, col in posed]
 
 
 def named(into, flag_heads=None):
@@ -1907,7 +1995,7 @@ def named(into, flag_heads=None):
     return ', '.join(f'{a} in {b} {v:.1f}' for (a, b), v in items[:4]) or 'none'
 
 
-def run_scene(prey, pose, times, views, out_dir):
+def run_scene(prey, pose, times, views, out_dir, filmed=None):
     """--scene: everyone the prey's plan lists round this pose at once (each feeding or holding spot taken by each
     form its pairs allow there, at the pairs' real sizes), every few ticks of their clips, and the full lions lying by
     the kill round it, saying which parts are in which."""
@@ -2034,6 +2122,9 @@ def run_scene(prey, pose, times, views, out_dir):
                               + ('  << lies in them' if bad else ''))
                     else:
                         print(f'    rank {rank} {h:8s} {where}: clear')
+        if filmed:
+            import clip_video
+            print('    drew', clip_video.scene_video(prey, pose, kind, size, holders, allowed, spots_all, **filmed))
     print(f'  {flags} flagged')
     return 2 if flags else 0
 
@@ -2048,6 +2139,7 @@ def main(argv):
     changes, write, fresh = False, False, False
     hold, angles = None, [90.0, 25.0, 155.0]
     pair_with, spots_wanted, size, scene = None, [], 1.0, None
+    video, cams, slow, plays, fixed, no_paths = False, ['side', 'front', 'above'], 4.0, 2, False, False
     i = 0
     while i < len(args):
         a = args[i]
@@ -2093,15 +2185,42 @@ def main(argv):
         elif a == '--scene':
             scene = args[i + 1]
             i += 2
+        elif a == '--video':
+            video = True
+            i += 1
+        elif a == '--cams':
+            cams = [c for c in args[i + 1].split(',') if c]
+            i += 2
+        elif a == '--slow':
+            slow = float(args[i + 1])
+            i += 2
+        elif a == '--plays':
+            plays = max(1, int(args[i + 1]))
+            i += 2
+        elif a == '--fixed':
+            fixed = True
+            i += 1
+        elif a == '--no-paths':
+            no_paths = True
+            i += 1
         else:
             names.append(a)
             i += 1
     animal = Animal(animal_name, model, size)
     out_dir = out_dir or os.path.join(PROJECT, 'references', 'anim_lab', animal_name + ('' if size == 1.0 else f'_size{size:g}'))
+    if video and (hold or changes):
+        print('--video is made for clips, clip changes (--switches), pairs (--pair) and scenes (--scene); not yet with '
+              '--hold or --gait-changes')
+        return 1
+    filmed = None
+    if video:
+        import clip_video
+        me = sys.modules[__name__]
+        filmed = dict(cc=me, cams=cams, slow=slow, fixed=fixed, no_paths=no_paths, plays=plays)
     if pair_with:
-        return run_pairs(animal, pair_with, names, spots_wanted, times, views, out_dir)
+        return run_pairs(animal, pair_with, names, spots_wanted, times, views, out_dir, filmed)
     if scene:
-        return run_scene(animal, scene, times, views, out_dir)
+        return run_scene(animal, scene, times, views, out_dir, filmed)
     every = list(animal.data)
     if changes:
         print(f'{animal_name}, clips of {animal.anim_stem}')
@@ -2128,6 +2247,8 @@ def main(argv):
             print('\n'.join(lines))
             if any('FLAGGED' in line for line in lines):
                 bad_clips.append(name)
+            if video:
+                print('    drew', clip_video.clip_video(me, animal, name, cams, slow, plays, fixed, no_paths))
             continue
         pl, planted, lines = check_clip(animal, name, flagged)
         print('\n'.join(lines))
@@ -2148,6 +2269,8 @@ def main(argv):
             png = strip(animal, pl, planted, ts, views, flagged, os.path.join(out_dir, f'cc_{animal.model_name}_{name}.png'),
                         f'{animal.model_name} {name}  {pl.length:g} S')
             print('  wrote', png)
+        if video:
+            print('    drew', clip_video.clip_video(me, animal, name, cams, slow, plays, fixed, no_paths))
     if switches:
         ticks, source = animal.blend_ticks()
         todo = pairs(animal, every)
@@ -2167,6 +2290,8 @@ def main(argv):
             if times or flag:
                 png = switch_strip(animal, a, b, into, views, os.path.join(out_dir, f'sw_{a}_{b}.png'), phase)
                 print('    drew', png)
+            if video:
+                print('    drew', clip_video.switch_video(me, animal, a, b, into, phase, cams, slow, fixed, no_paths))
         print(f'  {bad} change(s) flagged')
     # the count every caller reads (R12-3): exit 0 nothing flagged, 2 something flagged (1: a mistake in the call, a crash)
     hid_bad = bool(hid) and 'FLAGGED' in hid

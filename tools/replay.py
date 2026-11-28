@@ -193,6 +193,10 @@ def build(folder, start=None, end=None, only=None, out=None):
             'clips': clips, 'clipTable': clip_table,
             'play': [m.get('play', {}) for m in moments], 'facts': [m.get('facts', {}) for m in moments],
         })
+        if any(m.get('marks') for m in moments):
+            # red marks (an offline clip's parts inside a block, tools/clip_video.py), given from where it was drawn
+            animals[-1]['marks'] = [[[r(m['pos'][i] + p[i] - origin[i], 3) for i in range(3)] for p in m.get('marks', [])]
+                                    for m in moments]
         print(f'  {name:18s} {header["entity"]:26s} {len(moments):5d} moments, {n_bones} bones, clock {clock}')
     if not animals:
         raise SystemExit('nothing to show: ' + '; '.join(skipped))

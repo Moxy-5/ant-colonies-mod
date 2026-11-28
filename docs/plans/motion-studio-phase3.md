@@ -19,6 +19,9 @@ commit 7ca907b2): every idea of Neon's is there (57 to 59 built in phase 2, 60 t
 - **Part B, motion as video** (Neon's 60 to 62): steps 1 to 3.
 - **Part C, living motion** (Neon's 63 and 64), measured first and rethought as clips: steps 4 to 6.
 - First, **step 0**, the branch sync Neon asked for.
+- **The Motion Studio's whole phase list was remade 2026-11-27 with all of Neon's ideas written out in full** (the
+  user: "Could remake the phase list with all of neons ideas"): `docs/plans/motion-studio.md`, "The phases". Every
+  idea from 1 to 64 has one place there (built, next, later, or not kept); parts B and C below carry Neon's own words.
 
 ### Step 0: the branches in step (before Neon is back, about 2026-12-02; no code)
 Neon's note asked for this first and it has not happened. `neon/studio` has none of the Motion Studio's work since
@@ -27,6 +30,8 @@ phase 0 (149 commits behind: no `tools/recording.py`, `replay.py`, `spots.py`, n
 re-export there would drop the `spots`, `holds`, `strikes` and `postures` tables that phase 2's `keep_sections` now
 keeps. So: the full run and the whole guard set (the rules before a merge into `master`), the merge into `master` (the
 user's yes first), and a line on `docs/HANDOFF.md` asking Neon to merge `master` into `neon/studio` before any new clip.
+**Claude's half done 2026-11-27** (another session, the user: "Start step 0"; branch `claude/master-step0`, now
+`master`; the note on `docs/HANDOFF.md` written). Left: Neon's merge of `master` into `neon/studio`.
 
 ### Part B: motion as video (Neon's 60 to 62)
 **Why first:** making animations faster comes first (the user), and the animation rework (every clip redone) comes
@@ -38,13 +43,136 @@ video. It checks the same frames as picture strips; the videos are for the user'
    played at 1x then slowed, a bar under it with the tick, the clip, the play speed and a red mark for each sliding foot
    (the one feet rule in `tools/recording.py`). An mp4 into `references/replay/video/` (ffmpeg, as the guard films).
    Its own check: one frame matches `replay_strips.py`'s picture of the same tick.
+   **Built 2026-11-27 (branch `claude/motion-video`; the user: "Start step 1 of phase 3"), below.**
 2. **A clip to video, no game (61).** `python tools/clip_check.py <animal> <clips> --video` (my pick over a new tool:
-   the checker already poses every clip as the game draws it, with `--switches`, `--pair`, `--scene` and `--size`): the
-   clip on a floor whose lines move at the clip's own stride (a planted foot that slides shows against them), the
-   faults in red as on its strips, 1x then slowed, in seconds.
-3. **Real footage beside it (62), small, last.** `--ref <video> --cycle <start>,<end>`: a video the user gives (Claude
-   downloads nothing without asking), its marked stride stretched to the clip's length, side by side.
+   the checker already poses every clip as the game draws it, with `--switches`, `--pair`, `--scene` and `--size`).
+   Neon's full idea: the same mp4 as step 1 (several cameras side by side, 1x then slowed, the bar) straight from the
+   model and clip files: one clip on a floor whose lines move under it at the clip's own stride (a treadmill: a planted
+   foot that slides shows against them), a `--switches` blend from one clip into the next, a `--pair` scene of two
+   animals with the ground and red marks for parts inside each other and for sliding feet. In seconds, without
+   Minecraft, so Neon can watch every animation moving before filming it or building the user's viewer page.
+   **Built 2026-11-28 for clips and clip changes (branch `claude/motion-clip-video`; the user: "Start phase 2 of the
+   animal maker engine", read as this step), then its pairs and scenes (the user: "I meant phase 3 part 2"), below.**
+3. **Real footage beside it (62, grows idea 47), small, last.** `--ref <video> --cycle <start>,<end>`: a trimmed video
+   of the real animal the user gives (Claude downloads nothing without asking), its marked stride stretched to the
+   clip's length (cycle-matched), side by side in one mp4, so the real cadence, weight shift, spine flow and wingbeat
+   timing are set against the clip directly, not from slices of stills.
 Checks: each tool's self-test; the lion hunt film and the feast bench turned into videos and sent to the user.
+
+#### Step 1, built (2026-11-27)
+- **`python tools/replay_video.py <scene> --pick <animal> [--from t] [--to t] [--cams side,front,above] [--slow 4]
+  [--fixed] [--no-paths] [--check]`** writes `references/replay/video/<scene>_<animal>_<from>-<to>_<cams>[_fixed]_s<slow>.mp4`:
+  the replay page drawn moment by moment (each camera 640 by 480, side by side), every other animal see-through, the
+  foot paths drawn, played at the game's speed then `--slow` times slower (`--slow 1`: one pass). Under the pictures a
+  bar: the pass, the animal's game tick and seconds into the range, its clip with play speed and how far in, each foot
+  (dark down, red sliding with px a tick, light lifted), and a line along the range with a red mark where a foot slides,
+  a blue one after ticks not recorded, and the place now. Without `--to`, 200 game ticks. Neon's own note (its file on
+  `neon/studio`) added `--fixed` and the see-through animals: both in.
+- **Timing (my picks):** each moment lasts the scene's clock till the next (the client's ticks, one a tick through a
+  stepped burst, so 1x is the game's speed; the feast bench draws two moments a tick and plays right); a clock step over
+  4 ticks (ticks not recorded) plays as 4; 60 frames a second, so a moment a tick is always 3 frames; the real-speed
+  pass rests 0.5 s on its last moment.
+- **Drawn on the graphics card:** the software drawing every check picture uses took 0.15 s a camera picture (a
+  60-tick range: 2 minutes); `viewer_shot.Browser(gpu=True)` draws on the computer's card (the RTX 3080: 0.035 s a
+  moment for three cameras, the same range in 25 to 40 s with the page built), falling back to software where there is
+  none. The check below proves the card draws what the software draws (2 of 255 apart).
+- **The page's own loop held:** the stage redrew the scene behind every picture (doubling the software drawing's time);
+  `Replay.hold(true)` (`st.held` in `viewer_common.js`) stops it while a tool draws each picture itself. The strips use
+  it too (their pictures unchanged). Also on the page: each row's `clock` and `gapBefore`, and `snap`'s JPEG option.
+  `replay_strips.opened` is the one way both tools open a recording.
+- **Its own check (`--check`):** the frame of the range's middle moment and the one 4 game ticks before, read back out
+  of the mp4, against `replay_strips.py`'s picture of the middle moment (same range, same cameras): must match (under 8
+  of 255) and the other must match worse by 1. Feast bench, lioness walking (ticks 130 to 190): 2.06 against 13.45;
+  lying down into the feed (214 to 279): 1.93 against 3.74; one camera, one pass: 3.25 against 17.83. A reading made 4
+  ticks late on purpose: 16.05, FAILED.
+- **Not done yet:** the lion hunt's video (its recording is gone from `run-film` and the old page predates the feet
+  rule's move; a re-film waits for the game to be free: another session's game tests were running).
+
+#### Step 2, built (2026-11-28)
+- **`python tools/clip_check.py <animal> <clips> --video [--cams side,front,above] [--slow 4] [--plays 2] [--fixed]
+  [--no-paths] [--size s] [--model m]`**, and with `--switches` a video of each clip change checked:
+  `references/anim_lab/<animal>[_size<s>]/video/vid_<model>_<clip>.mp4` and `vid_sw_<a>_<b>.mp4`. Each clip runs its
+  checks as before, then its video. The new `tools/clip_video.py` does the work.
+- **One drawing for both (the starting idea):** the clip is posed exactly as the checker poses it (the path, the dragged
+  tail, a flight's rise; a clip change through the checker's own blend rule, now one class, `clip_check.Blend`, which
+  `switch_poses` uses too), written as a recording in the game's own format (each bone's 3x4 matrix a moment, the boxes'
+  corners in the bone's frame, the blocks round it; `run-film/clip_video/<animal>/<name>/`), and handed to step 1's
+  `replay_video.make` (step 1's command made callable, with an output path and the bar's words "clip tick"). So an
+  offline clip and a game film get the same cameras, bar, see-through neighbours and feet rule, and the recording opens
+  on the replay page too (`python tools/replay.py <its folder>`). The game's frame was measured, not guessed: on the
+  feast bench's recording a lying lioness's offline pose fits the game's with x mirrored, turned by 180 degrees plus
+  the yaw, a model pixel 1/16 block, to 1e-9 of a block; the boxes are stored mirrored, as GeckoLib bakes them.
+- **The ground:** a walk (the plan's `checks.walks`, else its stride note: `clip_check.ground_speed`, now the one rule
+  the walk check and the video read) walks over still ground at its own speed and the cameras follow it, so the ground
+  moves under it like a treadmill. Proved on the buffalo's walk: a planted foot moves 0.014 px a tick (middle) at its
+  own speed, 0.051 at 1.1 times, 0.244 at 1.5 times, 0.486 with no moving ground (its walking speed). A move with its
+  own path crosses its scene's real blocks (a step up or down, a bank and its water, open water, the perch bar, a floor
+  far under a flier), the animal drawn at the size its scene is made for (a block is the scene's own block: the
+  monitor's `climb_up_850` is a monitor at 0.85 on a one-block step, as the game draws it). A clip change is shown on
+  flat ground, the ground's speed eased from clip a's to clip b's over the blend (my pick), clip a shown up to 1.5 s
+  from the moment the check judged (R12-11). A walk with no speed in its plan walks on the spot and says so.
+- **Red marks:** the parts inside a block, by the strips' own rule (`clip_check.inside_points`, taken out of `strip`),
+  go into the recording as each moment's `marks` and the replay page draws them as red dots (a new layer; game
+  recordings have none, so their pages are as before).
+- **Timing (my picks):** three moments a tick (the game's drawing at 60 frames a second, a new pose every frame at
+  1x); a loop plays twice (`--plays`), a clip played once plays once and holds its end half a second. About 10 to 55 s
+  a video on the graphics card (most of it the page and the frames, not the browser's start).
+- **Its own check, every time:** the recording read back gives every box corner within 0.01 px of where the checker
+  poses it (all tried: within 0.0001). Self-tests (`tools/engine_selftest.py`): a bone moved a pixel in the file is
+  caught at its moment; the treadmill keeps the buffalo walk's feet still and shows a walk carried 1.5 times too fast.
+  Step 1's own check on the feast bench after the change: 2.06 against 13.44, passed.
+- **Tried:** the lioness walk (and at size 0.5), the monitor's `climb_up_850` and `water_in_1000`, the tilapia's swim,
+  the bullfrog's hop, the martial eagle's `perch_idle` and `fly_flap`, the buffalo's `held_sink` and its ten clip
+  changes (`held_sink -> rest_up` is BUGS 466's tail flick). Frames read back from each video and looked at.
+- **What the first videos found (the feet rule on clips it never judged before, for the animation rework):** the
+  monitor's climbs drag their feet: on `climb_up_1000` the front left foot moves about 8 px forward over 4 ticks
+  while 0.1 to 0.7 px inside the ground (it shuffles instead of lifting), and planted feet slide up to 4.8 px a tick
+  in the push (`climb_up_1000` and `climb_down_1000`, every foot); the lioness's walk keeps its feet planted
+  (0.004 to 0.009 px a tick, the middle) but its hind feet settle up to 0.75 px a tick as they land and lift; the
+  monitor's plan has no walking speed (no `checks.walks`, no stride note), so neither the walk check nor the video can
+  judge its walk's feet (BUGS 480; the crocodile's and crab's walks too). The climbs: BUGS 479.
+- **Pairs and scenes, built the same day (the user: "I meant phase 3 part 2", phase 3's part B):**
+  `python tools/clip_check.py <holder> [holds] --pair <prey> [--spots a,b] --video` runs the pair check as before,
+  then a video of each prey clip with every spot checked held at once (`--spots` for fewer; my pick over a video a
+  spot: the same lioness on three spots is three videos with one finding): `<holder>/video/vid_pair_<hold>_<prey>
+  <size>_<clip>.mp4` (the prey's size in the name: one hold is paired with a grown buffalo and a calf).
+  `python tools/clip_check.py <prey> --scene <pose> --video` runs the scene check, then a video a size: the prey, each
+  spot taken by one of the forms its pairs allow there (my pick: the forms in turn, spot by spot; the check itself
+  tries every form at every spot, which no one video can show), and round a carcass the full lions lying where the
+  game lays them (`LionHunt.lieByKill`, the forms in turn, rank by rank, their `rest` loop playing; the check holds
+  them at its middle): `<prey>/video/vid_scene_<pose>[_size<s>].mp4`.
+- **One placing:** the animals are placed by the checker's own `Pair` (the spot tables, the holder's feet on the ground
+  facing in along its spot's way out, a holder riding its sinking prey), each a recording of its own in one folder
+  (the format always held several; the page and the video already show several), the prey drawn facing east from
+  the middle of a block. A holder's place between two ticks is the spot table's row between them, as the game draws
+  a rider. `clip_check.place_point` is now the one placing of a holder, a lion lying by the kill and the videos (it
+  was written twice in the checker).
+- **Red marks, one rule:** `clip_check.in_each_other` (taken out of the pair strip and made whole): each body's
+  points deeper than 1 px (`BODIES_IN`) in another, but a holder's head and the prey in each other (its bite). The
+  pair strips use it too, so they now also mark the prey's parts in a holder's body and one holder's in another (they
+  marked only a holder's parts in the prey).
+- **The cameras:** round the holder of the first spot (a scene: the prey), every other animal see-through (the user's
+  call of 2026-11-27, kept), fitted to the space the prey and every holder take up, in the picked animal's own frame
+  (the page's `Replay.fit(..., names)`, `replay_video.make(fit_with=...)`; fitted to the holder alone, a buffalo at
+  its jaws was cut off; fitted to everyone, the lions lying 5 to 8 blocks out made the carcass a speck, so they are
+  left out of the fit and show where they fall in view).
+- **Its own check, every time, stronger:** every animal's every corner at every whole tick read back against the
+  checker's own placing (`Pair.holder_posed`, `Pair.prey_posed`, `place_points`), now where it is in the world (the
+  recorded place as well as the bone's matrix: a check of the matrices alone passed an animal drawn from the wrong
+  place); all within 0.0001 of a sixteenth of a block. A new self-test: a lioness biting a buffalo read back where
+  the pair check puts them; the holder's place moved a sixteenth in the file is caught at that moment (28 tests).
+- **Tried:** the lioness's `bite` on an idle buffalo (rump and both flanks, 88 ticks, about 30 s), `hold_sink` with the
+  buffalo's `held_sink` (five holders riding it down; the red marks sit where the check flags the neck holders'
+  bodies 1.7 px in the buffalo, and the jaws 5.6 to 5.9 px over their spots, both known), and the buffalo's carcass scene at both sizes (a grown cow and a calf: four feeders, a lion, a lioness
+  and a cub in turn, and six lions lying round it, 128 ticks; about 10 minutes for the check and both videos, most of
+  it posing eleven animals and finding their parts in each other 385 times, 82 and 43 s drawing). All checks within
+  0.0001 of a sixteenth of a block.
+- **What they showed:** the rump lioness's hind feet slide 0.24 to 0.27 px a tick for a third of a tick at each bite
+  (clip tick 4 of `bite`: its lunge; about a fifth of a model pixel in all, too small to see; the clip's own, not the
+  placing's). The carcass videos show the scene check's own crowding (BUGS 467) where it happens: red on the carcass
+  between neighbouring feeders, legs and manes in each other; nothing new.
+- **Left:** `--hold` (a catch in the jaws); a hop or leap's own travel (the bullfrog hops on the spot: its plan gives
+  the hop no ground speed); step 3 (62), when the user gives a real animal's video.
 
 ### Part C: living motion (Neon's 63 and 64), measured first
 **What the code says (checked 2026-11-27):** the ants' `BodyTurn`, which Neon's 63 names as its pattern, bends no spine:
@@ -54,7 +182,8 @@ straight blend. Neon's 63 and 64 add live layers on top of the clips (a bend, th
 `accel_stride`). Bending a body live and fixing the feet after is the starting idea that failed twice on the monitor
 (method M1), and three new numbers in every plan pushing on each other is the warning sign "fewer rules" names.
 **My pick (to confirm with step 4's numbers): turns, starts and stops become clips the game picks, as it already picks
-a gait by speed.** One rule grown, no new live layer.
+a gait by speed.** One rule grown, no new live layer. **Neon's way stays beside it as option B** (63 and 64 as Neon
+wrote them, in `docs/plans/motion-studio.md`): the user picks between the two once step 4's numbers and video are in.
 4. **Measure first: the turning bench.** A film bench in phase 2's way (`until <facts> freeze`, one take per moment): a
    lioness and a cow walking a curve, a sharp turn at the trot, a start from standing to the gallop, a stop out of the
    gallop. Read from the recording: how fast they really turn (degrees a tick), how often and how long, and how far
@@ -66,14 +195,20 @@ a gait by speed.** One rule grown, no new live layer.
    motion kit, the spine bent into the curve over planted feet as the monitor's S-curve already is, at the turn rate
    each is made for). The game reads its own turn rate as it reads its speed and changes clip on the matching
    footfall, the gait change that exists; the checker and the pace report read the same rows. Proved on the lioness
-   (the most filmed). Fallback if clips cannot cover the turns step 4 measures: a drawing-only lag of the hips behind
-   the shoulders, said as a live rule and filmed.
+   (the most filmed). **Option B, Neon's 63:** one shared rule in the framework's body code bending each animal's
+   spine, neck and tail chain (from its body plan) into the arc of the turn, eased on `DrawClock` so films and play
+   agree; the feet then checked in the bench for skating (the live bend's risk, M1). Its smallest form: the hips drawn
+   lagging behind the shoulders.
 6. **Starts and stops (64), my pick: clips that carry their own travel.** A `stop` out of the gallop (hind legs brought
    under, head up, a short skid) and a `start` (the first strides from standing), made as the strikes are (their
    travel in the clip with the kit's `travel`, `path_note`, `on_path`; the box follows the clip, `Strikes.Ride`'s way),
    and entered and left through the clip map (a gait gets ways in and out, as a posture has). The buffalo's heavy stop
    and the lion's springy one stay each animal's own clips (the engine's rule 5). Fliers: the eagle's `bank_left`,
    `bank_right` and `land_flare` are clips already, picked the same way once the eagle is in the game (not before).
+   **Option B, Neon's 64:** an optional layer per body plan (limits `stop_pitch`, `turn_lean`, `accel_stride`) adding a
+   small wind-up and settle on quick starts, sudden stops and sharp banked turns, for runners and fliers alike, eased on
+   `DrawClock`, each animal's weight (the heavy buffalo, the springy lion, the banking eagle) from its own plan, no
+   species rules in the code.
 Checks: `clip_check.py` with `--switches`, the bench again (the slide in turns, starts and stops against step 4's
 numbers), the course scenes and the `land` tests the lion and the buffalo touch.
 
@@ -87,7 +222,10 @@ numbers), the course scenes and the `land` tests the lion and the buffalo touch.
   save, the dead buffalo's head 4.5 px over the ground, the calf's mother standing over the carcass through the feast.
 - **BUGS 378** (a calf's feet slide when it runs): the young clips, for the animation rework (phase 2 step 6 made
   their slots).
-- **Phase 4** (the replay key, idea 9, and the motion tests 43 to 46): still on hold.
+- **Phase 4** (the replay key 9, a recording turned into a test 10, the server's ghost 18, the tests 45 and 46; 43 and
+  44 were built in part A): still on hold.
+- **Phase 5, the studio and the user's eye** (new 2026-11-27, Neon's lane): 4, 48, 49, 50, and the overlays 17 and 19
+  on the replay page.
 - **At the end:** reviewers read the phase's code as in phase 2 (at most four, the agent budget), findings checked
   and fixed.
 

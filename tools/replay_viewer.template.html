@@ -263,6 +263,7 @@ function show(t) {
   }
   placeGhosts();
   placePaths();
+  placeMarks();
   drawChartNow();
   info();
   writeState();
@@ -361,23 +362,30 @@ function sceneView() {
 // moment and a turn cropped it: the stage 3 review, 2026-11-27). Over the frames j0..j1 when a tool asks (a strip is
 // fitted to its own moments: one lioness's leap throws a claw 1.7 blocks to her side, and fitted to the whole
 // recording every picture of her walk was small)
+// With a.fitWith (a tool's fit(..., names): an offline pair or scene, tools/clip_video.py) those animals drawn at
+// those moments count too, each measured in the picked animal's frame, so a holder's cameras take in the whole prey.
 function envelopeOf(a, j0 = 0, j1 = a.n - 1) {
-  const key = j0 + '-' + j1;
+  const key = j0 + '-' + j1 + (a.fitWith ? '-' + a.fitWith.map(e => e.name).join('+') : '');
   a.envelopes = a.envelopes || {};
   if (a.envelopes[key]) return a.envelopes[key];
-  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity], M = a.M;
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
   for (let j = j0; j <= j1; j++) {              // (every moment: a leap between two samples was cropped)
     const yaw = a.yaw[j] * Math.PI / 180, fx = -Math.sin(yaw), fz = Math.cos(yaw), lx = Math.cos(yaw), lz = Math.sin(yaw);
-    for (let b = 0; b < a.B; b++) {
-      const o = (j * a.B + b) * 12, s = a.turn[b], v = a.move[b];
-      if (hidden(M, o)) continue;
-      for (const c of a.bones[b].cubes) for (let k = 0; k < 24; k += 3) {
-        const x = c[k], y = c[k + 1], z = c[k + 2];
-        const wx = (M[o] * x + M[o + 1] * y + M[o + 2] * z) * s + M[o + 3] * v;
-        const wy = (M[o + 4] * x + M[o + 5] * y + M[o + 6] * z) * s + M[o + 7] * v;
-        const wz = (M[o + 8] * x + M[o + 9] * y + M[o + 10] * z) * s + M[o + 11] * v;
-        const q = [wx * fx + wz * fz, wx * lx + wz * lz, wy];
-        for (let i = 0; i < 3; i++) { if (q[i] < lo[i]) lo[i] = q[i]; if (q[i] > hi[i]) hi[i] = q[i]; }
+    for (const e of a.fitWith ? [...new Set([a, ...a.fitWith])] : [a]) {
+      const je = e === a ? j : e.frameAt[a.slot[j]];
+      if (je < 0) continue;
+      const M = e.M, d = [0, 1, 2].map(i => e.pos[je][i] - a.pos[j][i]);
+      for (let b = 0; b < e.B; b++) {
+        const o = (je * e.B + b) * 12, s = e.turn[b], v = e.move[b];
+        if (hidden(M, o)) continue;
+        for (const c of e.bones[b].cubes) for (let k = 0; k < 24; k += 3) {
+          const x = c[k], y = c[k + 1], z = c[k + 2];
+          const wx = (M[o] * x + M[o + 1] * y + M[o + 2] * z) * s + M[o + 3] * v + d[0];
+          const wy = (M[o + 4] * x + M[o + 5] * y + M[o + 6] * z) * s + M[o + 7] * v + d[1];
+          const wz = (M[o + 8] * x + M[o + 9] * y + M[o + 10] * z) * s + M[o + 11] * v + d[2];
+          const q = [wx * fx + wz * fz, wx * lx + wz * lz, wy];
+          for (let i = 0; i < 3; i++) { if (q[i] < lo[i]) lo[i] = q[i]; if (q[i] > hi[i]) hi[i] = q[i]; }
+        }
       }
     }
   }
@@ -718,6 +726,26 @@ function placePaths() {
   pathGroup.visible = true;
 }
 
+// --- red marks: the points a recording says are faults at this moment (the Motion Studio, phase 3 part B step 2: an
+// offline clip's parts inside a block, as the checker's strips mark them, tools/clip_video.py; a game film has none)
+const MARKS_MAX = 600;
+const markGeo = new THREE.BufferGeometry();
+markGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MARKS_MAX * 3), 3));
+const markDots = new THREE.Points(markGeo, new THREE.PointsMaterial({color: '#ff1d0d', size: 6, sizeAttenuation: false, depthTest: false}));
+markDots.renderOrder = 21; markDots.frustumCulled = false; markDots.visible = false;
+st.scene.add(markDots);
+function placeMarks() {
+  const pos = markGeo.attributes.position;
+  let n = 0;
+  animals.forEach(a => {
+    if (!a.marks || !a.on || a.now < 0) return;
+    for (const p of a.marks[a.now] || []) if (n < MARKS_MAX) pos.setXYZ(n++, p[0], p[1], p[2]);
+  });
+  markGeo.setDrawRange(0, n);
+  pos.needsUpdate = true;
+  markDots.visible = n > 0;
+}
+
 // --- controls (none answer before the recording is unpacked) ------------------------------------------------------
 const SPEEDS = [[0.1, '1/10'], [0.25, '1/4'], [0.5, '1/2'], [1, '1'], [2, '2']];
 const speedBtns = Viewer.buttons($('speedBtns'), SPEEDS.map(([v, l]) => [v, l + 'x', 'Play at ' + l + ' of the game\'s speed']),
@@ -905,7 +933,9 @@ st.onFrame.push(() => {
   // null when not recorded), feet, drawn step, mind and place
   function aboutAt(a, t) {
     const j = a.frameAt[t];
-    if (j < 0) return {moment: t + 1, index: t, drawn: false, sceneTick: tickAt[t]};
+    // (clock: the scene's clock at t in ticks, which spaces its moments in time; gapBefore: the game ticks not
+    // recorded just before it; tools/replay_video.py times its frames by these)
+    if (j < 0) return {moment: t + 1, index: t, drawn: false, sceneTick: tickAt[t], clock: timeline[t], gapBefore: gapBefore[t]};
     const table = a.clipTable[a.clips[j]], play = a.play[j] || {}, clips = {};
     Object.keys(table).forEach(k => {
       const [name, state] = table[k].split(' '), p = play[k] || [];
@@ -913,12 +943,15 @@ st.onFrame.push(() => {
     });
     const o = DATA.origin || [0, 0, 0];
     return {moment: t + 1, index: t, drawn: true, own: a.slot[j] === t, tick: a.ft[j], sceneTick: tickAt[t],
+            clock: timeline[t], gapBefore: gapBefore[t],
             ticksSince: j > 0 ? a.ft[j] - a.ft[j - 1] : null, clips, feet: feetAt(a, j), step: stepAt(a, j),
             facts: a.facts[j] || {}, place: a.pos[j].map((x, i) => +(x + o[i]).toFixed(3)), yaw: a.yaw[j]};
   }
   const fixedViews = {};                        // a camera's place kept from its first picture (--fixed)
   window.Replay = {
     show: t => { setPlaying(false); show(t); }, pick: n => pick(byName(n)), camera, follow: setFollow, play: setPlaying,
+    // the page's own drawing loop paused (true) or running: a tool taking pictures draws each one itself with snap
+    hold: on => { st.held = !!on; },
     moments: () => timeline.length, ready: true,
     names: () => animals.map(a => a.name),
     cams: () => CAMS.map(([k]) => k),
@@ -939,7 +972,9 @@ st.onFrame.push(() => {
       return {first: a.slot[own[k0]], last: a.slot[own[k1]]};
     },
     // the cameras fitted to the space this animal takes up over moments t0 to t1 (indexes) only, not its whole recording
-    fit: (n, t0, t1) => { const a = byName(n); a.fitRange = [Math.max(0, a.frameAt[t0]), a.frameAt[t1] < 0 ? a.n - 1 : a.frameAt[t1]]; },
+    // (names: the space these animals drawn then take up too, in its frame: an offline pair or scene)
+    fit: (n, t0, t1, names) => { const a = byName(n); a.fitRange = [Math.max(0, a.frameAt[t0]), a.frameAt[t1] < 0 ? a.n - 1 : a.frameAt[t1]];
+                                 const w = (names || []).map(byName).filter(Boolean); a.fitWith = w.length ? w : null; },
     // aboutAt for every moment from t0 to t1 (indexes)
     rows: (n, t0, t1) => { const a = byName(n), out = []; for (let t = t0; t <= t1; t++) out.push(aboutAt(a, t)); return out; },
     // the foot paths and ghosts of the picked animal in the pictures (paths: true/false; ghosts: 0, 4 or 8)
@@ -971,8 +1006,9 @@ st.onFrame.push(() => {
     },
     // the scene from one of the picked animal's cameras, drawn now and read back as a PNG (no labels: they are not
     // drawn on the canvas); fixed: the camera stays where it stood for this camera's first picture, so the animal's
-    // own travel and turns show
-    snap: (cam, fixed) => {
+    // own travel and turns show; jpeg: a JPEG of that quality (0 to 1) in place of the PNG, quicker to read back (the
+    // video's frames)
+    snap: (cam, fixed, jpeg) => {
       if (fixed && fixedViews[cam]) {
         st.camera.position.copy(fixedViews[cam].at); st.controls.target.copy(fixedViews[cam].look); st.controls.update();
       } else {
@@ -981,7 +1017,7 @@ st.onFrame.push(() => {
       }
       sunToView();
       st.renderer.render(st.scene, st.camera);
-      return st.renderer.domElement.toDataURL('image/png');
+      return jpeg ? st.renderer.domElement.toDataURL('image/jpeg', jpeg) : st.renderer.domElement.toDataURL('image/png');
     },
     // the footfall chart of moments t0..t1 as a PNG, 1200 pixels wide
     chart: (t0, t1) => {

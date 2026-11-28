@@ -37,6 +37,8 @@ FLAGS = ["--headless=new", "--use-angle=swiftshader", "--enable-unsafe-swiftshad
          "--hide-scrollbars", "--no-first-run", "--no-default-browser-check", "--disable-extensions",
          "--force-device-scale-factor=1"]
 
+GPU_FLAGS = [f for f in FLAGS if "swiftshader" not in f] + ["--enable-gpu"]
+
 
 _ANSWERS = []
 
@@ -94,9 +96,13 @@ class Browser:
     """One headless browser kept open, driven over its DevTools socket (Python's own socket: nothing to install), so a
     page's every view and score is taken in one launch instead of two launches a picture."""
 
-    def __init__(self, profile, size):
+    def __init__(self, profile, size, gpu=False):
+        # gpu: drawn on the computer's graphics card where it has one (about 20 times quicker than the software
+        # drawing on an RTX 3080, measured 2026-11-27: tools/replay_video.py's many frames), not the software drawing
+        # every check picture is taken with (the same picture on every computer)
         w, h = (int(v) for v in size.split(","))
-        self.proc = subprocess.Popen([str(browser()), *FLAGS, f"--user-data-dir={profile}", "--remote-debugging-port=0",
+        flags = GPU_FLAGS if gpu else FLAGS
+        self.proc = subprocess.Popen([str(browser()), *flags, f"--user-data-dir={profile}", "--remote-debugging-port=0",
                                       f"--window-size={w},{h}", "about:blank"],
                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
