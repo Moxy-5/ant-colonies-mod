@@ -229,6 +229,13 @@ public final class MoundPlan {
         return false;
     }
 
+    /** Tests only: whether this mound's plan is grown and kept now; asks for nothing. */
+    public static boolean isGrownForTests(MoundNumbers numbers, long seed) {
+        synchronized (GROWN) {
+            return GROWN.containsKey(key(numbers, seed));
+        }
+    }
+
     /**
      * The game tests: waits (at most this long) for the mounds being grown in the background. The test server runs its
      * ticks as fast as it can, so a test's 400 ticks can pass in a third of a second, before the second of growing is

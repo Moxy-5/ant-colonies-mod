@@ -60,6 +60,9 @@ final class MoundAwayBuilding implements ColonyHooks.AwayBuilder {
             boolean noSoil = false;
             Set<BlockPos> nestCells = colony.nest().nestCells(level);
             List<Map.Entry<BlockPos, MoundPlan.Part>> parts = new ArrayList<>(mound.getParts(level).entrySet());
+            if (parts.isEmpty()) {
+                return true; // (its plan is still being grown in the background, R5-1: next second)
+            }
             parts.sort(Comparator.comparingInt(entry -> entry.getKey().getY()));
             for (Map.Entry<BlockPos, MoundPlan.Part> entry : parts) {
                 if (!build.timeLeft() || build.secondFull()) {

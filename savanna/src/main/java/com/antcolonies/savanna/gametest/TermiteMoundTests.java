@@ -60,6 +60,39 @@ public class TermiteMoundTests {
      * is slim and becomes a full block when soil is put beside it, and termites pass through it while a player cannot;
      * the pieces dry with age like mound soil.
      */
+    /**
+     * R5-1: a mound whose plan is not kept (a colony far from every player, after a restart) is asked for its stage, its
+     * cells, its foot and its line of the colony list, by the rules of play (the test server else waits for a plan).
+     * None of them grows the plan on the game's own thread (a freeze of one to two seconds a mound), and the stage stays
+     * where it is; the plan comes from the background, and then the cells are there.
+     */
+    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
+    public static void aMoundAskedWithNoPlanKeptNeverGrowsItOnTheGamesOwnThread(GameTestHelper helper) {
+        TermiteScenes.colony(helper, TermiteScenes.spots(2, i -> new BlockPos(MIDDLE - 2 + 4 * i, SURFACE, MIDDLE + 2)), colony -> {
+            helper.assertTrue(colony != null, "no termite colony");
+            net.minecraft.server.level.ServerLevel level = helper.getLevel();
+            com.antcolonies.savanna.colony.Mound mound = colony.part(com.antcolonies.savanna.colony.SavannaParts.MOUND).orElseThrow();
+            mound.setWorkStage(level, 3);
+            long seed = 0x5EED51L ^ level.getGameTime() ^ helper.absolutePos(BlockPos.ZERO).asLong(); // (a mound nobody has grown)
+            mound.playRulesForTests();
+            mound.setSeedForTests(seed);
+            int stage = mound.getStage(level);
+            mound.getParts(level);
+            mound.footReach(level);
+            mound.describe(level);
+            mound.tick(level);
+            com.antcolonies.savanna.colony.Mound.partsOf(colony, level);
+            helper.assertTrue(!com.antcolonies.savanna.colony.MoundPlan.isGrownForTests(mound.numbers(), seed),
+                    "asking the mound grew its plan on the game's own thread");
+            helper.assertTrue(mound.getStage(level) == stage, "the stage moved from " + stage + " to " + mound.getStage(level) + " by being asked");
+            com.antcolonies.savanna.colony.MoundPlan.awaitGrowingForTests(60000);
+            helper.runAfterDelay(2, () -> {
+                helper.assertTrue(!mound.getParts(level).isEmpty(), "the plan grown in the background never reached the mound");
+                helper.succeed();
+            });
+        });
+    }
+
     @GameTest(template = "arena", timeoutTicks = 100)
     public static void cathedralPiecesArePlacedByHand(GameTestHelper helper) {
         ground(helper);

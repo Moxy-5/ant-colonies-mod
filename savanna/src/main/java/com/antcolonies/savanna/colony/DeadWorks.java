@@ -64,7 +64,7 @@ final class DeadWorks {
 
     /** The colony has died out ({@code ColonyNews.COLONY_ENDED}, heard by its galleries): its works go into the dead mound book. */
     static void colonyEnded(ServerLevel level, Colony colony, BlockPos center) {
-        Set<BlockPos> mound = colony.part(SavannaParts.MOUND).map(part -> part.getParts(level).keySet()).orElse(Set.of());
+        Set<BlockPos> mound = colony.part(SavannaParts.MOUND).map(part -> part.partsNow(level).keySet()).orElse(Set.of());
         DeadMounds.get(level).addWorks(level, colony.getId(), center, record(level, colony, mound));
     }
 

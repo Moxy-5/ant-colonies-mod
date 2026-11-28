@@ -359,8 +359,12 @@ public class NewLandMounds extends SavedData {
         int reach = antsNearLiving(level);
         for (Colony other : ColonyManager.get(level).getColonies()) {
             if (other.getSpecies().equals(SavannaSpecies.MACROTERMES)) {
+                double away = sideways(other.getCenter(), center); // (measured first: most colonies are far too far to ask)
+                if (away - MoundPlaces.footReach(TermiteMoundStructure.FULL_STAGE) > reach) {
+                    continue;
+                }
                 int stage = other.part(SavannaParts.MOUND).map(mound -> mound.getStage(level)).orElse(0);
-                if (sideways(other.getCenter(), center) - MoundPlaces.footReach(stage) <= reach) {
+                if (away - MoundPlaces.footReach(stage) <= reach) {
                     return true;
                 }
             }
@@ -506,7 +510,7 @@ public class NewLandMounds extends SavedData {
 
     /** Whatever new land put where the mound goes and is not soil (a fallen branch, a bush) is cleared first. */
     private static void clearForMound(ServerLevel level, Mound mound) {
-        for (BlockPos pos : mound.getParts(level).keySet()) {
+        for (BlockPos pos : mound.partsNow(level).keySet()) {
             BlockState state = level.getBlockState(pos);
             if (!state.isAir() && !state.canBeReplaced() && !state.is(ModTags.DIGGABLE) && !Mound.isMoundBlock(state)
                     && !state.is(Blocks.BEDROCK)) {
@@ -769,7 +773,7 @@ public class NewLandMounds extends SavedData {
         LongOpenHashSet footprint = new LongOpenHashSet();
         int reach = 0;
         if (mound != null) {
-            for (BlockPos part : mound.getParts(level).keySet()) {
+            for (BlockPos part : mound.partsNow(level).keySet()) {
                 footprint.add(BlockPos.asLong(part.getX(), 0, part.getZ()));
                 double dx = part.getX() - center.getX(), dz = part.getZ() - center.getZ();
                 reach = Math.max(reach, (int) Math.ceil(Math.sqrt(dx * dx + dz * dz)));

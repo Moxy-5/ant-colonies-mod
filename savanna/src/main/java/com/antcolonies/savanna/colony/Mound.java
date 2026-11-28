@@ -116,6 +116,7 @@ public class Mound {
     private MoundNumbers shapesFor;
     @Nullable
     private Long seedForTests;
+    private boolean playRulesForTests;
     private int[] wallsAt = new int[0];
     /** The soil counts read from the save (empty in an older one): the stage is known at once, with no mound grown. */
     private int[] savedWalls = new int[0];
@@ -257,8 +258,13 @@ public class Mound {
     }
 
     /** The game test server waits for a mound's shape: its ticks outrun the second of growing (docs/BUGS.md 73). */
-    private static boolean waits(Level level) {
-        return level.getServer() instanceof net.minecraft.gametest.framework.GameTestServer;
+    private boolean waits(Level level) {
+        return !playRulesForTests && level.getServer() instanceof net.minecraft.gametest.framework.GameTestServer;
+    }
+
+    /** Tests only: this mound never waits for its plan, as in play (R5-1's test), though the test server else does. */
+    public void playRulesForTests() {
+        playRulesForTests = true;
     }
 
     /** How many blocks of soil the mound has at stage {@code h}. */
@@ -273,7 +279,8 @@ public class Mound {
 
     /**
      * Every stage of the mound's plan: the one held while a watcher is near ({@link #keepShapes}), else the plan's own
-     * (kept for the last few mounds asked for; grown on the spot, about a second, if it is not).
+     * (kept for the last few mounds asked for; grown on the spot, about a second, if it is not: only the crumbling
+     * asks, right after {@link #getParts} had the plan).
      */
     private List<MoundPlan.Shape> stages(MoundNumbers numbers) {
         return held != null ? held : MoundPlan.growth(numbers, seed());
@@ -336,11 +343,10 @@ public class Mound {
     }
 
     /**
-     * The stage the termites build now. They finish one stage before they start the next, up to the stage the colony
-     * has earned ({@link #getEarnedStage}): the stages are proven buildable one after the other ({@link MoundGrowth}),
-     * not in jumps. If they have built nothing for {@link #STALL_TICKS} (a spot nobody can get to), they move on anyway.
-     * An old save (no stage saved yet) starts at the first stage and climbs. The pieces of earlier stages where the plan has
-     * nothing any more crumble when a new stage begins (see {@link MoundGrowth#crumblesAway}).
+     * The stage the termites build now: only read here, never moved on (R5-1: asking a far mound for its stage grew its
+     * whole plan on the game's own thread, and moved the stage on with nothing built where the land was not loaded).
+     * The stage moves in the two places that build: beside a player once a second ({@link #moveStageOn}), and with the
+     * builder numbers ({@link #nextStage}). An old save (no stage saved yet) starts at the first stage and climbs.
      */
     public int getStage(Level level) {
         MoundNumbers numbers = numbers();
@@ -348,24 +354,53 @@ public class Mound {
             return 0;
         }
         int earned = getEarnedStage(level);
-        long now = level.getGameTime();
         if (workStage <= 0) {
             workStage = 1; // a new colony, or an old save: up from the first stage, one at a time
         }
         workStage = Math.min(workStage, earned);
-        if (lastProgress == Colony.NOT_SET || now - stageCheckedAt > 3L * STAGE_CHECK_TICKS) {
-            lastProgress = now; // just loaded (or the chunk was away): the stall clock starts now
-        }
-        if (workStage < earned && now - stageCheckedAt >= STAGE_CHECK_TICKS) {
-            stageCheckedAt = now;
-            if (now - lastProgress >= STALL_TICKS || isStageDone(level)) {
-                workStage++;
-                lastProgress = now;
-            }
-        } else if (now - stageCheckedAt >= STAGE_CHECK_TICKS) {
-            stageCheckedAt = now;
-        }
         return workStage;
+    }
+
+    /**
+     * Once a second beside a player ({@link #tick}): the termites finish one stage before they start the next, up to
+     * the stage the colony has earned ({@link #getEarnedStage}): the stages are proven buildable one after the other
+     * ({@link MoundGrowth}), not in jumps. If they have built nothing for {@link #STALL_TICKS} (a spot nobody can get
+     * to), they move on anyway. The pieces of earlier stages where the plan has nothing any more crumble when a new
+     * stage begins (see {@link MoundGrowth#crumblesAway}).
+     */
+    private void moveStageOn(Level level) {
+        int earned = getEarnedStage(level);
+        getStage(level);
+        long now = level.getGameTime();
+        if (lastProgress == Colony.NOT_SET || now - stageCheckedAt > 3L * STAGE_CHECK_TICKS) {
+            lastProgress = now; // just loaded (or the colony was away): the stall clock starts now
+        }
+        if (now - stageCheckedAt < STAGE_CHECK_TICKS) {
+            return;
+        }
+        stageCheckedAt = now;
+        if (workStage < earned && stageKnown(level) && (now - lastProgress >= STALL_TICKS || isStageDone(level))) {
+            workStage++;
+            lastProgress = now;
+        }
+    }
+
+    /**
+     * Whether the stage being built can be judged now: its plan is here (not still being grown in the background) and
+     * every cell of it lies in loaded land. Without that nobody may call the stage finished or stalled (R5-1: in land
+     * not loaded every cell was passed over, so the answer was always "finished").
+     */
+    private boolean stageKnown(Level level) {
+        Map<BlockPos, MoundPlan.Part> parts = getParts(level);
+        if (parts.isEmpty() || cachedStage != getStage(level)) {
+            return false;
+        }
+        for (BlockPos pos : parts.keySet()) {
+            if (!LandReady.at(level, pos)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -387,11 +422,12 @@ public class Mound {
     /**
      * The brain, step 2d ({@link BuildLife}): if the stage being built is finished (or {@code stalled}: nothing more of
      * it can be built, see {@link #STALL_TICKS}) and the colony has earned a taller one, the next stage starts now (the
-     * real termites look every few seconds, {@link #getStage}). True if it did.
+     * real termites look every few seconds, {@link #moveStageOn}). True if it did. Never while the stage cannot be judged
+     * ({@link #stageKnown}).
      */
     boolean nextStage(Level level, boolean stalled) {
         int stage = getStage(level);
-        if (stage >= getEarnedStage(level) || !stalled && !isStageDone(level)) {
+        if (stage >= getEarnedStage(level) || !stageKnown(level) || !stalled && !isStageDone(level)) {
             return false;
         }
         workStage = stage + 1;
@@ -439,15 +475,36 @@ public class Mound {
         });
     }
 
-    /** Every cell of the mound at its stage now, in world positions. Empty if the colony builds no mound. */
+    /**
+     * Every cell of the mound at its stage now, in world positions. Empty if the colony builds no mound. Never grows
+     * the plan on the game's own thread (R5-1, a freeze of one to two seconds a mound): while the plan is not here it is
+     * asked for in the background and this answers with what it has, the cells of the stage it last knew or none (the
+     * callers all take "no cells" as "nothing to do yet"). Who must have the cells now asks {@link #partsNow}.
+     */
     public Map<BlockPos, MoundPlan.Part> getParts(Level level) {
+        return parts(level, waits(level));
+    }
+
+    /**
+     * {@link #getParts}, waiting (about a second) for a plan that is not here: only where the answer cannot come later
+     * and happens once (the colony's end, a mound of new land put in, a mound put up at once by a command or a test).
+     */
+    public Map<BlockPos, MoundPlan.Part> partsNow(Level level) {
+        return parts(level, true);
+    }
+
+    private Map<BlockPos, MoundPlan.Part> parts(Level level, boolean wait) {
         MoundNumbers numbers = numbers();
         if (numbers == null) {
             return Map.of();
         }
         int h = getStage(level);
         if (h != cachedStage) {
-            MoundPlan.Shape shape = stage(h, numbers);
+            List<MoundPlan.Shape> stages = held != null ? held : wait ? MoundPlan.growth(numbers, seed()) : MoundPlan.growthSoon(numbers, seed());
+            if (stages == null) {
+                return cachedParts; // (on its way)
+            }
+            MoundPlan.Shape shape = stages.get(Math.max(1, Math.min(h, stages.size() - 1)));
             Map<BlockPos, MoundPlan.Part> parts = new LinkedHashMap<>();
             shape.parts().forEach((offset, part) -> parts.put(center.offset(offset), part));
             cachedParts = parts;
@@ -459,17 +516,26 @@ public class Mound {
     }
 
     /**
-     * Called once a second for the colony (by the queen): the pieces of earlier stages where the stage now being built
-     * has nothing crumble away, once after the stage has changed (see {@link #crumbleLeftovers}).
+     * Called once a second for the colony (by the queen): the plan is held (asked for in the background; nothing is
+     * done while it is on its way), the stage moves on when it is finished ({@link #moveStageOn}), and the pieces of
+     * earlier stages where the stage now being built has nothing crumble away, once after the stage has changed (see
+     * {@link #crumbleLeftovers}).
      */
     public void tick(Level level) {
-        MoundNumbers its = numbers();
-        if (held == null && its != null) {
-            held = MoundPlan.growthSoon(its, seed()); // (the colony is here, its insects real: it holds its plan)
-        }
-        Map<BlockPos, MoundPlan.Part> parts = getParts(level);
         MoundNumbers numbers = numbers();
-        if (crumbleDue && numbers != null && !parts.isEmpty()) {
+        if (numbers == null) {
+            return;
+        }
+        if (held == null) {
+            // (the colony is here, its insects real: it holds its plan)
+            held = waits(level) ? MoundPlan.growth(numbers, seed()) : MoundPlan.growthSoon(numbers, seed());
+            if (held == null) {
+                return;
+            }
+        }
+        moveStageOn(level);
+        Map<BlockPos, MoundPlan.Part> parts = getParts(level);
+        if (crumbleDue && !parts.isEmpty()) {
             crumbleDue = false;
             crumbleLeftovers(level, numbers, cachedStage);
         }
@@ -754,8 +820,7 @@ public class Mound {
      * built for a while (see {@link #FALLBACK_AFTER_TICKS}).
      */
     public boolean mayUseFallbacks(Level level) {
-        getStage(level);
-        return level.getGameTime() - lastProgress >= FALLBACK_AFTER_TICKS;
+        return lastProgress != Colony.NOT_SET && level.getGameTime() - lastProgress >= FALLBACK_AFTER_TICKS;
     }
 
     /**
@@ -931,7 +996,7 @@ public class Mound {
         }
         setWorkStage(level, h);
         cachedStage = 0;
-        Map<BlockPos, MoundPlan.Part> parts = getParts(level);
+        Map<BlockPos, MoundPlan.Part> parts = partsNow(level);
         MoundPlan.Shape shape = cachedShape;
         // Clear what is left of an earlier mound outside the new shape.
         int reach = MoundPlan.REACH + 1;
