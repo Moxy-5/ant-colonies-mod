@@ -64,6 +64,35 @@ public class DryGrassBlock extends BushBlock implements BonemealableBlock {
      */
     static final int DRY_CHANCE = 27;
 
+    /**
+     * How long (ticks, a day and a half: what {@link #DRY_CHANCE} comes to on random ticks) one step of drying takes
+     * for a tuft a colony ate and keeps the time of ({@code BarePatches}; review R5-53: Minecraft gives no random ticks
+     * beside a spectator or far from every player, so eaten grass grew back green and never became food again).
+     */
+    public static final int STEP_TICKS = 36000;
+
+    /**
+     * The tuft standing at {@code pos} (short or tall, both halves) dries one step, if it is one and not dry yet.
+     * Returns how dry it is after, or null if no tuft of dry grass stands there.
+     */
+    @org.jetbrains.annotations.Nullable
+    public static Growth dryOneStep(ServerLevel level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        if (!state.hasProperty(GROWTH) || !(state.getBlock() instanceof DryGrassBlock || state.getBlock() instanceof TallDryGrassBlock)) {
+            return null;
+        }
+        Growth growth = state.getValue(GROWTH);
+        if (growth == Growth.DRY) {
+            return growth;
+        }
+        level.setBlock(pos, state.setValue(GROWTH, growth.next()), 3);
+        BlockState top = level.getBlockState(pos.above());
+        if (state.getBlock() instanceof TallDryGrassBlock && top.is(state.getBlock())) {
+            level.setBlock(pos.above(), top.setValue(GROWTH, growth.next()), 3);
+        }
+        return growth.next();
+    }
+
     private static final VoxelShape SHAPE = Block.box(2.0, 0.0, 2.0, 14.0, 13.0, 14.0);
 
     public DryGrassBlock(Properties properties) {

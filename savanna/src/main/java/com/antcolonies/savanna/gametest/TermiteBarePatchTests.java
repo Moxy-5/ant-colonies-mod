@@ -33,7 +33,9 @@ public class TermiteBarePatchTests {
      * A colony with its nest and foraging holes dug. Three tufts of dry grass: one 2 blocks out from the first hole, one
      * far from every hole, and one that a stone is put on after it is eaten. Each is eaten away (its pieces cut as a
      * forager would). The ground by the hole turns bare (coarse dirt), the far ground stays grass. Then they grow back:
-     * green tufts where the spot is free, the bare ground grass again; none under the stone.
+     * green tufts where the spot is free, the bare ground grass again; none under the stone. And (review R5-53) the
+     * tufts grown back dry step by step by the bare patches' own clock, with no random tick, and once dry the colony
+     * knows of them again.
      */
     @GameTest(template = "arena", timeoutTicks = 2000)
     public static void dryGrassEatenByAHoleLeavesBareGroundAndGrowsBack(GameTestHelper helper) {
@@ -90,6 +92,34 @@ public class TermiteBarePatchTests {
             }
             helper.assertTrue(level.getBlockState(tufts[2]).is(Blocks.STONE), "the stone was replaced");
             helper.assertTrue(colony.part(com.antcolonies.savanna.colony.SavannaParts.BARE_PATCHES).orElseThrow().waiting() == 0, "tufts still waiting: " + colony.part(com.antcolonies.savanna.colony.SavannaParts.BARE_PATCHES).orElseThrow().describe());
+            // Review R5-53: the two tufts are kept until they are food again, and dry by the part's own clock (no
+            // random tick comes here: no player is near, as beside a spectator).
+            var patches = colony.part(com.antcolonies.savanna.colony.SavannaParts.BARE_PATCHES).orElseThrow();
+            helper.assertTrue(patches.drying() == 2, "the 2 tufts grown back should be kept until they are dry: " + patches.describe());
+            helper.assertTrue(!colony.foodMap().isKnown(tufts[1]), "a green tuft is no food yet");
+            patches.growBackSoonForTests(level);
+        });
+        helper.runAfterDelay(800, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            var patches = colony.part(com.antcolonies.savanna.colony.SavannaParts.BARE_PATCHES).orElseThrow();
+            for (int i = 0; i < 2; i++) {
+                helper.assertTrue(level.getBlockState(tufts[i]).is(SavannaBlocks.DRY_GRASS.get())
+                        && level.getBlockState(tufts[i]).getValue(DryGrassBlock.GROWTH) == DryGrassBlock.Growth.DRYING,
+                        "the tuft at " + tufts[i].toShortString() + " did not dry its first step: " + level.getBlockState(tufts[i]));
+            }
+            helper.assertTrue(patches.drying() == 2, "the 2 drying tufts should still be kept: " + patches.describe());
+            patches.growBackSoonForTests(level);
+        });
+        helper.runAfterDelay(1200, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            var patches = colony.part(com.antcolonies.savanna.colony.SavannaParts.BARE_PATCHES).orElseThrow();
+            for (int i = 0; i < 2; i++) {
+                helper.assertTrue(level.getBlockState(tufts[i]).is(SavannaBlocks.DRY_GRASS.get())
+                        && level.getBlockState(tufts[i]).getValue(DryGrassBlock.GROWTH) == DryGrassBlock.Growth.DRY,
+                        "the tuft at " + tufts[i].toShortString() + " is not dry again: " + level.getBlockState(tufts[i]));
+                helper.assertTrue(colony.foodMap().isKnown(tufts[i]), "the colony was not told of the tuft that is food again at " + tufts[i].toShortString());
+            }
+            helper.assertTrue(patches.drying() == 0, "dry tufts should be let go: " + patches.describe());
             helper.succeed();
         });
     }

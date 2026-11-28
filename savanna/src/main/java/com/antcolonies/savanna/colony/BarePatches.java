@@ -10,6 +10,7 @@ import java.util.List;
 
 import com.antcolonies.species.SpeciesProfile;
 
+import com.antcolonies.savanna.block.DryGrassBlock;
 import com.antcolonies.savanna.species.SavannaNumbers;
 
 import net.minecraft.core.BlockPos;
@@ -30,6 +31,13 @@ import net.minecraft.world.phys.AABB;
  * back from its roots, so nothing is stripped for good. Here every tuft the colony eats away is remembered and grows
  * back, green, some days later; one eaten near a hole leaves the grass block under it bare (coarse dirt) until then.
  * Grass never grows back into the nest, a hole or a runway: it waits until the spot is free again.
+ *
+ * <p>The tuft is kept until it is food again (review R5-53): grown back green, it dries a step every
+ * {@link DryGrassBlock#STEP_TICKS} by this part's own clock (game time, as its growing back), and when it is dry the
+ * colony is told of it. Before, the drying hung on Minecraft's random ticks alone, which a chunk gets only while a
+ * player who is not a spectator is within 128 blocks: beside a spectator, and far from every player, eaten grass stayed
+ * green for good. So from eaten to food again is 6 days (3 to grow back, 3 to dry; my pick), whoever watches. Grass
+ * the colony never ate is the world's, and dries on random ticks as before.
  */
 public class BarePatches {
     /** At most this many eaten tufts are remembered (the oldest grow back first anyway). */
@@ -41,8 +49,14 @@ public class BarePatches {
 
     private final Colony colony;
 
-    /** A tuft eaten away at {@code spot}: when it grows back, and whether the ground under it was made bare. */
-    private record Tuft(BlockPos spot, long growsAt, boolean madeBare) {
+    /**
+     * A tuft eaten away at {@code spot}: when it grows back (or, grown back, {@code grown}, dries its next step), and
+     * whether the ground under it was made bare.
+     */
+    private record Tuft(BlockPos spot, long growsAt, boolean madeBare, boolean grown) {
+        Tuft(BlockPos spot, long growsAt, boolean madeBare) {
+            this(spot, growsAt, madeBare, false);
+        }
     }
 
     /** The tufts eaten away and not grown back yet, oldest first. Saved. */
@@ -121,6 +135,10 @@ public class BarePatches {
                 continue;
             }
             it.remove();
+            if (tuft.grown()) {
+                dry(level, tuft, now, later);
+                continue;
+            }
             if (young == null) {
                 unbare(level, tuft);
                 continue;
@@ -135,8 +153,25 @@ public class BarePatches {
                 continue; // something else is there now (a block, water), or the ground is gone: no tuft
             }
             level.setBlock(spot, young, 3);
+            if (young.hasProperty(DryGrassBlock.GROWTH) && young.getValue(DryGrassBlock.GROWTH) != DryGrassBlock.Growth.DRY) {
+                later.add(new Tuft(spot, now + DryGrassBlock.STEP_TICKS, false, true)); // (kept until it is dry: food again)
+            }
         }
         tufts.addAll(later);
+    }
+
+    /**
+     * A tuft grown back dries its next step. Dry (by this step, or by Minecraft's random ticks before it), it is food
+     * again: the colony is told where it stands, as it knew before it ate it. Gone (something broke it), it is forgotten.
+     */
+    private void dry(ServerLevel level, Tuft tuft, long now, List<Tuft> later) {
+        DryGrassBlock.Growth growth = DryGrassBlock.dryOneStep(level, tuft.spot());
+        if (growth == DryGrassBlock.Growth.DRY) {
+            colony.foodMap().learn(tuft.spot());
+            colony.food().rescanPlantsSoon();
+        } else if (growth != null) {
+            later.add(new Tuft(tuft.spot(), now + DryGrassBlock.STEP_TICKS, false, true));
+        }
     }
 
     /** Whether the spot is one of the colony's own: in the nest, over a hole, in a runway, or a termite stands in it. */
@@ -167,12 +202,18 @@ public class BarePatches {
     /** How many eaten tufts are waiting to grow back, and how many of them left bare ground. For the list command and tests. */
     public String describe() {
         long bare = tufts.stream().filter(Tuft::madeBare).count();
-        return tufts.size() + " eaten tufts growing back (" + bare + " on bare ground by the holes)";
+        long drying = tufts.stream().filter(Tuft::grown).count();
+        return (tufts.size() - drying) + " eaten tufts growing back (" + bare + " on bare ground by the holes), " + drying + " grown back and drying";
     }
 
     /** How many eaten tufts are waiting to grow back. For tests. */
     public int waiting() {
-        return tufts.size();
+        return (int) tufts.stream().filter(tuft -> !tuft.grown()).count();
+    }
+
+    /** How many tufts have grown back and are still drying (not food yet). For tests. */
+    public int drying() {
+        return (int) tufts.stream().filter(Tuft::grown).count();
     }
 
     /** Every eaten tuft grows back on the next look (for tests). */
@@ -182,7 +223,7 @@ public class BarePatches {
     }
 
     public void growBackSoonForTests(Level level) {
-        tufts.replaceAll(tuft -> new Tuft(tuft.spot(), level.getGameTime(), tuft.madeBare()));
+        tufts.replaceAll(tuft -> new Tuft(tuft.spot(), level.getGameTime(), tuft.madeBare(), tuft.grown()));
         nextCheck = 0;
     }
 
@@ -198,6 +239,9 @@ public class BarePatches {
             entry.putLong("spot", tuft.spot().asLong());
             entry.putLong("growsAt", tuft.growsAt());
             entry.putBoolean("bare", tuft.madeBare());
+            if (tuft.grown()) {
+                entry.putBoolean("grown", true);
+            }
             list.add(entry);
         }
         tag.put("regrowth", list);
@@ -207,7 +251,7 @@ public class BarePatches {
         tufts.clear();
         for (Tag t : tag.getList("regrowth", Tag.TAG_COMPOUND)) {
             CompoundTag entry = (CompoundTag) t;
-            tufts.add(new Tuft(BlockPos.of(entry.getLong("spot")), entry.getLong("growsAt"), entry.getBoolean("bare")));
+            tufts.add(new Tuft(BlockPos.of(entry.getLong("spot")), entry.getLong("growsAt"), entry.getBoolean("bare"), entry.getBoolean("grown")));
         }
     }
 }
