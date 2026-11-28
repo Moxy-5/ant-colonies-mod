@@ -1,0 +1,14 @@
+Game tests on 4 servers side by side (only: =atermitecolonyawayagesitscombfeedsitsqueenandeatsasnumbers,=thetermitesfeedingunderthemudstandintheirgallerywhenraidersbreakin,=atorchdownthechimneyleavesthematabeleroomsopen,=amatabelecolonyawayeatsitspreyasnumbers); Gradle's output goes to run-test-shards/gradle.log
+test times: 3 passed tests read, 0 new or changed, 523 in test-times.txt
+
+shard 1: all 1 passed
+shard 2: all 1 passed
+shard 3: all 1 passed
+shard 4: all 0 passed
+
+The slowest tests (seconds):
+         5  atermitecolonyawayagesitscombfeedsitsqueenandeatsasnumbers (passed)
+         4  thetermitesfeedingunderthemudstandintheirgallerywhenraidersbreakin (passed)
+         4  atorchdownthechimneyleavesthematabeleroomsopen (passed)
+
+ALL PASSED in 1m 6s

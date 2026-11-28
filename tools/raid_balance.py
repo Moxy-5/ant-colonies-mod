@@ -11,7 +11,7 @@ It is a model, not the game: the ground is flat with a flat chance for slopes an
 place is unless a mound has it, every known piece of dead wood gets its spot nearest first. Run:
 
     python tools/raid_balance.py --blocks      (before 3F: 1 to 3 branches, the nearest unaffordable food blocking)
-    python tools/raid_balance.py --small-share 0 --branches 3 6 --limb-from 0.8 --young-from 0.2         --branch-out 1.0 --open-wood 0.35 --per-workers 14 --old-clear      (3F as built in the game)
+    python tools/raid_balance.py --small-share 0 --branches 3 6 --limb-from 0.8 --young-from 0.2         --branch-out 1.0 --open-wood 0.35 --per-workers 30 --old-clear      (3F as built in the game)
 
 and read the summary: places and mounds per 96 by 96 blocks, the spacing, spots per living colony by size, the
 Matabele share of dead mounds and the nearest spot's spread. Numbers mirror the game files; change them here to try
