@@ -93,6 +93,38 @@ public class TermiteMoundTests {
         });
     }
 
+    /**
+     * R5-3: mound soil sets with nobody near whom Minecraft gives random ticks for (a spectator watching, the colony
+     * left alone). A stage 2 mound with two fresh blocks in it. The mound gives its cells the random ticks of 20 game
+     * days: the first block has set, so termites may build on it. Then the mound was last looked at 30 days ago: on its
+     * next looks the whole mound dries by that time, and the second block has set too.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true)
+    public static void moundSoilSetsWhereMinecraftGivesNoRandomTicks(GameTestHelper helper) {
+        TermiteScenes.colony(helper, TermiteScenes.spots(2, i -> new BlockPos(MIDDLE - 2 + 4 * i, SURFACE, MIDDLE + 2)), colony -> {
+            helper.assertTrue(colony != null, "no termite colony");
+            ServerLevel level = helper.getLevel();
+            com.antcolonies.savanna.colony.Mound mound = colony.part(SavannaParts.MOUND).orElseThrow();
+            mound.buildInstantly(level, 2);
+            java.util.List<BlockPos> walls = mound.getParts(level).entrySet().stream()
+                    .filter(entry -> entry.getValue() == com.antcolonies.savanna.colony.MoundPlan.Part.WALL
+                            && level.getBlockState(entry.getKey()).getBlock() instanceof TermiteMoundBlock)
+                    .map(java.util.Map.Entry::getKey).limit(2).toList();
+            helper.assertTrue(walls.size() == 2, "the stage 2 mound should have two blocks of soil");
+            for (BlockPos wall : walls) {
+                level.setBlock(wall, level.getBlockState(wall).setValue(TermiteMoundBlock.AGE, 0), 3);
+                helper.assertTrue(!TermiteMoundBlock.canBuildOn(level.getBlockState(wall), level, wall), "fresh soil is not to be built on");
+            }
+            mound.dryForTests(level, 480000);
+            helper.assertTrue(TermiteMoundBlock.canBuildOn(level.getBlockState(walls.get(0)), level, walls.get(0)),
+                    "the soil did not set by the mound's own random ticks: " + level.getBlockState(walls.get(0)));
+            level.setBlock(walls.get(1), level.getBlockState(walls.get(1)).setValue(TermiteMoundBlock.AGE, 0), 3);
+            mound.leftAloneForTests(level, 720000);
+            helper.succeedWhen(() -> helper.assertTrue(TermiteMoundBlock.canBuildOn(level.getBlockState(walls.get(1)), level, walls.get(1)),
+                    "the soil of a mound left alone for 30 days did not set: " + level.getBlockState(walls.get(1))));
+        });
+    }
+
     @GameTest(template = "arena", timeoutTicks = 100)
     public static void cathedralPiecesArePlacedByHand(GameTestHelper helper) {
         ground(helper);

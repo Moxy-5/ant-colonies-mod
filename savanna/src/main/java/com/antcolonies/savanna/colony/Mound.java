@@ -101,6 +101,8 @@ public class Mound {
     private final Map<UUID, Claim> buildClaims = new HashMap<>();
     /** The shaping work: tunnels to carve, pieces to reshape or clear (see {@link MoundShaping}). */
     private final MoundShaping shaping = new MoundShaping(this);
+    /** The soil drying where Minecraft gives no random ticks: beside a spectator, after a time away (R5-3). */
+    private final MoundDrying drying;
     /** Spots a termite found no way to from inside, left alone until the game time given (not saved). */
     private final Map<BlockPos, Long> unreachable = new HashMap<>();
     /** Termites on their way to dig soil (not saved). */
@@ -139,6 +141,7 @@ public class Mound {
     Mound(Colony colony) {
         this.colony = colony;
         this.center = colony.getCenter();
+        this.drying = new MoundDrying(this);
     }
 
     /** The shaping work of the plan: tunnels to carve, pieces to reshape or clear away. */
@@ -303,6 +306,19 @@ public class Mound {
         } else if (held == null) {
             held = MoundPlan.growthSoon(numbers, seed());
         }
+        if (held != null) {
+            drying.tick(level, getParts(level)); // (its soil dries by the time it was left alone, before the player is there)
+        }
+    }
+
+    /** Tests only: the mound's soil was last looked at this many ticks ago (it dries by that time on the next look). */
+    public void leftAloneForTests(Level level, long ticks) {
+        drying.last = level.getGameTime() - ticks;
+    }
+
+    /** Tests only: the mound's soil gets the random ticks of this many game ticks now ({@link MoundDrying}). */
+    public void dryForTests(net.minecraft.server.level.ServerLevel level, long ticks) {
+        drying.giveForTests(level, partsNow(level), ticks);
     }
 
     /**
@@ -538,6 +554,9 @@ public class Mound {
         if (crumbleDue && !parts.isEmpty()) {
             crumbleDue = false;
             crumbleLeftovers(level, numbers, cachedStage);
+        }
+        if (level instanceof net.minecraft.server.level.ServerLevel server) {
+            drying.tick(server, parts);
         }
     }
 
@@ -1083,12 +1102,16 @@ public class Mound {
         allowance = 3.5;
         updatedAt = level.getGameTime();
         workStage = 2;
+        drying.last = level.getGameTime() - 7;
     }
 
     void save(CompoundTag tag) {
         tag.putDouble("moundAllowance", allowance);
         tag.putLong("moundUpdated", updatedAt);
         tag.putInt("moundWorkStage", workStage);
+        if (drying.last != Colony.NOT_SET) {
+            tag.putLong("moundDried", drying.last);
+        }
         if (shapesFor != null) {
             tag.putIntArray("moundWalls", wallsAt);
         } else if (savedWalls.length > 0) {
@@ -1103,6 +1126,7 @@ public class Mound {
         allowance = tag.getDouble("moundAllowance");
         updatedAt = tag.contains("moundUpdated") ? tag.getLong("moundUpdated") : Colony.NOT_SET;
         workStage = tag.getInt("moundWorkStage"); // 0 in an old save: climbs up from the first stage
+        drying.last = tag.contains("moundDried") ? tag.getLong("moundDried") : Colony.NOT_SET; // (an old save: from the first look)
         savedWalls = tag.getIntArray("moundWalls"); // (none in an older save: worked out in the background)
         reachAt = tag.getIntArray("moundReach");
     }

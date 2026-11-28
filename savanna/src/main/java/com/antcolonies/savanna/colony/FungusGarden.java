@@ -316,13 +316,24 @@ public class FungusGarden implements NurseFood {
     }
 
     /**
+     * How many comb blocks the garden has as far as the brain knows: those last seen, and at least as many as the layers
+     * it knows of need (R5-2: forage laid while away is comb too; a pair put down and left, with no comb block seen yet,
+     * never grew a nodule away).
+     */
+    int combsKnown() {
+        int layers = freshKnown() + ripeKnown() + oldKnown();
+        return Math.max(seenCombs, (layers + FungusCombBlock.MAX_COMB_LAYERS - 1) / FungusCombBlock.MAX_COMB_LAYERS);
+    }
+
+    /**
      * What the brain knows of the comb's ages: what it saw the last second the garden was loaded, with what the counts
      * have changed since and the blocks have not caught up with ({@link NestLedger}: layers added on top are fresh,
-     * layers taken off the bottom old; layers ripened and gone old).
+     * layers taken off the bottom old; layers ripened and gone old). Every layer put on and every layer taken off
+     * counts, also those that cancel in what the blocks are owed (R5-2).
      */
     public int freshKnown() {
         NestLedger ledger = colony.ledger();
-        return Math.max(0, seenFresh + Math.max(0, ledger.store()) - ledger.ripened());
+        return Math.max(0, seenFresh + ledger.storePutOn() - ledger.ripened());
     }
 
     public int ripeKnown() {
@@ -332,7 +343,7 @@ public class FungusGarden implements NurseFood {
 
     public int oldKnown() {
         NestLedger ledger = colony.ledger();
-        return Math.max(0, seenOld + ledger.aged() + Math.min(0, ledger.store()));
+        return Math.max(0, seenOld + ledger.aged() - ledger.storeTakenOff());
     }
 
     /** The nodules on the comb as far as the brain knows: in the world while the nest is loaded, as last seen while away, with what the ledger still owes the world. */

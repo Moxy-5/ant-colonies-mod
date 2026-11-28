@@ -174,6 +174,45 @@ public class TermiteAwayTests {
      * starved together. Now they are spread over the last meal's length. 120 worker numbers put in at once: about a
      * quarter are due after a quarter of the day, half after half.
      */
+    /**
+     * R5-2: the comb is a conveyor while away too. The brain knows of 4 old layers; the colony eats all 4 and its
+     * foragers bring 6 pieces in. The brain then knows of 6 fresh layers and no old one (before, a piece brought in and
+     * a layer eaten cancelled in the one number owed to the blocks, and only 2 fresh layers were known). And with no
+     * comb block ever seen (a pair put down and left), the pieces laid away are comb all the same: they ripen and a
+     * nodule grows from them.
+     */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void aGardenAwayKnowsEveryPieceBroughtInAsFreshCombThoughAsManyOldLayersAreEaten(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null, "no termite colony");
+            var garden = colony.part(SavannaParts.FUNGUS_GARDEN).orElseThrow();
+            helper.assertTrue(garden.freshKnown() == 0 && garden.ripeKnown() == 0 && garden.oldKnown() == 0, "the new pair should have no comb");
+            var ledger = colony.ledger();
+            ledger.addStore(4);
+            ledger.addRipened(4);
+            ledger.addAged(4);
+            helper.assertTrue(garden.oldKnown() == 4 && garden.freshKnown() == 0, "4 old layers should be known, not " + garden.oldKnown());
+            ledger.addStore(-4); // the workers eat every old layer
+            ledger.addStore(6); // and the foragers bring 6 pieces in
+            helper.assertTrue(garden.freshKnown() == 6 && garden.ripeKnown() == 0 && garden.oldKnown() == 0, "6 fresh layers and nothing else should be known, not "
+                    + garden.freshKnown() + " fresh, " + garden.ripeKnown() + " ripe, " + garden.oldKnown() + " old");
+            helper.assertTrue(colony.away().getFoodOwed() == 6, "the blocks are owed the net, 6 layers, not " + colony.away().getFoodOwed());
+            int grown = garden.getNodulesGrown();
+            garden.setAgeingSpeedForTests(100000.0F);
+            for (int second = 0; second < 20000 && garden.getNodulesGrown() == grown; second++) {
+                for (var work : colony.hooks().all(com.antcolonies.colony.ColonyHooks.AWAY_AFTER_NURSES)) {
+                    work.work(level);
+                }
+            }
+            helper.assertTrue(garden.getNodulesGrown() > grown, "no nodule grew from the pieces laid away (no comb block was ever seen)");
+            helper.succeed();
+        });
+    }
+
     @GameTest(template = "arena", timeoutTicks = 200, skyAccess = true)
     public static void termiteNumbersPutInTogetherAreDueTheirMealsSpreadOverADay(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();

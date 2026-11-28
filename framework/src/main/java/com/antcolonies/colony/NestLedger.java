@@ -32,6 +32,13 @@ public class NestLedger {
     private final Colony colony;
     /** Layers of the food store still to put down (above 0) or take away (below 0). Saved. */
     private int store;
+    /**
+     * Layers both put on and taken off since the blocks last caught up ({@link #apply}): they cancel in {@link #store}
+     * (the blocks are owed only the net), but each was a real layer: one put on top, one taken off the bottom (review
+     * R5-2: with the one net number a fresh piece and an eaten old layer cancelled, so a fungus garden away saw no
+     * fresh comb at all once the colony ate what it brought in). Saved.
+     */
+    private int turnover;
     /** Pieces of the nurses' food still to put down (above 0) or take away (below 0). Saved. */
     private int nurseFood;
     /** Bodies still to lay in the refuse chamber (termites eat theirs). Saved. */
@@ -45,7 +52,22 @@ public class NestLedger {
     }
 
     public void addStore(int layers) {
-        store += layers;
+        for (int i = Math.abs(layers); i > 0; i--) {
+            if (layers > 0 && store < 0 || layers < 0 && store > 0) {
+                turnover++; // (a layer put on meets one taken off)
+            }
+            store += Integer.signum(layers);
+        }
+    }
+
+    /** Every layer put on the store since the blocks last caught up, the ones cancelled by layers taken off too. */
+    public int storePutOn() {
+        return Math.max(0, store) + turnover;
+    }
+
+    /** Every layer taken off the store since the blocks last caught up, the ones cancelled by layers put on too. */
+    public int storeTakenOff() {
+        return Math.max(0, -store) + turnover;
     }
 
     public void addNurseFood(int pieces) {
@@ -99,6 +121,7 @@ public class NestLedger {
      */
     boolean apply(ServerLevel level, List<Vec3> eyes) {
         budget = PER_SECOND;
+        turnover = 0; // (the blocks are looked at again from now: the cancelled pairs never reach them)
         boolean changed = applyBodies(level, eyes);
         // Fungus comb, in the order it happened: layers put on top (fresh), then ripened and gone old, and only then the
         // old layers eaten or crumbled taken off the bottom (most of them went old while away: see docs/BUGS.md 26).
@@ -252,6 +275,7 @@ public class NestLedger {
     void save(CompoundTag tag) {
         CompoundTag ledger = new CompoundTag();
         ledger.putInt("store", store);
+        ledger.putInt("turnover", turnover);
         ledger.putInt("nurseFood", nurseFood);
         ledger.putInt("bodies", bodies);
         ledger.putInt("ripened", ripened);
@@ -262,6 +286,7 @@ public class NestLedger {
     void load(CompoundTag tag) {
         CompoundTag ledger = tag.getCompound("ledger");
         store = ledger.getInt("store");
+        turnover = ledger.getInt("turnover");
         nurseFood = ledger.getInt("nurseFood");
         bodies = ledger.getInt("bodies");
         ripened = ledger.getInt("ripened");

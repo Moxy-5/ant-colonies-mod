@@ -36,7 +36,7 @@ final class GardenAway {
      */
     boolean grow(ServerLevel level) {
         SavannaNumbers.GardenNumbers numbers = colony.profile().section(SavannaNumbers.GARDEN).orElse(null);
-        if (numbers == null || garden.seenCombs() == 0) {
+        if (numbers == null || garden.combsKnown() == 0) {
             return false;
         }
         NestLedger ledger = colony.ledger();
@@ -50,8 +50,8 @@ final class GardenAway {
             changed = true;
         }
         ripening = garden.freshKnown() > 0 ? ripening : 0;
-        int room = garden.seenCombs() * FungusCombBlock.MAX_NODULES - (garden.seenNodules() + ledger.nurseFood());
-        int canGrow = Math.min(garden.seenCombs(), Math.min(garden.ripeKnown(), room));
+        int room = garden.combsKnown() * FungusCombBlock.MAX_NODULES - (garden.seenNodules() + ledger.nurseFood());
+        int canGrow = Math.min(garden.combsKnown(), Math.min(garden.ripeKnown(), room));
         if (canGrow <= 0) {
             noduleGrowth = 0;
         } else {

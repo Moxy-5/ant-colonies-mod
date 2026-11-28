@@ -49,6 +49,23 @@ public final class MoundSoil {
         }
     }
 
+    /**
+     * The soil after this many random ticks at once (a mound not looked at for a while, {@code MoundDrying}): each step
+     * older takes as many random ticks as {@link #age} would have taken, picked by the same chance.
+     */
+    public static BlockState agedBy(BlockState state, double randomTicks, RandomSource random) {
+        int age = state.getValue(AGE);
+        while (age < OLDEST) {
+            double step = Math.max(1, Math.ceil(Math.log(1 - random.nextDouble()) / Math.log(1 - 1.0 / AGE_CHANCE[age])));
+            if (step > randomTicks) {
+                break;
+            }
+            randomTicks -= step;
+            age++;
+        }
+        return age == state.getValue(AGE) ? state : state.setValue(AGE, age);
+    }
+
     /** Breaking speed worked out as for dirt or stone (by age), with the given hardness. */
     public static float destroyProgress(boolean stoneHard, float hardness, Player player, BlockPos pos) {
         BlockState feel = stoneHard ? Blocks.STONE.defaultBlockState() : Blocks.DIRT.defaultBlockState();
